@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section admin-editor-section">
+    <div class="container">
+        <div class="page-head">
+            <div>
+                <span class="eyebrow">Admin</span>
+                <p class="page-text">Changing a saved game recalculates ELO and rating history for all later matches.</p>
+            </div>
+            <div class="page-actions">
+                <a class="button button-secondary" href="/reports">Back to Game Reports</a>
+            </div>
+        </div>
+
+        {% if error_message %}
+        <div class="submit-alert submit-alert-error admin-inline-alert">
+            <strong>Could not save match.</strong>
+            <span>{{ error_message }}</span>
+        </div>
+        {% endif %}
+
+        {% if success_message %}
+        <div class="submit-alert submit-alert-success admin-inline-alert">
+            <strong>{{ success_message }}</strong>
+        </div>
+        {% endif %}
+
+        {% if match %}
+        <div class="leaderboard-shell admin-editor-shell">
+            <form class="admin-form-grid" method="post" action="/admin/matches/{{ match.id }}">
+                <div class="admin-form-two-col">
+                    <div class="toolbar-field">
+                        <label for="player1_name">Player 1</label>
+                        <input id="player1_name" name="player1_name" type="text" value="{{ form_state.player1_name }}" required>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="player2_name">Player 2</label>
+                        <input id="player2_name" name="player2_name" type="text" value="{{ form_state.player2_name }}" required>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="winner_side">Winner</label>
+                        <select id="winner_side" name="winner_side" required>
+                            <option value="player1" {% if form_state.winner_side == 'player1' %}selected{% endif %}>Player 1 wins</option>
+                            <option value="player2" {% if form_state.winner_side == 'player2' %}selected{% endif %}>Player 2 wins</option>
+                        </select>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="played_at">Played at</label>
+                        <input id="played_at" name="played_at" type="datetime-local" value="{{ form_state.played_at }}" required>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="player1_race">Player 1 race</label>
+                        <select id="player1_race" name="player1_race" required>
+                            {% for race in race_options %}
+                            <option value="{{ race }}" {% if form_state.player1_race == race %}selected{% endif %}>{{ race }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="player2_race">Player 2 race</label>
+                        <select id="player2_race" name="player2_race" required>
+                            {% for race in race_options %}
+                            <option value="{{ race }}" {% if form_state.player2_race == race %}selected{% endif %}>{{ race }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="is_ranked">Ranked</label>
+                        <select id="is_ranked" name="is_ranked" required>
+                            <option value="yes" {% if form_state.is_ranked == 'yes' %}selected{% endif %}>Ranked</option>
+                            <option value="no" {% if form_state.is_ranked == 'no' %}selected{% endif %}>Unranked</option>
+                        </select>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="game_type">Game type</label>
+                        <select id="game_type" name="game_type" required>
+                            {% for game_type in game_type_options %}
+                            <option value="{{ game_type }}" {% if form_state.game_type == game_type %}selected{% endif %}>{{ game_type }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="toolbar-field form-section-span-2">
+                        <label for="mission_name">Mission</label>
+                        <select id="mission_name" name="mission_name" required>
+                            <option value="">Choose mission</option>
+                            {% for mission in mission_options %}
+                            <option value="{{ mission }}" {% if form_state.mission_name == mission %}selected{% endif %}>{{ mission }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="toolbar-field form-section-span-2">
+                        <label for="comment">Comment</label>
+                        <textarea id="comment" name="comment" rows="5" placeholder="Optional comment">{{ form_state.comment }}</textarea>
+                    </div>
+                </div>
+
+                <div class="admin-editor-meta">
+                    <div><strong>ID:</strong> {{ match.id }}</div>
+                    <div><strong>Current date:</strong> {{ match.played_at_label }}</div>
+                    <div><strong>Current winner:</strong> {{ match.player1_name if match.winner_side == 'player1' else match.player2_name }}</div>
+                </div>
+
+                <div class="admin-form-actions admin-form-actions-split">
+                    <button class="button button-primary" type="submit" name="action" value="save">Save match</button>
+                    <button class="button button-danger" type="submit" name="action" value="delete" onclick="return confirm('Delete this match and recalculate ELO?');">Delete match</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section submit-section">
+    <div class="container submit-container">
+        <div class="submit-shell">
+            <div class="submit-hero">
+                <span class="eyebrow">Submit Match</span>
+            </div>
+
+            {% if error_message %}
+            <div class="submit-alert submit-alert-error">
+                <strong>Could not save the match.</strong>
+                <span>{{ error_message }}</span>
+            </div>
+            {% endif %}
+
+            {% if success_data %}
+            <div class="submit-alert submit-alert-success">
+                <div class="submit-alert-head">
+                    <strong>Match saved.</strong>
+                    <span>{{ success_data.played_at_label }}</span>
+                </div>
+                <div class="submit-alert-grid">
+                    <div>
+                        <div class="submit-alert-label">Winner</div>
+                        <div class="submit-alert-main">
+                            <a href="{{ success_data.winner_profile_url }}">{{ success_data.winner_name }}</a>
+                            <span>• {{ success_data.winner_race }}</span>
+                        </div>
+                        {% if success_data.winner_created %}
+                        <div class="submit-alert-note">New player created</div>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="submit-alert-label">Loser</div>
+                        <div class="submit-alert-main">
+                            <a href="{{ success_data.opponent_profile_url }}">{{ success_data.opponent_name }}</a>
+                            <span>• {{ success_data.opponent_race }}</span>
+                        </div>
+                        {% if success_data.opponent_created %}
+                        <div class="submit-alert-note">New player created</div>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="submit-alert-label">Mode</div>
+                        <div class="submit-alert-main">
+                            {{ 'Ranked' if success_data.is_ranked else 'Unranked' }}
+                            <span>• {{ success_data.game_type }}</span>
+                        </div>
+                        <div class="submit-alert-note">{{ success_data.mission_name }}</div>
+                    </div>
+                </div>
+                {% if success_data.is_ranked %}
+                <div class="submit-elo-summary">
+                    <div class="submit-elo-pill submit-elo-pill-win">
+                        {{ success_data.winner_name }} {{ success_data.winner_old_elo_display }} → {{ success_data.winner_new_elo_display }}
+                        <span>{{ success_data.winner_delta_display }}</span>
+                    </div>
+                    <div class="submit-elo-pill submit-elo-pill-loss">
+                        {{ success_data.opponent_name }} {{ success_data.opponent_old_elo_display }} → {{ success_data.opponent_new_elo_display }}
+                        <span>{{ success_data.opponent_delta_display }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="submit-alert-note submit-alert-note-standalone">ELO was not changed because this match is unranked.</div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <form class="submit-form" method="post" action="/submit">
+                <div class="submit-form-grid">
+                    <section class="form-section form-section-span-2">
+                        <div class="form-section-head">
+                            <h2>Players</h2>
+                            <p>Choose an existing name or type a new one.</p>
+                        </div>
+                        <div class="form-two-col">
+                            <div class="toolbar-field player-name-field">
+                                <label for="winner_name">Winner name</label>
+                                <input
+                                    id="winner_name"
+                                    name="winner_name"
+                                    type="text"
+                                    list="player-name-suggestions"
+                                    value="{{ form_state.winner_name }}"
+                                    placeholder="Enter winner name"
+                                    autocomplete="off"
+                                    required
+                                    data-player-input
+                                >
+                                <div class="player-status-hint{% if form_state.winner_name and (form_state.winner_name | trim) and (form_state.winner_name | trim | lower) not in (name_suggestions | map('lower') | list) %} is-visible{% endif %}" data-new-player-warning-for="winner_name">
+                                    New player will be created after saving the match.
+                                </div>
+                            </div>
+                            <div class="toolbar-field player-name-field">
+                                <label for="opponent_name">Opponent name</label>
+                                <input
+                                    id="opponent_name"
+                                    name="opponent_name"
+                                    type="text"
+                                    list="player-name-suggestions"
+                                    value="{{ form_state.opponent_name }}"
+                                    placeholder="Enter opponent name"
+                                    autocomplete="off"
+                                    required
+                                    data-player-input
+                                >
+                                <div class="player-status-hint{% if form_state.opponent_name and (form_state.opponent_name | trim) and (form_state.opponent_name | trim | lower) not in (name_suggestions | map('lower') | list) %} is-visible{% endif %}" data-new-player-warning-for="opponent_name">
+                                    New player will be created after saving the match.
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="form-section">
+                        <div class="form-section-head">
+                            <h2>Winner race</h2>
+                            <p>Race is stored with the match.</p>
+                        </div>
+                        <div class="choice-grid choice-grid-race">
+                            {% for race in race_options %}
+                            {% set race_slug = race.slug|lower %}
+                            {% if race_slug == 'terran' or race.label == 'Терран' %}
+                                {% set race_name = 'Terran' %}
+                            {% elif race_slug == 'protoss' or race.label == 'Протосс' %}
+                                {% set race_name = 'Protoss' %}
+                            {% elif race_slug == 'zerg' or race.label == 'Зерг' %}
+                                {% set race_name = 'Zerg' %}
+                            {% else %}
+                                {% set race_name = race.label %}
+                            {% endif %}
+                            <div class="choice-card-wrapper">
+                                <input class="choice-input" type="radio" id="winner_race_{{ race_slug }}" name="winner_race" value="{{ race.label }}" {% if form_state.winner_race == race.label %}checked{% endif %}>
+                                <label class="choice-card choice-card-race choice-card-race-{{ race_slug }}" for="winner_race_{{ race_slug }}">{{ race_name }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="form-section">
+                        <div class="form-section-head">
+                            <h2>Loser race</h2>
+                            <p>Race is stored with the match.</p>
+                        </div>
+                        <div class="choice-grid choice-grid-race">
+                            {% for race in race_options %}
+                            {% set race_slug = race.slug|lower %}
+                            {% if race_slug == 'terran' or race.label == 'Терран' %}
+                                {% set race_name = 'Terran' %}
+                            {% elif race_slug == 'protoss' or race.label == 'Протосс' %}
+                                {% set race_name = 'Protoss' %}
+                            {% elif race_slug == 'zerg' or race.label == 'Зерг' %}
+                                {% set race_name = 'Zerg' %}
+                            {% else %}
+                                {% set race_name = race.label %}
+                            {% endif %}
+                            <div class="choice-card-wrapper">
+                                <input class="choice-input" type="radio" id="opponent_race_{{ race_slug }}" name="opponent_race" value="{{ race.label }}" {% if form_state.opponent_race == race.label %}checked{% endif %}>
+                                <label class="choice-card choice-card-race choice-card-race-{{ race_slug }}" for="opponent_race_{{ race_slug }}">{{ race_name }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="form-section">
+                        <div class="form-section-head">
+                            <h2>Ranked</h2>
+                            <p>Ranked changes ELO. Unranked is saved only in match statistics.</p>
+                        </div>
+                        <div class="choice-grid choice-grid-compact">
+                            <div class="choice-card-wrapper">
+                                <input class="choice-input" type="radio" id="is_ranked_yes" name="is_ranked" value="yes" {% if form_state.is_ranked == 'yes' %}checked{% endif %}>
+                                <label class="choice-card choice-card-mode" for="is_ranked_yes">
+                                    <span>Yes</span>
+                                    <small>ELO changes</small>
+                                </label>
+                            </div>
+                            <div class="choice-card-wrapper">
+                                <input class="choice-input" type="radio" id="is_ranked_no" name="is_ranked" value="no" {% if form_state.is_ranked == 'no' %}checked{% endif %}>
+                                <label class="choice-card choice-card-mode" for="is_ranked_no">
+                                    <span>No</span>
+                                    <small>Stats only</small>
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="form-section">
+                        <div class="form-section-head">
+                            <h2>Game type</h2>
+                            <p>Choose the match format.</p>
+                        </div>
+                        <div class="choice-grid choice-grid-compact">
+                            {% for game_type in game_type_options %}
+                            <div class="choice-card-wrapper">
+                                <input class="choice-input" type="radio" id="game_type_{{ loop.index }}" name="game_type" value="{{ game_type }}" {% if form_state.game_type == game_type %}checked{% endif %}>
+                                <label class="choice-card choice-card-mode" for="game_type_{{ loop.index }}">
+                                    <span>{{ game_type }}</span>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="form-section">
+                        <div class="form-section-head">
+                            <h2>Mission</h2>
+                            <p>Choose a mission from the list.</p>
+                        </div>
+                        <div class="toolbar-field">
+                            <select id="mission_name" name="mission_name" required>
+                                <option value="">Choose mission</option>
+                                {% for mission in mission_options %}
+                                <option value="{{ mission }}" {% if form_state.mission_name == mission %}selected{% endif %}>{{ mission }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </section>
+
+                    <section class="form-section form-section-span-2">
+                        <div class="form-section-head">
+                            <h2>Comment</h2>
+                            <p>Optional notes about the game.</p>
+                        </div>
+                        <div class="toolbar-field">
+                            <textarea id="comment" name="comment" rows="5" placeholder="Add comments about the match">{{ form_state.comment }}</textarea>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="submit-actions">
+                    <button class="button button-primary" type="submit">Save match</button>
+                    <a class="button button-secondary" href="/leaderboard">Open leaderboard</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+<datalist id="player-name-suggestions">
+    {% for player_name in name_suggestions %}
+    <option value="{{ player_name }}"></option>
+    {% endfor %}
+</datalist>
+
+<script>
+(function () {
+    const suggestionOptions = Array.from(document.querySelectorAll('#player-name-suggestions option'));
+    const knownNames = new Set(
+        suggestionOptions
+            .map((option) => (option.value || '').trim().toLowerCase())
+            .filter(Boolean)
+    );
+
+    const inputs = document.querySelectorAll('[data-player-input]');
+
+    function updateWarning(input) {
+        const warning = document.querySelector('[data-new-player-warning-for="' + input.id + '"]');
+        if (!warning) {
+            return;
+        }
+
+        const value = (input.value || '').trim().toLowerCase();
+        const shouldShow = value.length > 0 && !knownNames.has(value);
+        warning.classList.toggle('is-visible', shouldShow);
+    }
+
+    inputs.forEach((input) => {
+        updateWarning(input);
+        input.addEventListener('input', function () {
+            updateWarning(input);
+        });
+        input.addEventListener('change', function () {
+            updateWarning(input);
+        });
+        input.addEventListener('blur', function () {
+            updateWarning(input);
+        });
+    });
+})();
+</script>
+{% endblock %}

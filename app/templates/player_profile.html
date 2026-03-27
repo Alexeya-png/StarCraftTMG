@@ -1,0 +1,599 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section">
+    <div class="container profile-container">
+        {% if db_error %}
+        <div class="state-card state-card-error">
+            <h1>Player profile is unavailable</h1>
+            <p>{{ db_error }}</p>
+            <a class="button button-secondary" href="/leaderboard">Back to leaderboard</a>
+        </div>
+        {% elif not player %}
+        <div class="state-card">
+            <h1>Player not found</h1>
+            <p>This player does not exist or is inactive.</p>
+            <a class="button button-secondary" href="/leaderboard">Back to leaderboard</a>
+        </div>
+        {% else %}
+        {% set race_slug = player.priority_race|lower if player.priority_race else '' %}
+
+        <div class="profile-header-card">
+            <div class="profile-header-top">
+                <a class="button button-secondary profile-back-button" href="/leaderboard">← Back to leaderboard</a>
+            </div>
+
+            <div class="profile-header-main">
+                <div class="profile-identity">
+                    <div class="profile-identity-line">
+                        {% if player.flag_url %}
+                        <img class="country-flag-image profile-flag" src="{{ player.flag_url }}" alt="">
+                        {% endif %}
+                        {% if race_slug in ['terran', 'protoss', 'zerg'] %}
+                        <img class="profile-race-icon" src="/static/Race/{{ race_slug }}.svg" alt="{{ player.priority_race }} icon">
+                        {% endif %}
+                        <h1 class="profile-player-name">{{ player.name }}</h1>
+                    </div>
+                    <p class="profile-subtitle">
+                        Rank #{{ player.rank_position }}
+                        {% if player.country_code %}
+                        • {{ player.country_code|upper }}
+                        {% endif %}
+                        {% if player.priority_race %}
+                        • {{ player.priority_race }}
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="profile-elo-card">
+                    <span class="profile-elo-label">Current ELO</span>
+                    <strong class="profile-elo-value">{{ player.current_elo_display }}</strong>
+                    <span class="profile-last-played">Last played {{ player.last_played_label }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-stats-grid">
+            <article class="profile-stat-card">
+                <span class="profile-stat-label">Matches</span>
+                <strong class="profile-stat-value">{{ player.matches_count }}</strong>
+            </article>
+            <article class="profile-stat-card">
+                <span class="profile-stat-label">Wins</span>
+                <strong class="profile-stat-value">{{ player.wins }}</strong>
+            </article>
+            <article class="profile-stat-card">
+                <span class="profile-stat-label">Losses</span>
+                <strong class="profile-stat-value">{{ player.losses }}</strong>
+            </article>
+            <article class="profile-stat-card">
+                <span class="profile-stat-label">Winrate</span>
+                <strong class="profile-stat-value">{{ player.win_rate_display }}</strong>
+            </article>
+        </div>
+
+        <div class="profile-meta-grid">
+            <article class="profile-meta-card">
+                <span class="profile-meta-label">Discord</span>
+                {% if player.discord_url %}
+                <a class="profile-discord-link" href="{{ player.discord_url }}" target="_blank" rel="noopener noreferrer">
+                    {{ player.discord_url }}
+                </a>
+                {% else %}
+                <span class="profile-meta-empty">Not added yet</span>
+                {% endif %}
+            </article>
+            <article class="profile-meta-card">
+                <span class="profile-meta-label">Member since</span>
+                <strong class="profile-meta-value">{{ player.member_since_label }}</strong>
+            </article>
+        </div>
+
+        <div class="profile-section-card profile-rating-chart-section">
+            <div class="profile-section-head profile-section-head-chart">
+                <div>
+                    <h2>Rating history</h2>
+                </div>
+
+                {% if rating_chart %}
+                <div class="chart-toolbar">
+                    <div class="chart-mode-toggle" data-chart-toggle>
+                        <button type="button" class="chart-mode-button is-active" data-mode="smoothed">Smoothed</button>
+                        <button type="button" class="chart-mode-button" data-mode="raw">Raw</button>
+                    </div>
+                    <button type="button" class="chart-reset-button" data-chart-reset>Reset zoom</button>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if rating_chart %}
+            <div
+                class="profile-chart-shell"
+                data-rating-chart-root
+                data-plot-left="{{ rating_chart.plot_left }}"
+                data-plot-top="{{ rating_chart.plot_top }}"
+                data-plot-width="{{ rating_chart.plot_width }}"
+                data-plot-height="{{ rating_chart.plot_height }}"
+                data-chart-width="{{ rating_chart.width }}"
+                data-chart-height="{{ rating_chart.height }}"
+            >
+                <div class="profile-chart-frame">
+                    <svg class="rating-chart-svg" viewBox="0 0 {{ rating_chart.width }} {{ rating_chart.height }}" role="img" aria-label="Rating history chart" data-chart-svg>
+                        <defs>
+                            <clipPath id="rating-chart-plot-clip">
+                                <rect x="{{ rating_chart.plot_left }}" y="{{ rating_chart.plot_top }}" width="{{ rating_chart.plot_width }}" height="{{ rating_chart.plot_height }}"></rect>
+                            </clipPath>
+                        </defs>
+
+                        {% for tick in rating_chart.y_ticks %}
+                        <line
+                            class="rating-chart-grid-line"
+                            x1="{{ rating_chart.plot_left }}"
+                            y1="{{ tick.y }}"
+                            x2="{{ rating_chart.width - rating_chart.plot_right }}"
+                            y2="{{ tick.y }}"
+                        ></line>
+                        <text class="rating-chart-axis-label" x="10" y="{{ tick.y + 5 }}">{{ tick.label }}</text>
+                        {% endfor %}
+
+                        <g class="rating-chart-x-layer" data-chart-x-layer></g>
+
+                        <g class="rating-chart-plot-layer" data-chart-plot-layer clip-path="url(#rating-chart-plot-clip)">
+                            <polyline class="rating-chart-line rating-chart-line-smoothed is-visible" points="{{ rating_chart.smoothed_points_attr }}"></polyline>
+                            <polyline class="rating-chart-line rating-chart-line-raw" points="{{ rating_chart.raw_points_attr }}"></polyline>
+                        </g>
+
+                        <line class="rating-chart-cursor-line" data-chart-cursor-line x1="{{ rating_chart.plot_left }}" y1="{{ rating_chart.plot_top }}" x2="{{ rating_chart.plot_left }}" y2="{{ rating_chart.height - rating_chart.plot_bottom }}"></line>
+                        <circle class="rating-chart-cursor-dot" data-chart-cursor-dot cx="{{ rating_chart.plot_left }}" cy="{{ rating_chart.plot_top }}" r="5"></circle>
+
+                        <rect
+                            class="rating-chart-brush-overlay"
+                            x="{{ rating_chart.plot_left }}"
+                            y="{{ rating_chart.plot_top }}"
+                            width="{{ rating_chart.plot_width }}"
+                            height="{{ rating_chart.plot_height }}"
+                            data-chart-brush-overlay
+                        ></rect>
+                        <rect
+                            class="rating-chart-brush-selection"
+                            x="{{ rating_chart.plot_left }}"
+                            y="{{ rating_chart.plot_top }}"
+                            width="0"
+                            height="{{ rating_chart.plot_height }}"
+                            data-chart-brush-selection
+                        ></rect>
+                    </svg>
+
+                    <div class="chart-tooltip" data-chart-tooltip hidden>
+                        <div class="chart-tooltip-date" data-chart-tooltip-date></div>
+                        <div class="chart-tooltip-main" data-chart-tooltip-main></div>
+                        <div class="chart-tooltip-sub" data-chart-tooltip-sub></div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="profile-section-card">
+            <div class="profile-section-head">
+                <h2>Recent matches</h2>
+                <p>Latest {{ recent_matches|length }} games with result and rating change.</p>
+            </div>
+
+            {% if recent_matches %}
+            <div class="leaderboard-table-wrap profile-table-wrap">
+                <table class="leaderboard-table leaderboard-table-polished profile-history-table">
+                    <colgroup>
+                        <col style="width: 170px;">
+                        <col style="width: 200px;">
+                        <col style="width: 110px;">
+                        <col style="width: 120px;">
+                        <col style="width: 120px;">
+                        <col style="width: 120px;">
+                        <col style="width: 120px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Opponent</th>
+                            <th>Result</th>
+                            <th>Your race</th>
+                            <th>Enemy race</th>
+                            <th>Delta</th>
+                            <th>ELO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for match in recent_matches %}
+                        {% set player_race_slug = match.player_race|lower if match.player_race else '' %}
+                        {% set opponent_race_slug = match.opponent_race|lower if match.opponent_race else '' %}
+                        <tr>
+                            <td>{{ match.played_at_label }}</td>
+                            <td>
+                                <a class="player-profile-link inline-link" href="{{ match.opponent_profile_url }}">{{ match.opponent_name }}</a>
+                            </td>
+                            <td>
+                                <span class="match-result-badge {% if match.is_win %}match-result-win{% else %}match-result-loss{% endif %}">
+                                    {{ match.result_label }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="profile-race-inline">
+                                    {% if player_race_slug in ['terran', 'protoss', 'zerg'] %}
+                                    <img class="race-inline-icon" src="/static/Race/{{ player_race_slug }}.svg" alt="{{ match.player_race }} icon">
+                                    {% endif %}
+                                    <span>{{ match.player_race or '—' }}</span>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="profile-race-inline">
+                                    {% if opponent_race_slug in ['terran', 'protoss', 'zerg'] %}
+                                    <img class="race-inline-icon" src="/static/Race/{{ opponent_race_slug }}.svg" alt="{{ match.opponent_race }} icon">
+                                    {% endif %}
+                                    <span>{{ match.opponent_race or '—' }}</span>
+                                </span>
+                            </td>
+                            <td class="{% if match.is_win %}delta-win{% else %}delta-loss{% endif %}">{{ match.elo_delta_display }}</td>
+                            <td>{{ match.old_elo_display }} → {{ match.new_elo_display }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="state-card profile-empty-state">
+                <h3>No matches yet</h3>
+                <p>This player has no recorded games.</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+{% if rating_chart %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const chartRoot = document.querySelector('[data-rating-chart-root]');
+    const toggleRoot = document.querySelector('[data-chart-toggle]');
+    const resetButton = document.querySelector('[data-chart-reset]');
+
+    if (!chartRoot) {
+        return;
+    }
+
+    const chartData = {{ rating_chart.hover_points | tojson }};
+    const plotLeft = Number(chartRoot.dataset.plotLeft || 0);
+    const plotTop = Number(chartRoot.dataset.plotTop || 0);
+    const plotWidth = Number(chartRoot.dataset.plotWidth || 0);
+    const plotHeight = Number(chartRoot.dataset.plotHeight || 0);
+    const chartWidth = Number(chartRoot.dataset.chartWidth || 0);
+    const chartHeight = Number(chartRoot.dataset.chartHeight || 0);
+
+    const svg = chartRoot.querySelector('[data-chart-svg]');
+    const xLayer = chartRoot.querySelector('[data-chart-x-layer]');
+    const plotLayer = chartRoot.querySelector('[data-chart-plot-layer]');
+    const overlay = chartRoot.querySelector('[data-chart-brush-overlay]');
+    const selection = chartRoot.querySelector('[data-chart-brush-selection]');
+    const cursorLine = chartRoot.querySelector('[data-chart-cursor-line]');
+    const cursorDot = chartRoot.querySelector('[data-chart-cursor-dot]');
+    const tooltip = chartRoot.querySelector('[data-chart-tooltip]');
+    const tooltipDate = chartRoot.querySelector('[data-chart-tooltip-date]');
+    const tooltipMain = chartRoot.querySelector('[data-chart-tooltip-main]');
+    const tooltipSub = chartRoot.querySelector('[data-chart-tooltip-sub]');
+
+    const rawLine = chartRoot.querySelector('.rating-chart-line-raw');
+    const rawArea = chartRoot.querySelector('.rating-chart-area-raw');
+    const smoothedLine = chartRoot.querySelector('.rating-chart-line-smoothed');
+    const smoothedArea = chartRoot.querySelector('.rating-chart-area-smoothed');
+
+    let currentMode = 'smoothed';
+    let zoomStart = plotLeft;
+    let zoomEnd = plotLeft + plotWidth;
+    let isBrushing = false;
+    let brushStartOriginalX = null;
+
+    const clamp = function (value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    };
+
+    const screenXToChartX = function (clientX) {
+        const rect = svg.getBoundingClientRect();
+        const ratio = rect.width ? (clientX - rect.left) / rect.width : 0;
+        const svgX = ratio * chartWidth;
+        return clamp(svgX, plotLeft, plotLeft + plotWidth);
+    };
+
+    const visibleXToOriginalX = function (visibleX) {
+        const ratio = (visibleX - plotLeft) / plotWidth;
+        return zoomStart + ratio * (zoomEnd - zoomStart);
+    };
+
+    const originalXToVisibleX = function (originalX) {
+        const ratio = (originalX - zoomStart) / (zoomEnd - zoomStart);
+        return plotLeft + ratio * plotWidth;
+    };
+
+
+    const renderDateTicks = function () {
+        if (!xLayer) {
+            return;
+        }
+
+        const visiblePoints = chartData.filter(function (point) {
+            return point.x >= zoomStart && point.x <= zoomEnd;
+        });
+
+        if (!visiblePoints.length) {
+            xLayer.innerHTML = '';
+            return;
+        }
+
+        const maxTicks = Math.min(6, visiblePoints.length);
+        const tickIndexes = Array.from(new Set(Array.from({ length: maxTicks }, function (_, step) {
+            return Math.round(step * (visiblePoints.length - 1) / Math.max(1, maxTicks - 1));
+        })));
+
+        xLayer.innerHTML = tickIndexes.map(function (index) {
+            const point = visiblePoints[index];
+            const visibleX = originalXToVisibleX(point.x);
+            const label = point.date_label || point.played_at_label || '—';
+            return ''
+                + '<line class="rating-chart-date-separator" x1="' + visibleX + '" y1="' + plotTop + '" x2="' + visibleX + '" y2="' + (plotTop + plotHeight) + '"></line>'
+                + '<text class="rating-chart-date-label" x="' + visibleX + '" y="' + (chartHeight - 18) + '" text-anchor="middle">' + label + '</text>';
+        }).join('');
+    };
+
+    const applyZoom = function () {
+        const visibleSpan = Math.max(1, zoomEnd - zoomStart);
+        const scaleX = plotWidth / visibleSpan;
+        const translateX = plotLeft - (zoomStart * scaleX);
+        const transformValue = 'translate(' + translateX + ' 0) scale(' + scaleX + ' 1)';
+
+        if (plotLayer) {
+            plotLayer.setAttribute('transform', transformValue);
+        }
+
+        renderDateTicks();
+    };
+
+    const resetZoom = function () {
+        zoomStart = plotLeft;
+        zoomEnd = plotLeft + plotWidth;
+        if (selection) {
+            selection.classList.remove('is-visible');
+            selection.setAttribute('width', '0');
+        }
+        applyZoom();
+    };
+
+    const setMode = function (mode) {
+        currentMode = mode === 'raw' ? 'raw' : 'smoothed';
+
+        if (smoothedLine) smoothedLine.classList.toggle('is-visible', currentMode === 'smoothed');
+        if (smoothedArea) smoothedArea.classList.toggle('is-visible', currentMode === 'smoothed');
+        if (rawLine) rawLine.classList.toggle('is-visible', currentMode === 'raw');
+        if (rawArea) rawArea.classList.toggle('is-visible', currentMode === 'raw');
+
+        if (toggleRoot) {
+            toggleRoot.querySelectorAll('[data-mode]').forEach(function (button) {
+                button.classList.toggle('is-active', button.dataset.mode === currentMode);
+            });
+        }
+    };
+
+    const findClosestPoint = function (originalX) {
+        if (!chartData.length) {
+            return null;
+        }
+
+        let closest = chartData[0];
+        let minDistance = Math.abs(chartData[0].x - originalX);
+
+        for (let index = 1; index < chartData.length; index += 1) {
+            const point = chartData[index];
+            const distance = Math.abs(point.x - originalX);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closest = point;
+            }
+        }
+
+        return closest;
+    };
+
+    const hideTooltip = function () {
+        if (tooltip) {
+            tooltip.hidden = true;
+        }
+        if (cursorLine) {
+            cursorLine.classList.remove('is-visible');
+        }
+        if (cursorDot) {
+            cursorDot.classList.remove('is-visible');
+        }
+    };
+
+    const showTooltipForPoint = function (point, clientX, clientY) {
+        if (!point || !tooltip) {
+            hideTooltip();
+            return;
+        }
+
+        const visibleX = originalXToVisibleX(point.x);
+        const visibleY = currentMode === 'smoothed' ? point.ema_y : point.raw_y;
+
+        if (cursorLine) {
+            cursorLine.setAttribute('x1', String(visibleX));
+            cursorLine.setAttribute('x2', String(visibleX));
+            cursorLine.classList.add('is-visible');
+        }
+
+        if (cursorDot) {
+            cursorDot.setAttribute('cx', String(visibleX));
+            cursorDot.setAttribute('cy', String(visibleY));
+            cursorDot.classList.add('is-visible');
+        }
+
+        if (tooltipDate) {
+            tooltipDate.textContent = point.played_at_label || 'Match';
+        }
+
+        if (tooltipMain) {
+            tooltipMain.textContent = currentMode === 'smoothed'
+                ? 'EMA ' + point.smoothed_elo + ' ELO'
+                : point.new_elo_display + ' ELO';
+        }
+
+        if (tooltipSub) {
+            tooltipSub.textContent = 'Raw ' + point.new_elo_display + ' · Δ ' + point.elo_delta_display + ' · ' + point.old_elo_display + ' → ' + point.new_elo_display;
+        }
+
+        tooltip.hidden = false;
+
+        const frameRect = chartRoot.querySelector('.profile-chart-frame').getBoundingClientRect();
+        const tooltipWidth = tooltip.offsetWidth || 220;
+        const tooltipHeight = tooltip.offsetHeight || 72;
+
+        let left = clientX - frameRect.left + 16;
+        let top = clientY - frameRect.top - tooltipHeight - 16;
+
+        if (left + tooltipWidth > frameRect.width - 12) {
+            left = frameRect.width - tooltipWidth - 12;
+        }
+
+        if (left < 12) {
+            left = 12;
+        }
+
+        if (top < 12) {
+            top = clientY - frameRect.top + 16;
+        }
+
+        if (top + tooltipHeight > frameRect.height - 12) {
+            top = frameRect.height - tooltipHeight - 12;
+        }
+
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+    };
+
+    if (toggleRoot) {
+        toggleRoot.querySelectorAll('[data-mode]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                setMode(button.dataset.mode);
+            });
+        });
+    }
+
+    if (resetButton) {
+        resetButton.addEventListener('click', function () {
+            resetZoom();
+        });
+    }
+
+    if (overlay) {
+        overlay.addEventListener('mousemove', function (event) {
+            if (isBrushing) {
+                const currentVisibleX = screenXToChartX(event.clientX);
+                const currentOriginalX = visibleXToOriginalX(currentVisibleX);
+                const startVisibleX = originalXToVisibleX(brushStartOriginalX);
+                const endVisibleX = originalXToVisibleX(currentOriginalX);
+                const selectionX = Math.min(startVisibleX, endVisibleX);
+                const selectionWidth = Math.abs(endVisibleX - startVisibleX);
+
+                if (selection) {
+                    selection.setAttribute('x', String(selectionX));
+                    selection.setAttribute('width', String(selectionWidth));
+                    selection.classList.add('is-visible');
+                }
+                return;
+            }
+
+            const visibleX = screenXToChartX(event.clientX);
+            const originalX = visibleXToOriginalX(visibleX);
+            const point = findClosestPoint(originalX);
+            showTooltipForPoint(point, event.clientX, event.clientY);
+        });
+
+        overlay.addEventListener('mouseleave', function () {
+            if (!isBrushing) {
+                hideTooltip();
+            }
+        });
+
+        overlay.addEventListener('mousedown', function (event) {
+            if (event.button !== 0) {
+                return;
+            }
+
+            isBrushing = true;
+            const startVisibleX = screenXToChartX(event.clientX);
+            brushStartOriginalX = visibleXToOriginalX(startVisibleX);
+
+            if (selection) {
+                selection.setAttribute('x', String(startVisibleX));
+                selection.setAttribute('width', '0');
+                selection.classList.add('is-visible');
+            }
+            hideTooltip();
+        });
+
+        overlay.addEventListener('dblclick', function () {
+            resetZoom();
+            hideTooltip();
+        });
+    }
+
+    window.addEventListener('mousemove', function (event) {
+        if (!isBrushing) {
+            return;
+        }
+
+        const currentVisibleX = screenXToChartX(event.clientX);
+        const currentOriginalX = visibleXToOriginalX(currentVisibleX);
+        const startVisibleX = originalXToVisibleX(brushStartOriginalX);
+        const endVisibleX = originalXToVisibleX(currentOriginalX);
+
+        if (selection) {
+            selection.setAttribute('x', String(Math.min(startVisibleX, endVisibleX)));
+            selection.setAttribute('width', String(Math.abs(endVisibleX - startVisibleX)));
+            selection.classList.add('is-visible');
+        }
+    });
+
+    window.addEventListener('mouseup', function (event) {
+        if (!isBrushing) {
+            return;
+        }
+
+        isBrushing = false;
+        const endVisibleX = screenXToChartX(event.clientX);
+        const brushEndOriginalX = visibleXToOriginalX(endVisibleX);
+        const nextStart = Math.min(brushStartOriginalX, brushEndOriginalX);
+        const nextEnd = Math.max(brushStartOriginalX, brushEndOriginalX);
+        const visibleWidth = Math.abs(originalXToVisibleX(nextEnd) - originalXToVisibleX(nextStart));
+
+        if (selection) {
+            selection.classList.remove('is-visible');
+            selection.setAttribute('width', '0');
+        }
+
+        if (visibleWidth >= 18 && nextEnd - nextStart >= 4) {
+            zoomStart = clamp(nextStart, plotLeft, plotLeft + plotWidth - 4);
+            zoomEnd = clamp(nextEnd, plotLeft + 4, plotLeft + plotWidth);
+
+            if (zoomEnd - zoomStart < 4) {
+                zoomEnd = zoomStart + 4;
+            }
+
+            applyZoom();
+        }
+    });
+
+    setMode('smoothed');
+    applyZoom();
+});
+</script>
+{% endif %}
+{% endblock %}

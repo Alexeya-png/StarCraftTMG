@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="{{ url_for('static', path='/logo_small.webp') }}">
+    <title>{{ page_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}?v=20260327-admin-1">
+</head>
+<body>
+    <header class="site-header">
+
+        <div class="container header-inner">
+            <a class="brand-block" href="/">
+    <img class="brand-logo" src="{{ url_for('static', path='/Race/logo.png') }}" alt="Archon Studio logo">
+    <div class="brand-meta">
+        <span class="brand-title">StarCraft ELO</span>
+        <span class="brand-version">Version 0.1</span>
+        <span class="brand-note">Unofficial fan project</span>
+    </div>
+        </a>
+            <nav class="nav">
+                <a class="{% if active_page == 'home' %}is-active{% endif %}" href="/">Home</a>
+                <a class="{% if active_page == 'leaderboard' %}is-active{% endif %}" href="/leaderboard">Ratings</a>
+                <a class="{% if active_page == 'submit' %}is-active{% endif %}" href="/submit">Submit Match</a>
+                <a class="{% if active_page == 'reports' %}is-active{% endif %}" href="/reports">Game Reports</a>
+                <a class="{% if active_page == 'admin' %}is-active{% endif %}" href="/admin">Admin</a>
+            </nav>
+            {% if is_admin %}
+            <div class="admin-header-box">
+                <span class="admin-badge">Admin mode</span>
+                <form method="post" action="/admin/logout">
+                    <button class="button button-secondary button-small" type="submit">Logout</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

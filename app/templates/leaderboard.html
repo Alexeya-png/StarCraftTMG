@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section leaderboard-section leaderboard-compact-section">
+    <div class="container leaderboard-container">
+        <div class="page-head leaderboard-page-head">
+            <div>
+                <p class="page-text leaderboard-page-subtitle">{{ players|length }} players shown</p>
+            </div>
+        </div>
+        <div class="leaderboard-shell leaderboard-shell-polished leaderboard-shell-scrollable">
+            <div class="leaderboard-toolbar leaderboard-toolbar-polished leaderboard-toolbar-top">
+                <form class="leaderboard-filter leaderboard-filter-polished leaderboard-filter-status-form" method="get" action="/leaderboard">
+                    <div class="leaderboard-filter-row leaderboard-filter-row-status">
+                        <div class="leaderboard-status-group" role="group" aria-label="Player status filter">
+                            <label class="leaderboard-status-toggle {% if show_active %}is-active{% endif %}">
+                                <input class="leaderboard-status-input" type="checkbox" name="status" value="active" {% if show_active %}checked{% endif %}>
+                                <span>Active</span>
+                            </label>
+                            <label class="leaderboard-status-toggle {% if show_inactive %}is-active{% endif %}">
+                                <input class="leaderboard-status-input" type="checkbox" name="status" value="inactive" {% if show_inactive %}checked{% endif %}>
+                                <span>Unactive</span>
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            {% if db_error %}
+            <div class="state-card state-card-error leaderboard-state-card">
+                <h2>Database connection error</h2>
+                <p>{{ db_error }}</p>
+            </div>
+            {% elif players %}
+            <div class="leaderboard-table-wrap polished-table-wrap leaderboard-table-wrap-vertical">
+                <table class="leaderboard-table leaderboard-table-sc2 leaderboard-table-polished leaderboard-table-tight">
+                    <colgroup>
+                        <col class="col-rank">
+                        <col class="col-elo">
+                        <col class="col-player">
+                        <col class="col-games-all">
+                        <col class="col-winrate">
+                        <col class="col-wins">
+                        <col class="col-losses">
+                        {% if is_admin %}<col class="col-admin-actions">{% endif %}
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th class="col-rank">Rank</th>
+                            <th class="col-elo">ELO</th>
+                            <th class="col-player">Player</th>
+                            <th class="col-games-all">Games All time</th>
+                            <th class="col-winrate">Winrate</th>
+                            <th class="col-wins col-divider-left">Wins</th>
+                            <th class="col-losses">Losses</th>
+                            {% if is_admin %}<th class="col-admin-actions">Admin</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for player in players %}
+                        {% set race_slug = player.priority_race|lower if player.priority_race else '' %}
+                        <tr class="leaderboard-row-link" data-href="{{ player.profile_url }}" tabindex="0" aria-label="Open {{ player.name }} profile">
+                            <td class="value-rank">{{ player.rank_position }}</td>
+                            <td class="value-elo">{{ player.current_elo_display if player.current_elo_display is defined else player.current_elo }}</td>
+                            <td class="value-player">
+                                <a class="player-profile-link" href="{{ player.profile_url }}">
+                                    <div class="sc2-player-inline polished-player-inline">
+                                        {% if player.flag_url %}
+                                        <img class="country-flag-image player-flag" src="{{ player.flag_url }}" alt="">
+                                        {% endif %}
+                                        {% if race_slug in ['terran', 'protoss', 'zerg'] %}
+                                        <img class="race-inline-icon" src="/static/Race/{{ race_slug }}.svg" alt="{{ player.priority_race }} icon">
+                                        {% endif %}
+                                        <span class="player-name sc2-player-name">{{ player.name }}</span>
+                                    </div>
+                                </a>
+                            </td>
+                            <td class="value-games-all">{{ player.matches_count }}</td>
+                            <td class="value-winrate">{{ player.win_rate_display if player.win_rate_display is defined else player.win_rate }}</td>
+                            <td class="value-wins col-divider-left">{{ player.wins }}</td>
+                            <td class="value-losses">{{ player.losses }}</td>
+                            {% if is_admin %}
+                            <td class="value-admin-action">
+                                <a class="admin-action-link" href="/admin/players/{{ player.id }}">Edit</a>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="state-card leaderboard-state-card">
+                <h2>No players found</h2>
+                <p>The current Active and Unactive filter returned nothing.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.body.classList.add('page-leaderboard-scroll-lock');
+
+        const rows = document.querySelectorAll('.leaderboard-row-link');
+        const statusInputs = document.querySelectorAll('.leaderboard-status-input');
+        const filterForm = document.querySelector('.leaderboard-filter-status-form');
+
+        rows.forEach(function (row) {
+            const href = row.dataset.href;
+            if (!href) {
+                return;
+            }
+
+            row.addEventListener('click', function (event) {
+                if (event.target.closest('a')) {
+                    return;
+                }
+                window.location.href = href;
+            });
+
+            row.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    window.location.href = href;
+                }
+            });
+        });
+
+        statusInputs.forEach(function (input) {
+            input.addEventListener('change', function () {
+                const checked = Array.from(statusInputs).filter(function (item) {
+                    return item.checked;
+                });
+
+                if (checked.length === 0) {
+                    const activeInput = document.querySelector('.leaderboard-status-input[value="active"]');
+                    if (activeInput) {
+                        activeInput.checked = true;
+                    }
+                }
+
+                if (filterForm) {
+                    filterForm.submit();
+                }
+            });
+        });
+
+        window.addEventListener('beforeunload', function () {
+            document.body.classList.remove('page-leaderboard-scroll-lock');
+        });
+    });
+</script>
+{% endblock %}

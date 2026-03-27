@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section admin-dashboard-section">
+    <div class="container">
+        <div class="page-head">
+            <div>
+                <span class="eyebrow">Admin</span>
+                <h1 class="page-title">Control panel</h1>
+                <p class="page-text">Hidden edit actions are now visible in Rating and Game Reports.</p>
+            </div>
+        </div>
+
+        <div class="cards-grid admin-dashboard-grid">
+            <article class="card">
+                <h3>Rating</h3>
+                <p>Open the leaderboard and use the Edit button near each player name.</p>
+                <a class="button button-secondary" href="/leaderboard">Open Rating</a>
+            </article>
+            <article class="card">
+                <h3>Game Reports</h3>
+                <p>Open the reports table and use the Edit button near every saved game.</p>
+                <a class="button button-secondary" href="/reports">Open Game Reports</a>
+            </article>
+        </div>
+    </div>
+</section>
+{% endblock %}

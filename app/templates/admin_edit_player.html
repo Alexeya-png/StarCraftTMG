@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section admin-editor-section">
+    <div class="container">
+        <div class="page-head">
+            <div>
+                <span class="eyebrow">Admin</span>
+            </div>
+            <div class="page-actions">
+                <a class="button button-secondary" href="/leaderboard">Back to Rating</a>
+                {% if player %}
+                <a class="button button-secondary" href="{{ player.profile_url }}">Open profile</a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if error_message %}
+        <div class="submit-alert submit-alert-error admin-inline-alert">
+            <strong>Could not save player.</strong>
+            <span>{{ error_message }}</span>
+        </div>
+        {% endif %}
+
+        {% if success_message %}
+        <div class="submit-alert submit-alert-success admin-inline-alert">
+            <strong>{{ success_message }}</strong>
+        </div>
+        {% endif %}
+
+        {% if player %}
+        <div class="leaderboard-shell admin-editor-shell">
+            <form class="admin-form-grid" method="post" action="/admin/players/{{ player.id }}">
+                <div class="admin-form-two-col">
+                    <div class="toolbar-field">
+                        <label for="player_name">Player name</label>
+                        <input id="player_name" name="name" type="text" value="{{ form_state.name }}" required>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="player_current_elo">Current ELO</label>
+                        <input id="player_current_elo" name="current_elo" type="number" min="0" step="1" value="{{ form_state.current_elo }}" required>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="player_country_code">Country code</label>
+                        <input id="player_country_code" name="country_code" type="text" value="{{ form_state.country_code }}" placeholder="pl, ua, us">
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="player_country_name">Country name</label>
+                        <input id="player_country_name" name="country_name" type="text" value="{{ form_state.country_name }}" placeholder="Poland">
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="player_discord_url">Discord or link</label>
+                        <input id="player_discord_url" name="discord_url" type="text" value="{{ form_state.discord_url }}" placeholder="discord.gg/... or https://...">
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="player_priority_race">Priority race</label>
+                        <select id="player_priority_race" name="priority_race">
+                            <option value="">Not set</option>
+                            {% for race in race_options %}
+                            <option value="{{ race }}" {% if form_state.priority_race == race %}selected{% endif %}>{{ race }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <label class="admin-checkbox-row">
+                    <input type="checkbox" name="is_active" {% if form_state.is_active == 'on' %}checked{% endif %}>
+                    <span>Player is active and visible in Rating</span>
+                </label>
+
+                <div class="admin-editor-meta">
+                    <div><strong>ID:</strong> {{ player.id }}</div>
+                    <div><strong>Matches:</strong> {{ player.matches_count }}</div>
+                    <div><strong>Wins:</strong> {{ player.wins }}</div>
+                    <div><strong>Losses:</strong> {{ player.losses }}</div>
+                    <div><strong>Created:</strong> {{ player.created_at_label }}</div>
+                </div>
+
+                <div class="admin-form-actions">
+                    <button class="button button-primary" type="submit">Save player</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section admin-auth-section">
+    <div class="container admin-auth-container">
+        <div class="admin-auth-card">
+            <span class="eyebrow">Admin</span>
+            {% if login_error %}
+            <div class="submit-alert submit-alert-error admin-inline-alert">
+                <strong>Access denied.</strong>
+                <span>{{ login_error }}</span>
+            </div>
+            {% endif %}
+
+            <form class="admin-form-grid" method="post" action="/admin/login">
+                <div class="toolbar-field">
+                    <label for="admin_login">Login</label>
+                    <input id="admin_login" name="login" type="text" value="{{ admin_login_default }}" autocomplete="username" required>
+                </div>
+                <div class="toolbar-field">
+                    <label for="admin_password">Password</label>
+                    <input id="admin_password" name="password" type="password" value="" autocomplete="current-password" required>
+                </div>
+                <div class="admin-form-actions">
+                    <button class="button button-primary" type="submit">Enter admin mode</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}
