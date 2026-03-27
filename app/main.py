@@ -5,17 +5,12 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import parse_qs
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from flask import Flask, jsonify, make_response, redirect, render_template, request
 
 from app.database import (
     delete_match_admin,
-    fetch_game_reports,
     fetch_game_reports_page,
     fetch_leaderboard,
     fetch_match_admin,
@@ -24,6 +19,7 @@ from app.database import (
     fetch_player_name_suggestions,
     fetch_player_profile,
     ping_database,
+    warmup_application_cache,
     submit_match_result,
     update_match_admin,
     update_player_admin,
@@ -34,10 +30,12 @@ PROJECT_ROOT = BASE_DIR.parent
 
 load_dotenv(PROJECT_ROOT / '.env')
 
-app = FastAPI(title='StarCraft ELO', version='0.1.0')
-
-app.mount('/static', StaticFiles(directory=BASE_DIR / 'static'), name='static')
-templates = Jinja2Templates(directory=str(BASE_DIR / 'templates'))
+app = Flask(
+    __name__,
+    template_folder=str(BASE_DIR / 'templates'),
+    static_folder=str(BASE_DIR / 'static'),
+    static_url_path='/static',
+)
 
 RACE_OPTIONS = [
     {'label': 'Терран', 'slug': 'terran'},
@@ -59,12 +57,41 @@ DEFAULT_MISSION_OPTIONS = [
 
 ADMIN_COOKIE_NAME = 'starcraft_admin_session'
 ADMIN_SESSION_HOURS = 12
-
 SUBMIT_NAME_SUGGESTION_LIMIT = int(os.getenv('SUBMIT_NAME_SUGGESTION_LIMIT', '200') or '200')
 
 
-def _apply_fast_page_headers(response):
-    response.headers['Cache-Control'] = 'private, max-age=5'
+def _should_force_refresh_cache() -> bool:
+    if request.args.get('refresh') == '1':
+        return True
+
+    cache_control = (request.headers.get('Cache-Control') or '').lower()
+    pragma = (request.headers.get('Pragma') or '').lower()
+    return 'no-cache' in cache_control or 'max-age=0' in cache_control or 'no-cache' in pragma
+
+
+@app.before_request
+def preload_application_data():
+    if request.method != 'GET':
+        return None
+    if request.path.startswith('/static'):
+        return None
+
+    try:
+        warmup_application_cache(force_refresh=_should_force_refresh_cache())
+    except Exception:
+        return None
+    return None
+
+
+@app.after_request
+def apply_fast_page_headers(response):
+    if request.path.startswith('/static'):
+        response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
+        return response
+
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
     response.headers['Vary'] = 'Cookie'
     return response
 
@@ -73,8 +100,10 @@ def _get_admin_login() -> str:
     return (os.getenv('ADMIN_LOGIN') or os.getenv('ADMIN_USERNAME') or 'admin').strip() or 'admin'
 
 
+
 def _get_admin_password() -> str:
     return (os.getenv('ADMIN_PASSWORD') or 'admin').strip() or 'admin'
+
 
 
 def _get_admin_secret() -> str:
@@ -87,13 +116,16 @@ def _get_admin_secret() -> str:
     return secret.strip() or 'starcraft-local-admin-secret'
 
 
+
 def _b64encode(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode('utf-8').rstrip('=')
+
 
 
 def _b64decode(value: str) -> bytes:
     padding = '=' * (-len(value) % 4)
     return base64.urlsafe_b64decode(value + padding)
+
 
 
 def _build_admin_cookie(login: str) -> str:
@@ -103,6 +135,7 @@ def _build_admin_cookie(login: str) -> str:
     payload_part = _b64encode(payload_bytes)
     signature = hmac.new(_get_admin_secret().encode('utf-8'), payload_part.encode('utf-8'), hashlib.sha256).hexdigest()
     return f'{payload_part}.{signature}'
+
 
 
 def _read_admin_cookie(token: str | None) -> dict | None:
@@ -131,24 +164,27 @@ def _read_admin_cookie(token: str | None) -> dict | None:
     return payload
 
 
-def _is_admin(request: Request) -> bool:
+
+def _is_admin() -> bool:
     payload = _read_admin_cookie(request.cookies.get(ADMIN_COOKIE_NAME))
     if not payload:
         return False
     return payload.get('login') == _get_admin_login()
 
 
-def _base_context(request: Request, page_title: str, active_page: str) -> dict:
+
+def _base_context(page_title: str, active_page: str) -> dict:
     return {
-        'request': request,
         'page_title': page_title,
         'active_page': active_page,
-        'is_admin': _is_admin(request),
+        'is_admin': _is_admin(),
     }
 
 
-def _redirect_to_admin_login() -> RedirectResponse:
-    return RedirectResponse('/admin', status_code=303)
+
+def _redirect_to_admin_login():
+    return redirect('/admin', code=303)
+
 
 
 def _merge_mission_options() -> list[str]:
@@ -157,12 +193,13 @@ def _merge_mission_options() -> list[str]:
     except Exception:
         db_values = []
 
-    merged = []
+    merged: list[str] = []
     for value in DEFAULT_MISSION_OPTIONS + db_values:
         clean_value = str(value).strip()
         if clean_value and clean_value not in merged:
             merged.append(clean_value)
     return merged
+
 
 
 def _build_submit_form_state(raw_values: dict | None = None) -> dict:
@@ -179,27 +216,21 @@ def _build_submit_form_state(raw_values: dict | None = None) -> dict:
     }
 
 
-def _parse_form(request_body: bytes) -> dict[str, str]:
-    raw_body = request_body.decode('utf-8')
-    parsed_body = parse_qs(raw_body, keep_blank_values=True)
-    return {key: values[-1] if values else '' for key, values in parsed_body.items()}
-
 
 def _render_submit_page(
-    request: Request,
     *,
     form_state: dict | None = None,
     error_message: str | None = None,
     success_data: dict | None = None,
     status_code: int = 200,
 ):
-    name_suggestions = []
+    name_suggestions: list[str] = []
     try:
         name_suggestions = fetch_player_name_suggestions(limit=SUBMIT_NAME_SUGGESTION_LIMIT)
     except Exception:
         name_suggestions = []
 
-    context = _base_context(request, 'Submit Match', 'submit')
+    context = _base_context('Submit Match', 'submit')
     context.update(
         {
             'race_options': RACE_OPTIONS,
@@ -211,8 +242,8 @@ def _render_submit_page(
             'success_data': success_data,
         }
     )
+    return make_response(render_template('submit_match.html', **context), status_code)
 
-    return _apply_fast_page_headers(templates.TemplateResponse('submit_match.html', context, status_code=status_code))
 
 
 def _build_admin_player_form_state(player: dict | None = None, source: dict | None = None) -> dict:
@@ -227,6 +258,7 @@ def _build_admin_player_form_state(player: dict | None = None, source: dict | No
         'current_elo': str(source.get('current_elo', player.get('current_elo_input', 1000))).strip(),
         'is_active': str(source.get('is_active', 'on' if player.get('is_active', True) else '')).strip(),
     }
+
 
 
 def _build_admin_match_form_state(match: dict | None = None, source: dict | None = None) -> dict:
@@ -246,6 +278,7 @@ def _build_admin_match_form_state(match: dict | None = None, source: dict | None
     }
 
 
+
 def _parse_admin_datetime(value: str) -> datetime:
     clean_value = str(value or '').strip()
     if not clean_value:
@@ -260,26 +293,38 @@ def _parse_admin_datetime(value: str) -> datetime:
     raise ValueError('Use date format YYYY-MM-DDTHH:MM.')
 
 
-@app.get('/', response_class=HTMLResponse)
-async def home(request: Request):
-    context = _base_context(request, 'StarCraft ELO', 'home')
-    return _apply_fast_page_headers(templates.TemplateResponse('home.html', context))
+
+def _pagination_numbers(current_page: int, total_pages: int) -> list[int | str]:
+    if total_pages <= 7:
+        return list(range(1, total_pages + 1))
+    if current_page <= 4:
+        return [1, 2, 3, 4, '...', total_pages]
+    if current_page >= total_pages - 3:
+        return [1, '...', total_pages - 3, total_pages - 2, total_pages - 1, total_pages]
+    return [1, '...', current_page - 1, current_page, current_page + 1, '...', total_pages]
 
 
-@app.get('/health')
-async def health():
+@app.route('/')
+def home():
+    context = _base_context('StarCraft ELO', 'home')
+    return render_template('home.html', **context)
+
+
+@app.route('/health')
+def health():
     ok, error = ping_database()
-    return {'status': 'ok' if ok else 'error', 'database_error': error}
+    return jsonify({'status': 'ok' if ok else 'error', 'database_error': error})
 
 
-@app.get('/leaderboard', response_class=HTMLResponse)
-async def leaderboard(request: Request, search: str = ''):
+@app.route('/leaderboard')
+def leaderboard():
     db_error = None
     players = []
+    search = request.args.get('search', '')
 
     selected_statuses = {
         value.strip().lower()
-        for value in request.query_params.getlist('status')
+        for value in request.args.getlist('status')
         if value and value.strip()
     }
     if not selected_statuses:
@@ -297,7 +342,7 @@ async def leaderboard(request: Request, search: str = ''):
     except Exception as exc:
         db_error = str(exc)
 
-    context = _base_context(request, 'Global Rating', 'leaderboard')
+    context = _base_context('Global Rating', 'leaderboard')
     context.update(
         {
             'players': players,
@@ -307,39 +352,32 @@ async def leaderboard(request: Request, search: str = ''):
             'db_error': db_error,
         }
     )
-    return _apply_fast_page_headers(templates.TemplateResponse('leaderboard.html', context))
+    return render_template('leaderboard.html', **context)
 
 
-@app.get('/reports', response_class=HTMLResponse)
-@app.get('/players', response_class=HTMLResponse)
-async def game_reports(request: Request, search: str = '', page: int = 1, per_page: int = 100):
+@app.route('/reports')
+@app.route('/players')
+def game_reports():
     db_error = None
     matches = []
     total_matches = 0
-    current_page = 1
+    current_page = max(1, request.args.get('page', 1, type=int) or 1)
+    per_page = max(1, request.args.get('per_page', 100, type=int) or 100)
+    search = request.args.get('search', '')
     total_pages = 1
-    pagination_numbers = []
+    pagination_numbers: list[int | str] = []
 
     try:
-        page_data = fetch_game_reports_page(search=search, page=page, per_page=per_page)
+        page_data = fetch_game_reports_page(search=search, page=current_page, per_page=per_page)
         matches = page_data['items']
         total_matches = page_data['total_count']
         current_page = page_data['page']
         total_pages = page_data['total_pages']
-
-        if total_pages <= 7:
-            pagination_numbers = list(range(1, total_pages + 1))
-        else:
-            if current_page <= 4:
-                pagination_numbers = [1, 2, 3, 4, '...', total_pages]
-            elif current_page >= total_pages - 3:
-                pagination_numbers = [1, '...', total_pages - 3, total_pages - 2, total_pages - 1, total_pages]
-            else:
-                pagination_numbers = [1, '...', current_page - 1, current_page, current_page + 1, '...', total_pages]
+        pagination_numbers = _pagination_numbers(current_page, total_pages)
     except Exception as exc:
         db_error = str(exc)
 
-    context = _base_context(request, 'Game Reports', 'reports')
+    context = _base_context('Game Reports', 'reports')
     context.update(
         {
             'matches': matches,
@@ -352,11 +390,11 @@ async def game_reports(request: Request, search: str = '', page: int = 1, per_pa
             'pagination_numbers': pagination_numbers,
         }
     )
-    return _apply_fast_page_headers(templates.TemplateResponse('game_reports.html', context))
+    return render_template('game_reports.html', **context)
 
 
-@app.get('/players/{player_id}', response_class=HTMLResponse)
-async def player_profile(request: Request, player_id: int):
+@app.route('/players/<int:player_id>')
+def player_profile(player_id: int):
     db_error = None
     profile = None
 
@@ -366,16 +404,16 @@ async def player_profile(request: Request, player_id: int):
         db_error = str(exc)
 
     if db_error:
-        context = _base_context(request, 'Player Profile', 'players')
+        context = _base_context('Player Profile', 'players')
         context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'db_error': db_error})
-        return _apply_fast_page_headers(templates.TemplateResponse('player_profile.html', context, status_code=500))
+        return make_response(render_template('player_profile.html', **context), 500)
 
     if not profile:
-        context = _base_context(request, 'Player Not Found', 'players')
+        context = _base_context('Player Not Found', 'players')
         context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'db_error': None})
-        return _apply_fast_page_headers(templates.TemplateResponse('player_profile.html', context, status_code=404))
+        return make_response(render_template('player_profile.html', **context), 404)
 
-    context = _base_context(request, f"{profile['player']['name']} – Player Profile", 'players')
+    context = _base_context(f"{profile['player']['name']} – Player Profile", 'players')
     context.update(
         {
             'player': profile['player'],
@@ -384,17 +422,17 @@ async def player_profile(request: Request, player_id: int):
             'db_error': None,
         }
     )
-    return _apply_fast_page_headers(templates.TemplateResponse('player_profile.html', context))
+    return render_template('player_profile.html', **context)
 
 
-@app.get('/submit', response_class=HTMLResponse)
-async def submit_result(request: Request):
-    return _apply_fast_page_headers(_render_submit_page(request))
+@app.route('/submit', methods=['GET'])
+def submit_result():
+    return _render_submit_page()
 
 
-@app.post('/submit', response_class=HTMLResponse)
-async def submit_result_post(request: Request):
-    form_state = _parse_form(await request.body())
+@app.route('/submit', methods=['POST'])
+def submit_result_post():
+    form_state = {key: value for key, value in request.form.items()}
 
     try:
         success_data = submit_match_result(
@@ -408,90 +446,87 @@ async def submit_result_post(request: Request):
             comment=form_state.get('comment', ''),
         )
     except Exception as exc:
-        return _render_submit_page(request, form_state=form_state, error_message=str(exc), status_code=400)
+        return _render_submit_page(form_state=form_state, error_message=str(exc), status_code=400)
 
-    return _apply_fast_page_headers(_render_submit_page(request, form_state=None, success_data=success_data, status_code=200))
+    return _render_submit_page(form_state=None, success_data=success_data, status_code=200)
 
 
-@app.get('/admin', response_class=HTMLResponse)
-async def admin(request: Request):
-    context = _base_context(request, 'Admin Panel', 'admin')
-    context.update(
-        {
-            'login_error': None,
-            'admin_login_default': _get_admin_login(),
-        }
-    )
+@app.route('/admin', methods=['GET'])
+def admin():
+    context = _base_context('Admin Panel', 'admin')
+    context.update({'login_error': None, 'admin_login_default': _get_admin_login()})
     template_name = 'admin_dashboard.html' if context['is_admin'] else 'admin_login.html'
-    return _apply_fast_page_headers(templates.TemplateResponse(template_name, context))
+    return render_template(template_name, **context)
 
 
-@app.post('/admin/login')
-async def admin_login(request: Request):
-    form_state = _parse_form(await request.body())
-    login = str(form_state.get('login', '')).strip()
-    password = str(form_state.get('password', '')).strip()
+@app.route('/admin/login', methods=['POST'])
+def admin_login():
+    login = str(request.form.get('login', '')).strip()
+    password = str(request.form.get('password', '')).strip()
 
     if login != _get_admin_login() or password != _get_admin_password():
-        context = _base_context(request, 'Admin Panel', 'admin')
-        context.update(
-            {
-                'login_error': 'Wrong login or password.',
-                'admin_login_default': login,
-            }
-        )
-        return _apply_fast_page_headers(templates.TemplateResponse('admin_login.html', context, status_code=401))
+        context = _base_context('Admin Panel', 'admin')
+        context.update({'login_error': 'Wrong login or password.', 'admin_login_default': login})
+        return make_response(render_template('admin_login.html', **context), 401)
 
-    response = RedirectResponse('/admin', status_code=303)
+    response = redirect('/admin', code=303)
     response.set_cookie(
         ADMIN_COOKIE_NAME,
         _build_admin_cookie(login),
         max_age=ADMIN_SESSION_HOURS * 60 * 60,
         httponly=True,
-        samesite='lax',
+        samesite='Lax',
         secure=False,
         path='/',
     )
     return response
 
 
-@app.post('/admin/logout')
-async def admin_logout(request: Request):
-    response = RedirectResponse('/admin', status_code=303)
+@app.route('/admin/logout', methods=['POST'])
+def admin_logout():
+    response = redirect('/admin', code=303)
     response.delete_cookie(ADMIN_COOKIE_NAME, path='/')
     return response
 
 
-@app.get('/admin/players/{player_id}', response_class=HTMLResponse)
-async def admin_edit_player(request: Request, player_id: int):
-    if not _is_admin(request):
+@app.route('/admin/players/<int:player_id>', methods=['GET'])
+def admin_edit_player(player_id: int):
+    if not _is_admin():
         return _redirect_to_admin_login()
 
     player = fetch_player_admin(player_id)
     if not player:
-        context = _base_context(request, 'Player Not Found', 'admin')
-        context.update({'player': None, 'form_state': _build_admin_player_form_state(), 'error_message': 'Player not found.', 'success_message': None, 'race_options': RACE_LABELS})
-        return _apply_fast_page_headers(templates.TemplateResponse('admin_edit_player.html', context, status_code=404))
+        context = _base_context('Player Not Found', 'admin')
+        context.update(
+            {
+                'player': None,
+                'form_state': _build_admin_player_form_state(),
+                'error_message': 'Player not found.',
+                'success_message': None,
+                'race_options': RACE_LABELS,
+            }
+        )
+        return make_response(render_template('admin_edit_player.html', **context), 404)
 
-    context = _base_context(request, f"Edit Player – {player['name']}", 'admin')
+    context = _base_context(f"Edit Player – {player['name']}", 'admin')
     context.update(
         {
             'player': player,
             'form_state': _build_admin_player_form_state(player),
             'error_message': None,
-            'success_message': 'Player saved.' if request.query_params.get('saved') == '1' else None,
+            'success_message': 'Player saved.' if request.args.get('saved') == '1' else None,
             'race_options': RACE_LABELS,
         }
     )
-    return _apply_fast_page_headers(templates.TemplateResponse('admin_edit_player.html', context))
+    return render_template('admin_edit_player.html', **context)
 
 
-@app.post('/admin/players/{player_id}', response_class=HTMLResponse)
-async def admin_edit_player_post(request: Request, player_id: int):
-    if not _is_admin(request):
+@app.route('/admin/players/<int:player_id>', methods=['POST'])
+def admin_edit_player_post(player_id: int):
+    if not _is_admin():
         return _redirect_to_admin_login()
 
-    form_state = _parse_form(await request.body())
+    form_state = {key: value for key, value in request.form.items()}
     try:
         player = update_player_admin(
             player_id=player_id,
@@ -505,7 +540,7 @@ async def admin_edit_player_post(request: Request, player_id: int):
         )
     except Exception as exc:
         existing_player = fetch_player_admin(player_id)
-        context = _base_context(request, 'Edit Player', 'admin')
+        context = _base_context('Edit Player', 'admin')
         context.update(
             {
                 'player': existing_player,
@@ -515,43 +550,53 @@ async def admin_edit_player_post(request: Request, player_id: int):
                 'race_options': RACE_LABELS,
             }
         )
-        return _apply_fast_page_headers(templates.TemplateResponse('admin_edit_player.html', context, status_code=400))
+        return make_response(render_template('admin_edit_player.html', **context), 400)
 
-    return RedirectResponse(f'/admin/players/{player["id"]}?saved=1', status_code=303)
+    return redirect(f'/admin/players/{player["id"]}?saved=1', code=303)
 
 
-@app.get('/admin/matches/{match_id}', response_class=HTMLResponse)
-async def admin_edit_match(request: Request, match_id: int):
-    if not _is_admin(request):
+@app.route('/admin/matches/<int:match_id>', methods=['GET'])
+def admin_edit_match(match_id: int):
+    if not _is_admin():
         return _redirect_to_admin_login()
 
     match = fetch_match_admin(match_id)
     if not match:
-        context = _base_context(request, 'Match Not Found', 'admin')
-        context.update({'match': None, 'form_state': _build_admin_match_form_state(), 'error_message': 'Match not found.', 'success_message': None, 'race_options': RACE_LABELS, 'game_type_options': GAME_TYPE_OPTIONS, 'mission_options': _merge_mission_options()})
-        return _apply_fast_page_headers(templates.TemplateResponse('admin_edit_match.html', context, status_code=404))
+        context = _base_context('Match Not Found', 'admin')
+        context.update(
+            {
+                'match': None,
+                'form_state': _build_admin_match_form_state(),
+                'error_message': 'Match not found.',
+                'success_message': None,
+                'race_options': RACE_LABELS,
+                'game_type_options': GAME_TYPE_OPTIONS,
+                'mission_options': _merge_mission_options(),
+            }
+        )
+        return make_response(render_template('admin_edit_match.html', **context), 404)
 
-    context = _base_context(request, f'Edit Match – #{match_id}', 'admin')
+    context = _base_context(f'Edit Match – #{match_id}', 'admin')
     context.update(
         {
             'match': match,
             'form_state': _build_admin_match_form_state(match),
             'error_message': None,
-            'success_message': 'Match saved and ELO recalculated.' if request.query_params.get('saved') == '1' else None,
+            'success_message': 'Match saved and ELO recalculated.' if request.args.get('saved') == '1' else None,
             'race_options': RACE_LABELS,
             'game_type_options': GAME_TYPE_OPTIONS,
             'mission_options': _merge_mission_options(),
         }
     )
-    return _apply_fast_page_headers(templates.TemplateResponse('admin_edit_match.html', context))
+    return render_template('admin_edit_match.html', **context)
 
 
-@app.post('/admin/matches/{match_id}', response_class=HTMLResponse)
-async def admin_edit_match_post(request: Request, match_id: int):
-    if not _is_admin(request):
+@app.route('/admin/matches/<int:match_id>', methods=['POST'])
+def admin_edit_match_post(match_id: int):
+    if not _is_admin():
         return _redirect_to_admin_login()
 
-    form_state = _parse_form(await request.body())
+    form_state = {key: value for key, value in request.form.items()}
     action = str(form_state.get('action', 'save')).strip() or 'save'
 
     if action == 'delete':
@@ -559,7 +604,7 @@ async def admin_edit_match_post(request: Request, match_id: int):
             delete_match_admin(match_id)
         except Exception as exc:
             existing_match = fetch_match_admin(match_id)
-            context = _base_context(request, 'Edit Match', 'admin')
+            context = _base_context('Edit Match', 'admin')
             context.update(
                 {
                     'match': existing_match,
@@ -571,8 +616,8 @@ async def admin_edit_match_post(request: Request, match_id: int):
                     'mission_options': _merge_mission_options(),
                 }
             )
-            return _apply_fast_page_headers(templates.TemplateResponse('admin_edit_match.html', context, status_code=400))
-        return RedirectResponse('/reports', status_code=303)
+            return make_response(render_template('admin_edit_match.html', **context), 400)
+        return redirect('/reports', code=303)
 
     try:
         played_at = _parse_admin_datetime(form_state.get('played_at', ''))
@@ -591,7 +636,7 @@ async def admin_edit_match_post(request: Request, match_id: int):
         )
     except Exception as exc:
         existing_match = fetch_match_admin(match_id)
-        context = _base_context(request, 'Edit Match', 'admin')
+        context = _base_context('Edit Match', 'admin')
         context.update(
             {
                 'match': existing_match,
@@ -603,6 +648,13 @@ async def admin_edit_match_post(request: Request, match_id: int):
                 'mission_options': _merge_mission_options(),
             }
         )
-        return _apply_fast_page_headers(templates.TemplateResponse('admin_edit_match.html', context, status_code=400))
+        return make_response(render_template('admin_edit_match.html', **context), 400)
 
-    return RedirectResponse(f'/admin/matches/{match["id"]}?saved=1', status_code=303)
+    return redirect(f'/admin/matches/{match["id"]}?saved=1', code=303)
+
+
+application = app
+
+
+if __name__ == '__main__':
+    app.run(host='127.0.0.1', port=8000, debug=True)

@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="{{ url_for('static', path='/favicon.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <title>{{ page_title }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}?v=20260327-admin-1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260327-admin-1">
 </head>
 <body>
     <header class="site-header">
 
         <div class="container header-inner">
             <a class="brand-block" href="/">
-    <img class="brand-logo" src="{{ url_for('static', path='/Race/logo.png') }}" alt="Archon Studio logo">
+                <img class="brand-logo" src="{{ url_for('static', filename='Race/logo.png') }}" alt="Archon Studio logo">
     <div class="brand-meta">
         <span class="brand-title">StarCraft ELO</span>
         <span class="brand-version">Version 0.1</span>
