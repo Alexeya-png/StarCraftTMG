@@ -320,7 +320,7 @@
                                 <a class="player-profile-link inline-link" href="{{ match.opponent_profile_url }}">{{ match.opponent_name }}</a>
                             </td>
                             <td>
-                                <span class="match-result-badge {% if match.is_win %}match-result-win{% else %}match-result-loss{% endif %}">
+                                <span class="match-result-badge {% if match.is_tie %}match-result-tie{% elif match.is_win %}match-result-win{% else %}match-result-loss{% endif %}">
                                     {{ match.result_label }}
                                 </span>
                             </td>
@@ -340,7 +340,7 @@
                                     <span>{{ match.opponent_race or '—' }}</span>
                                 </span>
                             </td>
-                            <td class="{% if match.is_win %}delta-win{% else %}delta-loss{% endif %}">{{ match.elo_delta_display }}</td>
+                            <td class="{% if match.is_tie %}delta-tie{% elif match.is_win %}delta-win{% else %}delta-loss{% endif %}">{{ match.elo_delta_display }}</td>
                             <td>{{ match.old_elo_display }} → {{ match.new_elo_display }}</td>
                         </tr>
                         {% endfor %}

@@ -46,18 +46,23 @@
                         {% for match in matches %}
                         {% set winner_race_slug = match.winner_race|lower if match.winner_race else '' %}
                         {% set loser_race_slug = match.loser_race|lower if match.loser_race else '' %}
-                        <tr>
+                        <tr class="{% if match.is_tie %}game-report-row-tie{% endif %}">
                             <td class="value-match-id">{{ match.id }}</td>
                             <td class="value-played-at">{{ match.played_at_label }}</td>
-                            <td class="value-player">
-                                <a class="player-profile-link" href="{{ match.winner_profile_url }}">
-                                    <div class="sc2-player-inline polished-player-inline">
-                                        {% if winner_race_slug in ['terran', 'protoss', 'zerg'] %}
-                                        <img class="race-inline-icon" src="/static/Race/{{ winner_race_slug }}.svg" alt="{{ match.winner_race }} icon">
-                                        {% endif %}
-                                        <span class="player-name sc2-player-name">{{ match.winner_name }}</span>
-                                    </div>
-                                </a>
+                            <td class="value-player value-player-with-result">
+                                <div class="game-report-player-cell">
+                                    <a class="player-profile-link" href="{{ match.winner_profile_url }}">
+                                        <div class="sc2-player-inline polished-player-inline">
+                                            {% if winner_race_slug in ['terran', 'protoss', 'zerg'] %}
+                                            <img class="race-inline-icon" src="/static/Race/{{ winner_race_slug }}.svg" alt="{{ match.winner_race }} icon">
+                                            {% endif %}
+                                            <span class="player-name sc2-player-name">{{ match.winner_name }}</span>
+                                        </div>
+                                    </a>
+                                    {% if match.is_tie %}
+                                    <span class="inline-result-badge inline-result-badge-tie">TIE</span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td class="value-player">
                                 <a class="player-profile-link" href="{{ match.loser_profile_url }}">

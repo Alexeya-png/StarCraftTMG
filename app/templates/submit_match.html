@@ -18,12 +18,17 @@
             {% if success_data %}
             <div class="submit-alert submit-alert-success">
                 <div class="submit-alert-head">
-                    <strong>Match saved.</strong>
+                    <div class="submit-alert-head-main">
+                        <strong>Match saved.</strong>
+                        {% if success_data.is_tie %}
+                        <span class="submit-result-badge submit-result-badge-tie">TIE</span>
+                        {% endif %}
+                    </div>
                     <span>{{ success_data.played_at_label }}</span>
                 </div>
                 <div class="submit-alert-grid">
                     <div>
-                        <div class="submit-alert-label">Winner</div>
+                        <div class="submit-alert-label">{{ 'Player 1' if success_data.is_tie else 'Winner' }}</div>
                         <div class="submit-alert-main">
                             <a href="{{ success_data.winner_profile_url }}">{{ success_data.winner_name }}</a>
                             <span>• {{ success_data.winner_race }}</span>
@@ -33,7 +38,7 @@
                         {% endif %}
                     </div>
                     <div>
-                        <div class="submit-alert-label">Loser</div>
+                        <div class="submit-alert-label">{{ 'Player 2' if success_data.is_tie else 'Loser' }}</div>
                         <div class="submit-alert-main">
                             <a href="{{ success_data.opponent_profile_url }}">{{ success_data.opponent_name }}</a>
                             <span>• {{ success_data.opponent_race }}</span>
@@ -53,11 +58,11 @@
                 </div>
                 {% if success_data.is_ranked %}
                 <div class="submit-elo-summary">
-                    <div class="submit-elo-pill submit-elo-pill-win">
+                    <div class="submit-elo-pill {% if success_data.is_tie %}submit-elo-pill-tie{% else %}submit-elo-pill-win{% endif %}">
                         {{ success_data.winner_name }} {{ success_data.winner_old_elo_display }} → {{ success_data.winner_new_elo_display }}
                         <span>{{ success_data.winner_delta_display }}</span>
                     </div>
-                    <div class="submit-elo-pill submit-elo-pill-loss">
+                    <div class="submit-elo-pill {% if success_data.is_tie %}submit-elo-pill-tie{% else %}submit-elo-pill-loss{% endif %}">
                         {{ success_data.opponent_name }} {{ success_data.opponent_old_elo_display }} → {{ success_data.opponent_new_elo_display }}
                         <span>{{ success_data.opponent_delta_display }}</span>
                     </div>
@@ -77,14 +82,14 @@
                         </div>
                         <div class="form-two-col">
                             <div class="toolbar-field player-name-field">
-                                <label for="winner_name">Winner name</label>
+                                <label for="winner_name">Player 1 name</label>
                                 <input
                                     id="winner_name"
                                     name="winner_name"
                                     type="text"
                                     list="player-name-suggestions"
                                     value="{{ form_state.winner_name }}"
-                                    placeholder="Enter winner name"
+                                    placeholder="Enter player 1 name"
                                     autocomplete="off"
                                     required
                                     data-player-input
@@ -94,14 +99,14 @@
                                 </div>
                             </div>
                             <div class="toolbar-field player-name-field">
-                                <label for="opponent_name">Opponent name</label>
+                                <label for="opponent_name">Player 2 name</label>
                                 <input
                                     id="opponent_name"
                                     name="opponent_name"
                                     type="text"
                                     list="player-name-suggestions"
                                     value="{{ form_state.opponent_name }}"
-                                    placeholder="Enter opponent name"
+                                    placeholder="Enter player 2 name"
                                     autocomplete="off"
                                     required
                                     data-player-input
@@ -112,10 +117,9 @@
                             </div>
                         </div>
                     </section>
-
                     <section class="form-section">
                         <div class="form-section-head">
-                            <h2>Winner race</h2>
+                            <h2>Player 1 race</h2>
                             <p>Race is stored with the match.</p>
                         </div>
                         <div class="choice-grid choice-grid-race">
@@ -140,7 +144,7 @@
 
                     <section class="form-section">
                         <div class="form-section-head">
-                            <h2>Loser race</h2>
+                            <h2>Player 2 race</h2>
                             <p>Race is stored with the match.</p>
                         </div>
                         <div class="choice-grid choice-grid-race">
@@ -160,6 +164,28 @@
                                 <label class="choice-card choice-card-race choice-card-race-{{ race_slug }}" for="opponent_race_{{ race_slug }}">{{ race_name }}</label>
                             </div>
                             {% endfor %}
+                        </div>
+                    </section>
+                    <section class="form-section">
+                        <div class="form-section-head">
+                            <h2>Result</h2>
+                            <p>Choose a winner or save the match as a tie.</p>
+                        </div>
+                        <div class="choice-grid choice-grid-compact">
+                            <div class="choice-card-wrapper">
+                                <input class="choice-input" type="radio" id="result_type_win" name="result_type" value="win" {% if form_state.result_type != 'draw' %}checked{% endif %}>
+                                <label class="choice-card choice-card-mode" for="result_type_win">
+                                    <span>Win</span>
+                                    <small>Player 1 is the winner</small>
+                                </label>
+                            </div>
+                            <div class="choice-card-wrapper">
+                                <input class="choice-input" type="radio" id="result_type_draw" name="result_type" value="draw" {% if form_state.result_type == 'draw' %}checked{% endif %}>
+                                <label class="choice-card choice-card-mode" for="result_type_draw">
+                                    <span>Tie</span>
+                                    <small>Both players draw</small>
+                                </label>
+                            </div>
                         </div>
                     </section>
 

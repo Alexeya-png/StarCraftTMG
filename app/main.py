@@ -36,6 +36,15 @@ app = Flask(
     static_folder=str(BASE_DIR / 'static'),
     static_url_path='/static',
 )
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+ASSET_VERSION = os.getenv('APP_VERSION', '').strip() or str(int(datetime.now(timezone.utc).timestamp()))
+
+
+@app.context_processor
+def inject_asset_version() -> dict:
+    return {'asset_version': ASSET_VERSION}
+
 
 RACE_OPTIONS = [
     {'label': 'Терран', 'slug': 'terran'},
@@ -86,7 +95,9 @@ def preload_application_data():
 @app.after_request
 def apply_fast_page_headers(response):
     if request.path.startswith('/static'):
-        response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
         return response
 
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
@@ -209,6 +220,7 @@ def _build_submit_form_state(raw_values: dict | None = None) -> dict:
         'opponent_name': str(source.get('opponent_name', '')).strip(),
         'winner_race': str(source.get('winner_race', 'Терран')).strip() or 'Терран',
         'opponent_race': str(source.get('opponent_race', 'Протосс')).strip() or 'Протосс',
+        'result_type': str(source.get('result_type', 'win')).strip() or 'win',
         'is_ranked': str(source.get('is_ranked', 'yes')).strip() or 'yes',
         'game_type': str(source.get('game_type', '1к')).strip() or '1к',
         'mission_name': str(source.get('mission_name', '')).strip(),
@@ -441,6 +453,7 @@ def submit_result_post():
             opponent_name=form_state.get('opponent_name', ''),
             winner_race=form_state.get('winner_race', ''),
             opponent_race=form_state.get('opponent_race', ''),
+            result_type=form_state.get('result_type', 'win'),
             is_ranked=form_state.get('is_ranked', 'yes'),
             game_type=form_state.get('game_type', ''),
             mission_name=form_state.get('mission_name', ''),

@@ -1185,7 +1185,11 @@ h3 {
 }
 
 .submit-form input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]),
-.submit-form select,
+.submit-form select {
+    color-scheme: dark;
+    background-color: #08101d;
+    color: #f3f5ff;
+}
 .submit-form textarea {
     width: 100%;
     min-height: 54px;
@@ -2408,4 +2412,66 @@ h3 {
     .matchup-report-legend-values {
         justify-content: flex-start;
     }
+}
+
+
+.submit-alert-head-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.submit-result-badge,
+.inline-result-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.submit-result-badge-tie,
+.inline-result-badge-tie,
+.match-result-tie {
+    color: #bfe3ff;
+    background: rgba(76, 110, 170, 0.24);
+    border: 1px solid rgba(121, 183, 255, 0.22);
+}
+
+.submit-elo-pill-tie {
+    background: rgba(76, 110, 170, 0.18);
+    border: 1px solid rgba(121, 183, 255, 0.18);
+    color: #d6ecff;
+}
+
+.choice-card-mode-tie {
+    background: linear-gradient(180deg, rgba(30, 53, 92, 0.96) 0%, rgba(18, 33, 59, 1) 100%);
+    color: #c7e6ff;
+}
+
+.game-report-player-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.game-report-row-tie .value-player-with-result {
+    position: relative;
+}
+
+.game-report-row-tie .inline-result-badge-tie {
+    flex: 0 0 auto;
+}
+
+.match-result-tie {
+    border-width: 1px;
+}
+
+.delta-tie {
+    color: #bfe3ff;
 }
