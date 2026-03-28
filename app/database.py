@@ -1125,6 +1125,85 @@ def fetch_game_reports(search: str = '', limit: int = 100) -> list[dict]:
     return page_data['items']
 
 
+
+def _race_matchup_report_from_matches(player_id: int, priority_race: str | None, matches: list[dict]) -> dict:
+    normalized_priority_race = _normalize_race_label(priority_race)
+    race_code_by_name = {
+        'Terran': 'T',
+        'Zerg': 'Z',
+        'Protoss': 'P',
+    }
+    matchup_order = (
+        ('Terran', 'T', 'terran'),
+        ('Zerg', 'Z', 'zerg'),
+        ('Protoss', 'P', 'protoss'),
+    )
+
+    cards_map: dict[str, dict[str, Any]] = {
+        opponent_name: {
+            'opponent_race': opponent_name,
+            'opponent_slug': opponent_slug,
+            'matchup_code': f"{race_code_by_name.get(normalized_priority_race, 'Pr')}v{opponent_code}",
+            'wins': 0,
+            'losses': 0,
+            'total_games': 0,
+            'win_rate': 0.0,
+            'loss_rate': 0.0,
+        }
+        for opponent_name, opponent_code, opponent_slug in matchup_order
+    }
+
+    if normalized_priority_race not in race_code_by_name:
+        return {
+            'priority_race': normalized_priority_race,
+            'priority_race_code': 'Pr',
+            'cards': list(cards_map.values()),
+        }
+
+    player_id = int(player_id)
+
+    for match in matches:
+        player1_id = int(match['player1_id'])
+        player2_id = int(match['player2_id'])
+        if player_id not in {player1_id, player2_id}:
+            continue
+
+        player_race = _normalize_race_label(
+            match.get('player1_race') if player1_id == player_id else match.get('player2_race')
+        )
+        opponent_race = _normalize_race_label(
+            match.get('player2_race') if player1_id == player_id else match.get('player1_race')
+        )
+
+        if player_race != normalized_priority_race or opponent_race not in cards_map:
+            continue
+
+        card = cards_map[opponent_race]
+        card['total_games'] += 1
+        if int(match['winner_player_id']) == player_id:
+            card['wins'] += 1
+        else:
+            card['losses'] += 1
+
+    cards = []
+    for opponent_name, opponent_code, opponent_slug in matchup_order:
+        card = cards_map[opponent_name]
+        total_games = int(card['total_games'])
+        wins = int(card['wins'])
+        losses = int(card['losses'])
+        card['matchup_code'] = f"{race_code_by_name[normalized_priority_race]}v{opponent_code}"
+        card['opponent_slug'] = opponent_slug
+        card['win_rate'] = round((wins / total_games) * 100, 1) if total_games > 0 else 0.0
+        card['loss_rate'] = round((losses / total_games) * 100, 1) if total_games > 0 else 0.0
+        cards.append(card)
+
+    return {
+        'priority_race': normalized_priority_race,
+        'priority_race_code': race_code_by_name[normalized_priority_race],
+        'cards': cards,
+    }
+
+
 def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict | None:
     safe_recent_matches_limit = max(1, min(recent_matches_limit, 50))
     players_by_id = {int(row['id']): row for row in _fetch_all_players_raw()}
@@ -1201,11 +1280,13 @@ def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict
     rating_chart_rows.sort(key=lambda row: _parse_datetime(row.get('played_at')) or datetime.min)
     player['member_since_label'] = _format_match_datetime(player_row.get('created_at'))
     rating_chart = _build_rating_chart(player.get('current_elo'), rating_chart_rows)
+    priority_matchup_report = _race_matchup_report_from_matches(player_id, player.get('priority_race'), matches)
 
     return {
         'player': player,
         'recent_matches': recent_matches,
         'rating_chart': rating_chart,
+        'priority_matchup_report': priority_matchup_report,
     }
 
 

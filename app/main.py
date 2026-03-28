@@ -405,12 +405,12 @@ def player_profile(player_id: int):
 
     if db_error:
         context = _base_context('Player Profile', 'players')
-        context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'db_error': db_error})
+        context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'priority_matchup_report': None, 'db_error': db_error})
         return make_response(render_template('player_profile.html', **context), 500)
 
     if not profile:
         context = _base_context('Player Not Found', 'players')
-        context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'db_error': None})
+        context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'priority_matchup_report': None, 'db_error': None})
         return make_response(render_template('player_profile.html', **context), 404)
 
     context = _base_context(f"{profile['player']['name']} – Player Profile", 'players')
@@ -419,6 +419,7 @@ def player_profile(player_id: int):
             'player': profile['player'],
             'recent_matches': profile['recent_matches'],
             'rating_chart': profile.get('rating_chart'),
+            'priority_matchup_report': profile.get('priority_matchup_report'),
             'db_error': None,
         }
     )

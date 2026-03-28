@@ -17,7 +17,94 @@
         </div>
         {% else %}
         {% set race_slug = player.priority_race|lower if player.priority_race else '' %}
+        {% set priority_race_code = 'T' if race_slug == 'terran' else 'P' if race_slug == 'protoss' else 'Z' if race_slug == 'zerg' else 'Pr' %}
 
+        {% macro render_matchup_card(matchup_code, opponent_name, opponent_slug, wins, losses) %}
+        {% set total = wins + losses %}
+        {% set win_pct = ((wins / total) * 100) if total else 0 %}
+        {% set loss_pct = ((losses / total) * 100) if total else 0 %}
+        {% set donut_circumference = 326.7256359733385 %}
+        {% set win_arc = (donut_circumference * win_pct / 100) %}
+        {% set loss_arc = (donut_circumference * loss_pct / 100) %}
+        <article class="matchup-report-card matchup-report-card-{{ opponent_slug }}">
+            <div class="matchup-report-card-head">
+                <div>
+                    <h3>{{ matchup_code }}</h3>
+                    <p>Priority race vs {{ opponent_name }}</p>
+                </div>
+                <span class="matchup-race-badge matchup-race-badge-{{ opponent_slug }}">{{ opponent_name }}</span>
+            </div>
+
+            <div class="matchup-report-body">
+                <div class="matchup-donut-wrap">
+                    <div class="matchup-donut" aria-label="{{ matchup_code }} matchup report">
+                        <svg class="matchup-donut-svg" viewBox="0 0 160 160" role="img" aria-hidden="true">
+                            <circle class="matchup-donut-track" cx="80" cy="80" r="52"></circle>
+
+                            {% if total %}
+                            <circle
+                                class="matchup-donut-segment matchup-donut-segment-win"
+                                cx="80"
+                                cy="80"
+                                r="52"
+                                stroke-dasharray="{{ win_arc }} {{ donut_circumference - win_arc }}"
+                                stroke-dashoffset="0"
+                                data-matchup-segment
+                                data-tooltip-title="{{ matchup_code }} wins"
+                                data-tooltip-body="{{ '%.1f'|format(win_pct) }}% · {{ wins }} game{% if wins != 1 %}s{% endif %}"
+                            ></circle>
+                            <circle
+                                class="matchup-donut-segment matchup-donut-segment-loss"
+                                cx="80"
+                                cy="80"
+                                r="52"
+                                stroke-dasharray="{{ loss_arc }} {{ donut_circumference - loss_arc }}"
+                                stroke-dashoffset="-{{ win_arc }}"
+                                data-matchup-segment
+                                data-tooltip-title="{{ matchup_code }} losses"
+                                data-tooltip-body="{{ '%.1f'|format(loss_pct) }}% · {{ losses }} game{% if losses != 1 %}s{% endif %}"
+                            ></circle>
+                            {% endif %}
+                        </svg>
+
+                        <div class="matchup-donut-center">
+                            <span class="matchup-donut-code">{{ matchup_code }}</span>
+                            <strong class="matchup-donut-value">{{ '%.0f'|format(win_pct) if total else '0' }}%</strong>
+                            <span class="matchup-donut-sub">win rate</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="matchup-report-stats">
+                    <div class="matchup-report-total">
+                        <span>Total games</span>
+                        <strong>{{ total }}</strong>
+                    </div>
+
+                    <div class="matchup-report-legend">
+                        <div class="matchup-report-legend-row">
+                            <span class="matchup-report-legend-main">
+                                <span class="matchup-report-dot matchup-report-dot-win"></span>
+                                <span>Wins</span>
+                            </span>
+                            <span class="matchup-report-legend-values">
+                                <strong>{{ wins }}</strong>
+                            </span>
+                        </div>
+                        <div class="matchup-report-legend-row">
+                            <span class="matchup-report-legend-main">
+                                <span class="matchup-report-dot matchup-report-dot-loss"></span>
+                                <span>Losses</span>
+                            </span>
+                            <span class="matchup-report-legend-values">
+                                <strong>{{ losses }}</strong>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </article>
+        {% endmacro %}
         <div class="profile-header-card">
             <div class="profile-header-top">
                 <a class="button button-secondary profile-back-button" href="/leaderboard">← Back to leaderboard</a>
@@ -174,6 +261,26 @@
             {% endif %}
         </div>
 
+        {% if race_slug in ['terran', 'protoss', 'zerg'] and priority_matchup_report is defined and priority_matchup_report and priority_matchup_report['cards'] %}
+        <div class="profile-section-card profile-matchup-report-section">
+            <div class="profile-section-head">
+                <h2>Priority race report</h2>
+                <p>Win rate by enemy faction when this player uses {{ player.priority_race }}.</p>
+            </div>
+
+            <div class="profile-matchup-report-grid">
+                {% for matchup_card in priority_matchup_report['cards'] %}
+                {{ render_matchup_card(matchup_card.matchup_code, matchup_card.opponent_race, matchup_card.opponent_slug, matchup_card.wins, matchup_card.losses) }}
+                {% endfor %}
+            </div>
+
+            <div class="matchup-report-tooltip" data-matchup-tooltip hidden>
+                <div class="matchup-report-tooltip-title" data-matchup-tooltip-title></div>
+                <div class="matchup-report-tooltip-body" data-matchup-tooltip-body></div>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="profile-section-card">
             <div class="profile-section-head">
                 <h2>Recent matches</h2>
@@ -197,8 +304,8 @@
                             <th>Date</th>
                             <th>Opponent</th>
                             <th>Result</th>
-                            <th>Your race</th>
-                            <th>Enemy race</th>
+                            <th>Player race</th>
+                            <th>Opponent race</th>
                             <th>Delta</th>
                             <th>ELO</th>
                         </tr>
@@ -596,4 +703,72 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 {% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tooltip = document.querySelector('[data-matchup-tooltip]');
+
+    if (!tooltip) {
+        return;
+    }
+
+    const tooltipTitle = tooltip.querySelector('[data-matchup-tooltip-title]');
+    const tooltipBody = tooltip.querySelector('[data-matchup-tooltip-body]');
+    const reportSection = tooltip.closest('.profile-matchup-report-section');
+
+    const showTooltip = function (event, target) {
+        if (!tooltipTitle || !tooltipBody || !reportSection) {
+            return;
+        }
+
+        tooltipTitle.textContent = target.dataset.tooltipTitle || '';
+        tooltipBody.textContent = target.dataset.tooltipBody || '';
+        tooltip.hidden = false;
+
+        const sectionRect = reportSection.getBoundingClientRect();
+        const tooltipWidth = tooltip.offsetWidth || 180;
+        const tooltipHeight = tooltip.offsetHeight || 62;
+
+        let left = event.clientX - sectionRect.left + 14;
+        let top = event.clientY - sectionRect.top - tooltipHeight - 14;
+
+        if (left + tooltipWidth > sectionRect.width - 12) {
+            left = sectionRect.width - tooltipWidth - 12;
+        }
+
+        if (left < 12) {
+            left = 12;
+        }
+
+        if (top < 12) {
+            top = event.clientY - sectionRect.top + 16;
+        }
+
+        if (top + tooltipHeight > sectionRect.height - 12) {
+            top = sectionRect.height - tooltipHeight - 12;
+        }
+
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+    };
+
+    const hideTooltip = function () {
+        tooltip.hidden = true;
+    };
+
+    reportSection.querySelectorAll('[data-matchup-segment]').forEach(function (segment) {
+        segment.addEventListener('mouseenter', function (event) {
+            showTooltip(event, segment);
+        });
+
+        segment.addEventListener('mousemove', function (event) {
+            showTooltip(event, segment);
+        });
+
+        segment.addEventListener('mouseleave', hideTooltip);
+        segment.addEventListener('blur', hideTooltip);
+    });
+});
+</script>
+
 {% endblock %}
