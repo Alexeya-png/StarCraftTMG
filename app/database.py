@@ -8,7 +8,7 @@ import re
 import threading
 import time
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib import error as urllib_error
@@ -129,7 +129,7 @@ HIGH_RATING_K_FACTOR = 16
 BASE_RATING_K_FACTOR = 32
 NEW_PLAYER_K_FACTOR = 40
 NEW_PLAYER_MATCHES_LIMIT = 5
-CALIBRATION_MATCHES_REQUIRED = 3
+ACTIVE_PLAYER_DAYS_WINDOW = 365
 DATA_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_DATA_CACHE_TTL_SECONDS', '300') or '300'))
 
 _DATA_CACHE_LOCK = threading.RLock()
@@ -243,6 +243,18 @@ def _parse_datetime(value):
         return None
 
 
+def _is_player_active_by_last_match(last_match_at) -> bool:
+    parsed = _parse_datetime(last_match_at)
+    if not parsed:
+        return False
+
+    now = datetime.now(parsed.tzinfo) if getattr(parsed, 'tzinfo', None) else datetime.now()
+    if parsed > now:
+        return True
+
+    return (now - parsed) <= timedelta(days=ACTIVE_PLAYER_DAYS_WINDOW)
+
+
 def _format_match_datetime(value) -> str:
     parsed = _parse_datetime(value)
     if not parsed:
@@ -345,6 +357,13 @@ def _normalize_player_key(value: str | None) -> str:
     if not clean_value:
         return ''
     return clean_value.casefold()
+
+
+def _normalize_search_term(value: str | None) -> str:
+    clean_value = _normalize_text(value)
+    if not clean_value:
+        return ''
+    return re.sub(r'[\s,()]+', ' ', clean_value).strip()
 
 
 def _coerce_ranked_value(value) -> bool:
@@ -651,6 +670,40 @@ def _rest_select(
     return body or []
 
 
+def _rest_select_raw(
+    table: str,
+    *,
+    query: dict[str, Any] | None = None,
+    single: bool = False,
+    count: bool = False,
+):
+    prefer = 'count=exact' if count else None
+    body, headers = _supabase_request(
+        'GET',
+        f'/rest/v1/{table}',
+        query=query or {},
+        prefer=prefer,
+        return_headers=True,
+    )
+
+    if single:
+        if isinstance(body, list):
+            return body[0] if body else None
+        return body
+
+    if count:
+        content_range = headers.get('Content-Range', '')
+        total = 0
+        if '/' in content_range:
+            try:
+                total = int(content_range.rsplit('/', 1)[1])
+            except ValueError:
+                total = 0
+        return body or [], total
+
+    return body or []
+
+
 def _rest_fetch_all(
     table: str,
     *,
@@ -791,6 +844,7 @@ def _prepare_player_row(row: dict) -> dict:
     player['priority_race'] = _normalize_race_label(player.get('priority_race'))
     player['discord_url'] = _normalize_discord_url(player.get('discord_url'))
     player['flag_url'] = _resolve_flag_url(player.get('country_code'), player.get('country_name'))
+    player['is_active'] = _is_player_active_by_last_match(player.get('last_match_at'))
     player['last_played_label'] = _humanize_last_played(player.get('last_match_at'))
     player['current_elo_display'] = _normalize_elo_value(player.get('current_elo'))
     player['win_rate_display'] = _format_percent(player.get('win_rate'))
@@ -1053,20 +1107,36 @@ def _fetch_all_rating_history_raw(*, force_refresh: bool = False) -> list[dict]:
 
 def fetch_player_name_suggestions(limit: int = 500) -> list[str]:
     safe_limit = max(1, min(limit, 2000))
-    players = _fetch_all_players_raw()
-    players.sort(key=lambda row: (-int(row.get('current_elo') or 0), _normalize_player_name(row.get('name'))))
-    return [_normalize_player_name(row.get('name')) for row in players[:safe_limit] if _normalize_player_name(row.get('name'))]
+    rows = _rest_select(
+        'players',
+        select='name,current_elo',
+        order='current_elo.desc,name.asc',
+        limit=safe_limit,
+    )
+
+    suggestions: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        player_name = _normalize_player_name(row.get('name'))
+        player_key = player_name.casefold()
+        if not player_name or player_key in seen:
+            continue
+        seen.add(player_key)
+        suggestions.append(player_name)
+    return suggestions
 
 
 def fetch_mission_suggestions(limit: int = 50) -> list[str]:
     safe_limit = max(1, min(limit, 200))
     missions = []
     seen = set()
-    for row in _fetch_all_matches_raw():
+    for row in _rest_fetch_all('matches', select='mission_name', order='played_at.desc,id.desc'):
         mission = _normalize_player_name(row.get('mission_name'))
         if mission and mission not in seen:
             seen.add(mission)
             missions.append(mission)
+        if len(missions) >= safe_limit:
+            break
     missions.sort()
     return missions[:safe_limit]
 
@@ -1077,66 +1147,168 @@ def fetch_leaderboard(
     include_active: bool = True,
     include_inactive: bool = False,
 ) -> list[dict]:
-    normalized_search = search.strip().casefold()
+    normalized_search = _normalize_search_term(search)
 
     if not include_active and not include_inactive:
         include_active = True
 
-    rows = []
-    for row in _fetch_all_players_raw():
-        is_active = bool(row.get('is_active', True))
-        if include_active and include_inactive:
-            allowed = True
-        elif include_active:
-            allowed = is_active
-        else:
-            allowed = not is_active
-        if not allowed:
-            continue
+    filters: list[tuple[str, str, Any]] = []
+    if normalized_search:
+        filters.append(('name', 'ilike', f'*{normalized_search}*'))
 
-        player_name = _normalize_player_name(row.get('name'))
-        if normalized_search and normalized_search not in player_name.casefold():
-            continue
-
-        matches_count = int(row.get('matches_count') or 0)
-        wins = int(row.get('wins') or 0)
-        win_rate = round((wins / matches_count) * 100, 1) if matches_count > 0 else 0
-        prepared = dict(row)
-        prepared['matches_count'] = matches_count
-        prepared['wins'] = wins
-        prepared['losses'] = int(row.get('losses') or 0)
-        prepared['win_rate'] = win_rate
-        rows.append(prepared)
-
-    rows.sort(
-        key=lambda row: (
-            -int(row.get('current_elo') or 0),
-            -int(row.get('wins') or 0),
-            -int(row.get('matches_count') or 0),
-            _normalize_player_name(row.get('name')).casefold(),
-        )
+    rows = _rest_fetch_all(
+        'players',
+        select='id,name,country_code,priority_race,discord_url,last_match_at,current_elo,wins,losses,draws,matches_count,is_active,created_at',
+        filters=filters,
+        order='current_elo.desc,wins.desc,matches_count.desc,name.asc',
     )
 
     prepared_rows = []
-    for index, row in enumerate(rows, start=1):
-        row = dict(row)
-        row['rank_position'] = index
-        prepared_rows.append(_prepare_player_row(row))
+    rank_position = 0
+    for row in rows:
+        prepared = dict(row)
+        prepared['matches_count'] = int(row.get('matches_count') or 0)
+        prepared['wins'] = int(row.get('wins') or 0)
+        prepared['losses'] = int(row.get('losses') or 0)
+        prepared['is_active'] = _is_player_active_by_last_match(row.get('last_match_at'))
+
+        if include_active and not include_inactive and not prepared['is_active']:
+            continue
+        if include_inactive and not include_active and prepared['is_active']:
+            continue
+
+        prepared['win_rate'] = round((prepared['wins'] / prepared['matches_count']) * 100, 1) if prepared['matches_count'] > 0 else 0
+        rank_position += 1
+        prepared['rank_position'] = rank_position
+        prepared_rows.append(_prepare_player_row(prepared))
     return prepared_rows
 
+
+def _fetch_player_match_rows(player_id: int, *, limit: int | None = None, order_desc: bool = True) -> list[dict]:
+    query: dict[str, Any] = {
+        'select': 'id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,is_ranked,game_type,mission_name,comment,result_type',
+        'or': f'(player1_id.eq.{int(player_id)},player2_id.eq.{int(player_id)})',
+        'order': 'played_at.desc,id.desc' if order_desc else 'played_at.asc,id.asc',
+    }
+    if limit is not None:
+        query['limit'] = int(limit)
+    return _rest_select_raw('matches', query=query)
+
+
+def _fetch_players_by_ids(player_ids: list[int]) -> dict[int, dict]:
+    unique_ids = sorted({int(player_id) for player_id in player_ids if player_id is not None})
+    if not unique_ids:
+        return {}
+    rows = _rest_select('players', select='id,name', filters=[('id', 'in', unique_ids)])
+    return {int(row['id']): dict(row) for row in rows}
+
+
+def _fetch_history_for_matches(match_ids: list[int], player_ids: list[int]) -> dict[tuple[int, int], dict]:
+    unique_match_ids = sorted({int(match_id) for match_id in match_ids if match_id is not None})
+    unique_player_ids = sorted({int(player_id) for player_id in player_ids if player_id is not None})
+    if not unique_match_ids or not unique_player_ids:
+        return {}
+
+    rows = _rest_select(
+        'rating_history',
+        select='match_id,player_id,old_elo,new_elo,elo_delta',
+        filters=[('match_id', 'in', unique_match_ids), ('player_id', 'in', unique_player_ids)],
+    )
+    return {(int(row['match_id']), int(row['player_id'])): dict(row) for row in rows}
+
+
+def _build_match_search_or_clause(search: str) -> str:
+    normalized_search = _normalize_search_term(search)
+    if not normalized_search:
+        return ''
+
+    like_value = f'*{normalized_search}*'
+    or_parts = [
+        f'comment.ilike.{like_value}',
+        f'game_type.ilike.{like_value}',
+        f'mission_name.ilike.{like_value}',
+    ]
+
+    matching_players = _rest_select(
+        'players',
+        select='id',
+        filters=[('name', 'ilike', like_value)],
+        limit=200,
+    )
+    matching_player_ids = [str(int(row['id'])) for row in matching_players]
+    if matching_player_ids:
+        joined_ids = ','.join(matching_player_ids)
+        or_parts.append(f'player1_id.in.({joined_ids})')
+        or_parts.append(f'player2_id.in.({joined_ids})')
+
+    return '(' + ','.join(or_parts) + ')'
 
 
 def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25) -> dict:
     safe_per_page = max(1, min(int(per_page or 25), 100))
     safe_page = max(1, int(page or 1))
-    normalized_search = search.strip().casefold()
+    offset = (safe_page - 1) * safe_per_page
+    match_select = 'id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,is_ranked,game_type,mission_name,comment,result_type'
 
-    players_by_id = {int(row['id']): row for row in _fetch_all_players_raw()}
-    history_rows = _fetch_all_rating_history_raw()
-    history_by_pair = {(int(row['match_id']), int(row['player_id'])): row for row in history_rows}
+    normalized_search = _normalize_search_term(search)
+    if normalized_search:
+        or_clause = _build_match_search_or_clause(normalized_search)
+        count_query = {'select': 'id', 'or': or_clause}
+        page_query = {
+            'select': match_select,
+            'or': or_clause,
+            'order': 'id.desc',
+            'limit': safe_per_page,
+            'offset': offset,
+        }
+        _, total_count = _rest_select_raw('matches', query=count_query, count=True)
+        match_rows = _rest_select_raw('matches', query=page_query)
+    else:
+        _, total_count = _rest_select('matches', select='id', count=True)
+        match_rows = _rest_select(
+            'matches',
+            select=match_select,
+            order='id.desc',
+            limit=safe_per_page,
+            offset=offset,
+        )
+
+    total_pages = max(1, math.ceil(total_count / safe_per_page)) if total_count else 1
+    safe_page = min(safe_page, total_pages)
+
+    if not match_rows and safe_page != page and total_count:
+        offset = (safe_page - 1) * safe_per_page
+        if normalized_search:
+            match_rows = _rest_select_raw(
+                'matches',
+                query={
+                    'select': match_select,
+                    'or': or_clause,
+                    'order': 'id.desc',
+                    'limit': safe_per_page,
+                    'offset': offset,
+                },
+            )
+        else:
+            match_rows = _rest_select(
+                'matches',
+                select=match_select,
+                order='id.desc',
+                limit=safe_per_page,
+                offset=offset,
+            )
+
+    page_match_ids = [int(row['id']) for row in match_rows]
+    page_player_ids = []
+    for row in match_rows:
+        page_player_ids.append(int(row['player1_id']))
+        page_player_ids.append(int(row['player2_id']))
+
+    players_by_id = _fetch_players_by_ids(page_player_ids)
+    history_by_pair = _fetch_history_for_matches(page_match_ids, page_player_ids)
 
     items = []
-    for row in _fetch_all_matches_raw():
+    for row in match_rows:
         match = dict(row)
         player1_id = int(match['player1_id'])
         player2_id = int(match['player2_id'])
@@ -1150,20 +1322,6 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25)
 
         player1_name = _normalize_player_name(player1.get('name'))
         player2_name = _normalize_player_name(player2.get('name'))
-        searchable = ' '.join(
-            [
-                player1_name,
-                player2_name,
-                _normalize_text(match.get('game_type')),
-                _normalize_text(match.get('mission_name')),
-                _normalize_text(match.get('comment')),
-                'tie' if is_tie else '',
-                'draw' if is_tie else '',
-            ]
-        ).casefold()
-
-        if normalized_search and normalized_search not in searchable:
-            continue
 
         if is_tie:
             winner_id = player1_id
@@ -1205,24 +1363,16 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25)
             'result_type': result_type,
             'is_tie': is_tie,
         }
-        items.append(item)
-
-    items.sort(key=lambda row: int(row['id']), reverse=True)
-
-    total_count = len(items)
-    total_pages = max(1, math.ceil(total_count / safe_per_page)) if total_count else 1
-    safe_page = min(safe_page, total_pages)
-    start = (safe_page - 1) * safe_per_page
-    end = start + safe_per_page
-    page_items = [_prepare_game_report_row(row) for row in items[start:end]]
+        items.append(_prepare_game_report_row(item))
 
     return {
-        'items': page_items,
+        'items': items,
         'total_count': total_count,
         'page': safe_page,
         'per_page': safe_per_page,
         'total_pages': total_pages,
     }
+
 
 def fetch_game_reports(search: str = '', limit: int = 100) -> list[dict]:
     page_data = fetch_game_reports_page(search=search, page=1, per_page=limit)
@@ -1314,89 +1464,91 @@ def _race_matchup_report_from_matches(player_id: int, priority_race: str | None,
 
 def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict | None:
     safe_recent_matches_limit = max(1, min(recent_matches_limit, 50))
-    players_by_id = {int(row['id']): row for row in _fetch_all_players_raw()}
-    player_row = players_by_id.get(int(player_id))
-
+    player_row = _rest_get_player_by_id(int(player_id))
     if not player_row:
         return None
 
-    leaderboard_rows = fetch_leaderboard(search='', include_active=True, include_inactive=True)
-    leaderboard_by_id = {int(row['id']): row for row in leaderboard_rows}
-    player = leaderboard_by_id.get(int(player_id))
+    player_base = dict(player_row)
+    player_base['matches_count'] = int(player_row.get('matches_count') or 0)
+    player_base['wins'] = int(player_row.get('wins') or 0)
+    player_base['losses'] = int(player_row.get('losses') or 0)
+    player_base['win_rate'] = round((player_base['wins'] / player_base['matches_count']) * 100, 1) if player_base['matches_count'] > 0 else 0
+    player = _prepare_player_row(player_base)
+    player['rank_position'] = _compute_player_rank_position(int(player_id))
 
-    if not player:
-        player = _prepare_player_row(dict(player_row))
-        player['rank_position'] = '—'
+    matches = _fetch_player_match_rows(int(player_id), order_desc=True)
+    match_ids = [int(match['id']) for match in matches]
+    opponent_ids = [
+        int(match['player2_id']) if int(match['player1_id']) == int(player_id) else int(match['player1_id'])
+        for match in matches
+    ]
+    opponents_by_id = _fetch_players_by_ids(opponent_ids)
 
-    history_rows = _fetch_all_rating_history_raw()
-    history_by_pair = {(int(row['match_id']), int(row['player_id'])): row for row in history_rows}
-    matches = _fetch_all_matches_raw()
+    history_rows = _rest_select(
+        'rating_history',
+        select='match_id,player_id,old_elo,new_elo,elo_delta',
+        filters=[('player_id', 'eq', int(player_id))],
+    )
+    history_by_match_id = {int(row['match_id']): dict(row) for row in history_rows}
 
     recent_matches = []
-    rating_chart_rows = []
-
-    for match in matches:
+    for match in matches[:safe_recent_matches_limit]:
         match_id = int(match['id'])
         player1_id = int(match['player1_id'])
         player2_id = int(match['player2_id'])
-        if int(player_id) not in {player1_id, player2_id}:
-            continue
-
-        played_at = match.get('played_at')
-        history_row = history_by_pair.get((match_id, int(player_id)))
-        if history_row:
-            rating_chart_rows.append(
-                {
-                    'played_at': played_at,
-                    'old_elo': history_row.get('old_elo'),
-                    'new_elo': history_row.get('new_elo'),
-                    'elo_delta': history_row.get('elo_delta'),
-                }
-            )
-
         opponent_id = player2_id if player1_id == int(player_id) else player1_id
-        opponent = players_by_id.get(opponent_id)
+        opponent = opponents_by_id.get(opponent_id)
         if not opponent:
             continue
 
+        history_row = history_by_match_id.get(match_id)
         is_tie = _is_match_draw(match)
         is_win = False
         is_loss = False
         result_label = 'TIE'
-
         if not is_tie:
             is_win = int(match['winner_player_id']) == int(player_id)
             is_loss = not is_win
             result_label = 'Win' if is_win else 'Loss'
 
-        recent_matches.append(
+        prepared = {
+            'id': match_id,
+            'played_at': match.get('played_at'),
+            'opponent_id': opponent_id,
+            'opponent_name': _normalize_player_name(opponent.get('name')),
+            'result_label': result_label,
+            'is_win': is_win,
+            'is_loss': is_loss,
+            'is_tie': is_tie,
+            'player_race': match.get('player1_race') if player1_id == int(player_id) else match.get('player2_race'),
+            'opponent_race': match.get('player2_race') if player1_id == int(player_id) else match.get('player1_race'),
+            'old_elo': history_row.get('old_elo') if history_row else None,
+            'new_elo': history_row.get('new_elo') if history_row else None,
+            'elo_delta': history_row.get('elo_delta') if history_row else None,
+            'opponent_profile_url': f"/players/{opponent_id}",
+        }
+        prepared['played_at_label'] = _format_match_date(prepared.get('played_at'))
+        prepared['player_race'] = _normalize_race_label(prepared.get('player_race'))
+        prepared['opponent_race'] = _normalize_race_label(prepared.get('opponent_race'))
+        prepared['old_elo_display'] = _normalize_elo_value(prepared.get('old_elo'))
+        prepared['new_elo_display'] = _normalize_elo_value(prepared.get('new_elo'))
+        prepared['elo_delta_display'] = _format_delta(prepared.get('elo_delta'))
+        recent_matches.append(prepared)
+
+    matches_by_id = {int(match['id']): match for match in matches}
+    rating_chart_rows = []
+    for history_row in history_rows:
+        match = matches_by_id.get(int(history_row['match_id']))
+        if not match:
+            continue
+        rating_chart_rows.append(
             {
-                'id': match_id,
-                'played_at': played_at,
-                'opponent_id': opponent_id,
-                'opponent_name': _normalize_player_name(opponent.get('name')),
-                'result_label': result_label,
-                'is_win': is_win,
-                'is_loss': is_loss,
-                'is_tie': is_tie,
-                'player_race': match.get('player1_race') if player1_id == int(player_id) else match.get('player2_race'),
-                'opponent_race': match.get('player2_race') if player1_id == int(player_id) else match.get('player1_race'),
-                'old_elo': history_row.get('old_elo') if history_row else None,
-                'new_elo': history_row.get('new_elo') if history_row else None,
-                'elo_delta': history_row.get('elo_delta') if history_row else None,
-                'opponent_profile_url': f"/players/{opponent_id}",
+                'played_at': match.get('played_at'),
+                'old_elo': history_row.get('old_elo'),
+                'new_elo': history_row.get('new_elo'),
+                'elo_delta': history_row.get('elo_delta'),
             }
         )
-
-    recent_matches.sort(key=lambda row: (_parse_datetime(row.get('played_at')) or datetime.min, int(row['id'])), reverse=True)
-    recent_matches = recent_matches[:safe_recent_matches_limit]
-    for row in recent_matches:
-        row['played_at_label'] = _format_match_date(row.get('played_at'))
-        row['player_race'] = _normalize_race_label(row.get('player_race'))
-        row['opponent_race'] = _normalize_race_label(row.get('opponent_race'))
-        row['old_elo_display'] = _normalize_elo_value(row.get('old_elo'))
-        row['new_elo_display'] = _normalize_elo_value(row.get('new_elo'))
-        row['elo_delta_display'] = _format_delta(row.get('elo_delta'))
 
     rating_chart_rows.sort(key=lambda row: _parse_datetime(row.get('played_at')) or datetime.min)
     player['member_since_label'] = _format_match_datetime(player_row.get('created_at'))
@@ -1416,6 +1568,18 @@ def _rest_get_player_by_name_key(name_key: str) -> dict | None:
 
 def _rest_get_player_by_id(player_id: int) -> dict | None:
     return _rest_select('players', filters=[('id', 'eq', player_id)], single=True)
+
+
+def _compute_player_rank_position(player_id: int) -> int | str:
+    rows = _rest_fetch_all(
+        'players',
+        select='id,name,current_elo,wins,matches_count',
+        order='current_elo.desc,wins.desc,matches_count.desc,name.asc',
+    )
+    for index, row in enumerate(rows, start=1):
+        if int(row['id']) == int(player_id):
+            return index
+    return '—'
 
 
 def _get_or_create_player(player_name: str) -> dict:
@@ -1458,7 +1622,7 @@ def _get_or_create_player(player_name: str) -> dict:
 
 
 def _refresh_priority_race(player_id: int, *, force_refresh: bool = False) -> None:
-    match_rows = _fetch_all_matches_raw(force_refresh=force_refresh)
+    match_rows = _fetch_player_match_rows(int(player_id), order_desc=False)
     counts: dict[str, int] = defaultdict(int)
 
     for row in match_rows:
@@ -1481,9 +1645,6 @@ def _refresh_priority_race(player_id: int, *, force_refresh: bool = False) -> No
     )
 
 
-
-
-
 def _find_recent_duplicate_match(
     *,
     player1_id: int,
@@ -1498,9 +1659,15 @@ def _find_recent_duplicate_match(
     submitted_at: datetime,
     window_seconds: int = 5,
 ) -> dict | None:
-    matches = _fetch_all_matches_raw(force_refresh=True)
+    rows = _rest_select(
+        'matches',
+        select='id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,is_ranked,game_type,mission_name,comment,result_type',
+        filters=[('player1_id', 'eq', int(player1_id)), ('player2_id', 'eq', int(player2_id))],
+        order='played_at.desc,id.desc',
+        limit=20,
+    )
 
-    for row in reversed(matches):
+    for row in rows:
         played_at = _parse_datetime(row.get('played_at'))
         if not played_at:
             continue
@@ -1512,11 +1679,6 @@ def _find_recent_duplicate_match(
 
         delta_seconds = abs((submitted_at - played_at_naive).total_seconds())
         if delta_seconds > window_seconds:
-            continue
-
-        if int(row.get('player1_id') or 0) != int(player1_id):
-            continue
-        if int(row.get('player2_id') or 0) != int(player2_id):
             continue
         if _normalize_text(row.get('player1_race')) != _normalize_text(player1_race):
             continue
@@ -1532,7 +1694,6 @@ def _find_recent_duplicate_match(
             continue
         if _normalize_match_result_type(row.get('result_type')) != _normalize_match_result_type(result_type):
             continue
-
         return dict(row)
 
     return None
@@ -1726,14 +1887,14 @@ def submit_match_result(
             'current_elo': player1_new_elo,
             'matches_count': player1_matches_after_match,
             'last_match_at': played_at,
-            'is_active': player1_matches_after_match >= CALIBRATION_MATCHES_REQUIRED,
+            'is_active': _is_player_active_by_last_match(played_at),
             'updated_at': datetime.utcnow().isoformat(),
         }
         player2_updates = {
             'current_elo': player2_new_elo,
             'matches_count': player2_matches_after_match,
             'last_match_at': played_at,
-            'is_active': player2_matches_after_match >= CALIBRATION_MATCHES_REQUIRED,
+            'is_active': _is_player_active_by_last_match(played_at),
             'updated_at': datetime.utcnow().isoformat(),
         }
 
@@ -1813,7 +1974,7 @@ def fetch_player_admin(player_id: int) -> dict | None:
     player = _prepare_player_row(row)
     player['created_at_label'] = _format_match_datetime(player.get('created_at'))
     player['current_elo_input'] = int(row.get('current_elo') or 1000)
-    player['is_active'] = bool(row.get('is_active', True))
+    player['is_active'] = _is_player_active_by_last_match(row.get('last_match_at'))
     return player
 
 
@@ -1845,11 +2006,13 @@ def update_player_admin(
     except (TypeError, ValueError):
         raise ValueError('ELO must be a whole number.')
 
-    active_value = bool(is_active)
-
     existing = _rest_get_player_by_name_key(clean_key)
     if existing and int(existing['id']) != int(player_id):
         raise ValueError('Another player already has this name.')
+
+    current_player = _rest_get_player_by_id(player_id)
+    if not current_player:
+        raise ValueError('Player not found.')
 
     rows = _rest_update(
         'players',
@@ -1860,7 +2023,7 @@ def update_player_admin(
             'country_code': clean_country_code or None,
             'discord_url': clean_discord_url or None,
             'priority_race': clean_priority_race or None,
-            'is_active': active_value,
+            'is_active': _is_player_active_by_last_match(current_player.get('last_match_at')),
             'updated_at': datetime.utcnow().isoformat(),
         },
         filters=[('id', 'eq', player_id)],
@@ -1881,7 +2044,7 @@ def fetch_match_admin(match_id: int) -> dict | None:
     if not row:
         return None
 
-    players_by_id = {int(player['id']): player for player in _fetch_all_players_raw()}
+    players_by_id = _fetch_players_by_ids([int(row['player1_id']), int(row['player2_id'])])
     player1 = players_by_id.get(int(row['player1_id']))
     player2 = players_by_id.get(int(row['player2_id']))
     if not player1 or not player2:
@@ -2077,7 +2240,7 @@ def _rebuild_ratings_and_player_stats() -> None:
                 'losses': int(state['losses']),
                 'draws': int(state['draws']),
                 'last_match_at': state['last_match_at'],
-                'is_active': int(state['matches_count']) >= CALIBRATION_MATCHES_REQUIRED,
+                'is_active': _is_player_active_by_last_match(state['last_match_at']),
                 'priority_race': None,
                 'updated_at': datetime.utcnow().isoformat(),
             },

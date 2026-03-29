@@ -19,7 +19,6 @@ from app.database import (
     fetch_player_name_suggestions,
     fetch_player_profile,
     ping_database,
-    warmup_application_cache,
     submit_match_result,
     update_match_admin,
     update_player_admin,
@@ -36,9 +35,35 @@ app = Flask(
     static_folder=str(BASE_DIR / 'static'),
     static_url_path='/static',
 )
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
 
-ASSET_VERSION = os.getenv('APP_VERSION', '').strip() or str(int(datetime.now(timezone.utc).timestamp()))
+
+def _build_asset_version() -> str:
+    explicit_version = os.getenv('APP_VERSION', '').strip()
+    if explicit_version:
+        return explicit_version
+
+    asset_files = [
+        BASE_DIR / 'static' / 'styles.css',
+        BASE_DIR / 'static' / 'favicon.png',
+        BASE_DIR / 'static' / 'Race' / 'logo.png',
+    ]
+    version_parts: list[str] = []
+    for path in asset_files:
+        try:
+            stat = path.stat()
+            version_parts.append(f"{path.name}:{int(stat.st_mtime)}:{stat.st_size}")
+        except OSError:
+            continue
+
+    if not version_parts:
+        return '1'
+
+    digest = hashlib.sha1('|'.join(version_parts).encode('utf-8')).hexdigest()
+    return digest[:12]
+
+
+ASSET_VERSION = _build_asset_version()
 
 
 @app.context_processor
@@ -69,38 +94,16 @@ ADMIN_SESSION_HOURS = 12
 SUBMIT_NAME_SUGGESTION_LIMIT = int(os.getenv('SUBMIT_NAME_SUGGESTION_LIMIT', '200') or '200')
 
 
-def _should_force_refresh_cache() -> bool:
-    if request.args.get('refresh') == '1':
-        return True
-
-    cache_control = (request.headers.get('Cache-Control') or '').lower()
-    pragma = (request.headers.get('Pragma') or '').lower()
-    return 'no-cache' in cache_control or 'max-age=0' in cache_control or 'no-cache' in pragma
-
-
-@app.before_request
-def preload_application_data():
-    if request.method != 'GET':
-        return None
-    if request.path.startswith('/static'):
-        return None
-
-    try:
-        warmup_application_cache(force_refresh=_should_force_refresh_cache())
-    except Exception:
-        return None
-    return None
-
 
 @app.after_request
 def apply_fast_page_headers(response):
     if request.path.startswith('/static'):
-        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        response.headers.pop('Pragma', None)
+        response.headers.pop('Expires', None)
         return response
 
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Cache-Control'] = 'no-cache, max-age=0, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     response.headers['Vary'] = 'Cookie'
@@ -374,7 +377,7 @@ def game_reports():
     matches = []
     total_matches = 0
     current_page = max(1, request.args.get('page', 1, type=int) or 1)
-    per_page = max(1, request.args.get('per_page', 100, type=int) or 100)
+    per_page = max(1, min(request.args.get('per_page', 25, type=int) or 25, 100))
     search = request.args.get('search', '')
     total_pages = 1
     pagination_numbers: list[int | str] = []

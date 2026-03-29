@@ -19,8 +19,22 @@
                             </label>
                             <label class="leaderboard-status-toggle {% if show_inactive %}is-active{% endif %}">
                                 <input class="leaderboard-status-input" type="checkbox" name="status" value="inactive" {% if show_inactive %}checked{% endif %}>
-                                <span>Unactive</span>
+                                <span>Inactive</span>
                             </label>
+                        </div>
+                        <div class="leaderboard-status-help" data-status-help>
+                            <button
+                                class="leaderboard-status-help-button"
+                                type="button"
+                                aria-label="About Active and Inactive statuses"
+                            >
+                                !
+                            </button>
+                            <div class="leaderboard-status-help-popover" role="note">
+                                <strong>Status</strong>
+                                <p><span>Active</span> – player is currently active in the ladder.</p>
+                                <p><span>Inactive</span> – player has not played for more than 1 year.</p>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -92,7 +106,7 @@
             {% else %}
             <div class="state-card leaderboard-state-card">
                 <h2>No players found</h2>
-                <p>The current Active and Unactive filter returned nothing.</p>
+                <p>The current Active and Inactive filter returned nothing.</p>
             </div>
             {% endif %}
         </div>
@@ -146,7 +160,6 @@
                 }
             });
         });
-
         window.addEventListener('beforeunload', function () {
             document.body.classList.remove('page-leaderboard-scroll-lock');
         });
