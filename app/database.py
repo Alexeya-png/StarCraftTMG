@@ -133,6 +133,7 @@ CALIBRATION_MATCHES_REQUIRED = 3
 DATA_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_DATA_CACHE_TTL_SECONDS', '300') or '300'))
 
 _DATA_CACHE_LOCK = threading.RLock()
+_SUBMIT_MATCH_LOCK = threading.RLock()
 _DATA_CACHE: dict[str, Any] = {
     'players': None,
     'matches': None,
@@ -1316,14 +1317,16 @@ def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict
     players_by_id = {int(row['id']): row for row in _fetch_all_players_raw()}
     player_row = players_by_id.get(int(player_id))
 
-    if not player_row or not bool(player_row.get('is_active', True)):
+    if not player_row:
         return None
 
-    leaderboard_rows = fetch_leaderboard(search='', include_active=True, include_inactive=False)
+    leaderboard_rows = fetch_leaderboard(search='', include_active=True, include_inactive=True)
     leaderboard_by_id = {int(row['id']): row for row in leaderboard_rows}
     player = leaderboard_by_id.get(int(player_id))
+
     if not player:
-        return None
+        player = _prepare_player_row(dict(player_row))
+        player['rank_position'] = '—'
 
     history_rows = _fetch_all_rating_history_raw()
     history_by_pair = {(int(row['match_id']), int(row['player_id'])): row for row in history_rows}
@@ -1432,18 +1435,26 @@ def _get_or_create_player(player_name: str) -> dict:
         existing['created'] = False
         return existing
 
-    rows = _rest_insert(
-        'players',
-        {
-            'name': normalized_name,
-            'name_normalized': normalized_key,
-            'is_active': False,
-        },
-    )
-    created = rows[0] if isinstance(rows, list) else rows
-    created = dict(created)
-    created['created'] = True
-    return created
+    try:
+        rows = _rest_insert(
+            'players',
+            {
+                'name': normalized_name,
+                'name_normalized': normalized_key,
+                'is_active': False,
+            },
+        )
+        created = rows[0] if isinstance(rows, list) else rows
+        created = dict(created)
+        created['created'] = True
+        return created
+    except Exception:
+        existing = _rest_get_player_by_name_key(normalized_key)
+        if existing:
+            existing = dict(existing)
+            existing['created'] = False
+            return existing
+        raise
 
 
 def _refresh_priority_race(player_id: int, *, force_refresh: bool = False) -> None:
@@ -1471,6 +1482,104 @@ def _refresh_priority_race(player_id: int, *, force_refresh: bool = False) -> No
 
 
 
+
+
+def _find_recent_duplicate_match(
+    *,
+    player1_id: int,
+    player2_id: int,
+    player1_race: str,
+    player2_race: str,
+    is_ranked: bool,
+    game_type: str,
+    mission_name: str,
+    comment: str,
+    result_type: str,
+    submitted_at: datetime,
+    window_seconds: int = 5,
+) -> dict | None:
+    matches = _fetch_all_matches_raw(force_refresh=True)
+
+    for row in reversed(matches):
+        played_at = _parse_datetime(row.get('played_at'))
+        if not played_at:
+            continue
+
+        if getattr(played_at, 'tzinfo', None):
+            played_at_naive = played_at.replace(tzinfo=None)
+        else:
+            played_at_naive = played_at
+
+        delta_seconds = abs((submitted_at - played_at_naive).total_seconds())
+        if delta_seconds > window_seconds:
+            continue
+
+        if int(row.get('player1_id') or 0) != int(player1_id):
+            continue
+        if int(row.get('player2_id') or 0) != int(player2_id):
+            continue
+        if _normalize_text(row.get('player1_race')) != _normalize_text(player1_race):
+            continue
+        if _normalize_text(row.get('player2_race')) != _normalize_text(player2_race):
+            continue
+        if bool(row.get('is_ranked')) != bool(is_ranked):
+            continue
+        if _normalize_text(row.get('game_type')) != _normalize_text(game_type):
+            continue
+        if _normalize_player_name(row.get('mission_name')) != _normalize_player_name(mission_name):
+            continue
+        if _normalize_text(row.get('comment')) != _normalize_text(comment):
+            continue
+        if _normalize_match_result_type(row.get('result_type')) != _normalize_match_result_type(result_type):
+            continue
+
+        return dict(row)
+
+    return None
+
+
+def _build_submit_result_from_existing_match(
+    match_row: dict,
+    *,
+    player1: dict,
+    player2: dict,
+) -> dict:
+    match_id = int(match_row['id'])
+    ranked_match = bool(match_row.get('is_ranked'))
+    clean_result_type = _normalize_match_result_type(match_row.get('result_type'))
+    history_rows = _fetch_all_rating_history_raw(force_refresh=True)
+    history_by_pair = {(int(row['match_id']), int(row['player_id'])): row for row in history_rows}
+
+    player1_history = history_by_pair.get((match_id, int(player1['id'])), {})
+    player2_history = history_by_pair.get((match_id, int(player2['id'])), {})
+
+    return {
+        'match_id': match_id,
+        'played_at_label': _format_match_datetime(match_row.get('played_at')),
+        'result_type': clean_result_type,
+        'is_tie': clean_result_type == 'draw',
+        'winner_player_id': None if clean_result_type == 'draw' else player1['id'],
+        'winner_name': player1['name'],
+        'winner_created': bool(player1.get('created', False)),
+        'winner_race': _normalize_race_label(match_row.get('player1_race')),
+        'winner_profile_url': f"/players/{player1['id']}",
+        'opponent_player_id': player2['id'],
+        'opponent_name': player2['name'],
+        'opponent_created': bool(player2.get('created', False)),
+        'opponent_race': _normalize_race_label(match_row.get('player2_race')),
+        'opponent_profile_url': f"/players/{player2['id']}",
+        'is_ranked': ranked_match,
+        'game_type': _normalize_text(match_row.get('game_type')),
+        'mission_name': _normalize_player_name(match_row.get('mission_name')),
+        'comment': _normalize_text(match_row.get('comment')),
+        'winner_old_elo_display': _normalize_elo_value(player1_history.get('old_elo')),
+        'winner_new_elo_display': _normalize_elo_value(player1_history.get('new_elo')),
+        'winner_delta_display': _format_delta(player1_history.get('elo_delta')),
+        'opponent_old_elo_display': _normalize_elo_value(player2_history.get('old_elo')),
+        'opponent_new_elo_display': _normalize_elo_value(player2_history.get('new_elo')),
+        'opponent_delta_display': _format_delta(player2_history.get('elo_delta')),
+    }
+
 def submit_match_result(
     *,
     winner_name: str,
@@ -1483,197 +1592,218 @@ def submit_match_result(
     comment: str = '',
     result_type: str = 'win',
 ) -> dict:
-    clean_player1_name = _normalize_player_name(winner_name)
-    clean_player2_name = _normalize_player_name(opponent_name)
-    clean_player1_race = _normalize_text(winner_race)
-    clean_player2_race = _normalize_text(opponent_race)
-    clean_game_type = _normalize_text(game_type)
-    clean_mission_name = _normalize_player_name(mission_name)
-    clean_comment = _normalize_text(comment)
-    clean_result_type = _normalize_match_result_type(result_type)
-    ranked_match = _coerce_ranked_value(is_ranked)
+    with _SUBMIT_MATCH_LOCK:
+        clean_player1_name = _normalize_player_name(winner_name)
+        clean_player2_name = _normalize_player_name(opponent_name)
+        clean_player1_race = _normalize_text(winner_race)
+        clean_player2_race = _normalize_text(opponent_race)
+        clean_game_type = _normalize_text(game_type)
+        clean_mission_name = _normalize_player_name(mission_name)
+        clean_comment = _normalize_text(comment)
+        clean_result_type = _normalize_match_result_type(result_type)
+        ranked_match = _coerce_ranked_value(is_ranked)
 
-    if not clean_player1_name:
-        raise ValueError('Enter the first player name.')
-    if not clean_player2_name:
-        raise ValueError('Enter the second player name.')
-    if _normalize_player_key(clean_player1_name) == _normalize_player_key(clean_player2_name):
-        raise ValueError('Players must be different.')
-    if clean_player1_race not in RACE_OPTIONS:
-        raise ValueError('Choose the first player race.')
-    if clean_player2_race not in RACE_OPTIONS:
-        raise ValueError('Choose the second player race.')
-    if clean_game_type not in GAME_TYPE_OPTIONS:
-        raise ValueError('Choose the game type.')
-    if not clean_mission_name:
-        raise ValueError('Choose the mission.')
-    if len(clean_comment) > 4000:
-        raise ValueError('Comment is too long.')
+        if not clean_player1_name:
+            raise ValueError('Enter the first player name.')
+        if not clean_player2_name:
+            raise ValueError('Enter the second player name.')
+        if _normalize_player_key(clean_player1_name) == _normalize_player_key(clean_player2_name):
+            raise ValueError('Players must be different.')
+        if clean_player1_race not in RACE_OPTIONS:
+            raise ValueError('Choose the first player race.')
+        if clean_player2_race not in RACE_OPTIONS:
+            raise ValueError('Choose the second player race.')
+        if clean_game_type not in GAME_TYPE_OPTIONS:
+            raise ValueError('Choose the game type.')
+        if not clean_mission_name:
+            raise ValueError('Choose the mission.')
+        if len(clean_comment) > 4000:
+            raise ValueError('Comment is too long.')
 
-    played_at = datetime.now().isoformat()
+        submitted_at = datetime.now()
+        played_at = submitted_at.isoformat()
 
-    player1 = _get_or_create_player(clean_player1_name)
-    player2 = _get_or_create_player(clean_player2_name)
+        player1 = _get_or_create_player(clean_player1_name)
+        player2 = _get_or_create_player(clean_player2_name)
 
-    player1_old_elo = int(player1.get('current_elo') or 1000)
-    player2_old_elo = int(player2.get('current_elo') or 1000)
-
-    player1_matches_before_match = int(player1.get('matches_count') or 0)
-    player2_matches_before_match = int(player2.get('matches_count') or 0)
-
-    if ranked_match:
-        if clean_result_type == 'draw':
-            elo_result = _calculate_draw_elo_result(
-                player1_old_elo,
-                player2_old_elo,
-                player1_matches_before_match,
-                player2_matches_before_match,
-            )
-        else:
-            elo_result = _calculate_elo_result(
-                player1_old_elo,
-                player2_old_elo,
-                player1_matches_before_match,
-                player2_matches_before_match,
-            )
-            elo_result = {
-                'player1_old_elo': elo_result['winner_old_elo'],
-                'player1_new_elo': elo_result['winner_new_elo'],
-                'player1_delta': elo_result['winner_delta'],
-                'player1_expected_score': elo_result['winner_expected_score'],
-                'player1_actual_score': 1.0,
-                'player1_k_factor': elo_result['winner_k_factor'],
-                'player2_old_elo': elo_result['loser_old_elo'],
-                'player2_new_elo': elo_result['loser_new_elo'],
-                'player2_delta': elo_result['loser_delta'],
-                'player2_expected_score': elo_result['loser_expected_score'],
-                'player2_actual_score': 0.0,
-                'player2_k_factor': elo_result['loser_k_factor'],
-                'k_factor': elo_result['k_factor'],
-            }
-        player1_new_elo = elo_result['player1_new_elo']
-        player2_new_elo = elo_result['player2_new_elo']
-    else:
-        elo_result = {
-            'player1_old_elo': player1_old_elo,
-            'player1_new_elo': player1_old_elo,
-            'player1_delta': 0,
-            'player1_expected_score': 0,
-            'player1_actual_score': 0.5 if clean_result_type == 'draw' else 1.0,
-            'player1_k_factor': 0,
-            'player2_old_elo': player2_old_elo,
-            'player2_new_elo': player2_old_elo,
-            'player2_delta': 0,
-            'player2_expected_score': 0,
-            'player2_actual_score': 0.5 if clean_result_type == 'draw' else 0.0,
-            'player2_k_factor': 0,
-            'k_factor': 0,
-        }
-        player1_new_elo = player1_old_elo
-        player2_new_elo = player2_old_elo
-
-    match_payload = {
-        'player1_id': player1['id'],
-        'player2_id': player2['id'],
-        'played_at': played_at,
-        'comment': clean_comment or None,
-        'player1_race': clean_player1_race,
-        'player2_race': clean_player2_race,
-        'is_ranked': ranked_match,
-        'game_type': clean_game_type,
-        'mission_name': clean_mission_name,
-        'result_type': clean_result_type,
-        'winner_player_id': None if clean_result_type == 'draw' else player1['id'],
-    }
-
-    match_rows = _rest_insert('matches', match_payload)
-    match_row = match_rows[0] if isinstance(match_rows, list) else match_rows
-
-    player1_matches_after_match = player1_matches_before_match + 1
-    player2_matches_after_match = player2_matches_before_match + 1
-
-    player1_updates = {
-        'current_elo': player1_new_elo,
-        'matches_count': player1_matches_after_match,
-        'last_match_at': played_at,
-        'is_active': player1_matches_after_match >= CALIBRATION_MATCHES_REQUIRED,
-        'updated_at': datetime.utcnow().isoformat(),
-    }
-    player2_updates = {
-        'current_elo': player2_new_elo,
-        'matches_count': player2_matches_after_match,
-        'last_match_at': played_at,
-        'is_active': player2_matches_after_match >= CALIBRATION_MATCHES_REQUIRED,
-        'updated_at': datetime.utcnow().isoformat(),
-    }
-
-    if clean_result_type == 'draw':
-        player1_updates['draws'] = int(player1.get('draws') or 0) + 1
-        player2_updates['draws'] = int(player2.get('draws') or 0) + 1
-    else:
-        player1_updates['wins'] = int(player1.get('wins') or 0) + 1
-        player2_updates['losses'] = int(player2.get('losses') or 0) + 1
-
-    _rest_update('players', player1_updates, filters=[('id', 'eq', player1['id'])])
-    _rest_update('players', player2_updates, filters=[('id', 'eq', player2['id'])])
-
-    if ranked_match:
-        _rest_insert(
-            'rating_history',
-            [
-                {
-                    'match_id': match_row['id'],
-                    'player_id': player1['id'],
-                    'old_elo': elo_result['player1_old_elo'],
-                    'new_elo': elo_result['player1_new_elo'],
-                    'elo_delta': elo_result['player1_delta'],
-                    'expected_score': elo_result['player1_expected_score'],
-                    'actual_score': elo_result['player1_actual_score'],
-                    'k_factor': elo_result['player1_k_factor'],
-                },
-                {
-                    'match_id': match_row['id'],
-                    'player_id': player2['id'],
-                    'old_elo': elo_result['player2_old_elo'],
-                    'new_elo': elo_result['player2_new_elo'],
-                    'elo_delta': elo_result['player2_delta'],
-                    'expected_score': elo_result['player2_expected_score'],
-                    'actual_score': elo_result['player2_actual_score'],
-                    'k_factor': elo_result['player2_k_factor'],
-                },
-            ],
+        duplicate_match = _find_recent_duplicate_match(
+            player1_id=int(player1['id']),
+            player2_id=int(player2['id']),
+            player1_race=clean_player1_race,
+            player2_race=clean_player2_race,
+            is_ranked=ranked_match,
+            game_type=clean_game_type,
+            mission_name=clean_mission_name,
+            comment=clean_comment,
+            result_type=clean_result_type,
+            submitted_at=submitted_at,
         )
+        if duplicate_match:
+            return _build_submit_result_from_existing_match(
+                duplicate_match,
+                player1=player1,
+                player2=player2,
+            )
 
-    _refresh_priority_race(player1['id'], force_refresh=True)
-    _refresh_priority_race(player2['id'])
-    invalidate_application_cache()
+        player1_old_elo = int(player1.get('current_elo') or 1000)
+        player2_old_elo = int(player2.get('current_elo') or 1000)
 
-    return {
-        'match_id': match_row['id'],
-        'played_at_label': _format_match_datetime(match_row.get('played_at') or played_at),
-        'result_type': clean_result_type,
-        'is_tie': clean_result_type == 'draw',
-        'winner_player_id': None if clean_result_type == 'draw' else player1['id'],
-        'winner_name': player1['name'],
-        'winner_created': player1.get('created', False),
-        'winner_race': _normalize_race_label(clean_player1_race),
-        'winner_profile_url': f"/players/{player1['id']}",
-        'opponent_player_id': player2['id'],
-        'opponent_name': player2['name'],
-        'opponent_created': player2.get('created', False),
-        'opponent_race': _normalize_race_label(clean_player2_race),
-        'opponent_profile_url': f"/players/{player2['id']}",
-        'is_ranked': ranked_match,
-        'game_type': clean_game_type,
-        'mission_name': clean_mission_name,
-        'comment': clean_comment,
-        'winner_old_elo_display': _normalize_elo_value(elo_result['player1_old_elo']),
-        'winner_new_elo_display': _normalize_elo_value(elo_result['player1_new_elo']),
-        'winner_delta_display': _format_delta(elo_result['player1_delta']),
-        'opponent_old_elo_display': _normalize_elo_value(elo_result['player2_old_elo']),
-        'opponent_new_elo_display': _normalize_elo_value(elo_result['player2_new_elo']),
-        'opponent_delta_display': _format_delta(elo_result['player2_delta']),
-    }
+        player1_matches_before_match = int(player1.get('matches_count') or 0)
+        player2_matches_before_match = int(player2.get('matches_count') or 0)
+
+        if ranked_match:
+            if clean_result_type == 'draw':
+                elo_result = _calculate_draw_elo_result(
+                    player1_old_elo,
+                    player2_old_elo,
+                    player1_matches_before_match,
+                    player2_matches_before_match,
+                )
+            else:
+                elo_result = _calculate_elo_result(
+                    player1_old_elo,
+                    player2_old_elo,
+                    player1_matches_before_match,
+                    player2_matches_before_match,
+                )
+                elo_result = {
+                    'player1_old_elo': elo_result['winner_old_elo'],
+                    'player1_new_elo': elo_result['winner_new_elo'],
+                    'player1_delta': elo_result['winner_delta'],
+                    'player1_expected_score': elo_result['winner_expected_score'],
+                    'player1_actual_score': 1.0,
+                    'player1_k_factor': elo_result['winner_k_factor'],
+                    'player2_old_elo': elo_result['loser_old_elo'],
+                    'player2_new_elo': elo_result['loser_new_elo'],
+                    'player2_delta': elo_result['loser_delta'],
+                    'player2_expected_score': elo_result['loser_expected_score'],
+                    'player2_actual_score': 0.0,
+                    'player2_k_factor': elo_result['loser_k_factor'],
+                    'k_factor': elo_result['k_factor'],
+                }
+            player1_new_elo = elo_result['player1_new_elo']
+            player2_new_elo = elo_result['player2_new_elo']
+        else:
+            elo_result = {
+                'player1_old_elo': player1_old_elo,
+                'player1_new_elo': player1_old_elo,
+                'player1_delta': 0,
+                'player1_expected_score': 0,
+                'player1_actual_score': 0.5 if clean_result_type == 'draw' else 1.0,
+                'player1_k_factor': 0,
+                'player2_old_elo': player2_old_elo,
+                'player2_new_elo': player2_old_elo,
+                'player2_delta': 0,
+                'player2_expected_score': 0,
+                'player2_actual_score': 0.5 if clean_result_type == 'draw' else 0.0,
+                'player2_k_factor': 0,
+                'k_factor': 0,
+            }
+            player1_new_elo = player1_old_elo
+            player2_new_elo = player2_old_elo
+
+        match_payload = {
+            'player1_id': player1['id'],
+            'player2_id': player2['id'],
+            'played_at': played_at,
+            'comment': clean_comment or None,
+            'player1_race': clean_player1_race,
+            'player2_race': clean_player2_race,
+            'is_ranked': ranked_match,
+            'game_type': clean_game_type,
+            'mission_name': clean_mission_name,
+            'result_type': clean_result_type,
+            'winner_player_id': None if clean_result_type == 'draw' else player1['id'],
+        }
+
+        match_rows = _rest_insert('matches', match_payload)
+        match_row = match_rows[0] if isinstance(match_rows, list) else match_rows
+
+        player1_matches_after_match = player1_matches_before_match + 1
+        player2_matches_after_match = player2_matches_before_match + 1
+
+        player1_updates = {
+            'current_elo': player1_new_elo,
+            'matches_count': player1_matches_after_match,
+            'last_match_at': played_at,
+            'is_active': player1_matches_after_match >= CALIBRATION_MATCHES_REQUIRED,
+            'updated_at': datetime.utcnow().isoformat(),
+        }
+        player2_updates = {
+            'current_elo': player2_new_elo,
+            'matches_count': player2_matches_after_match,
+            'last_match_at': played_at,
+            'is_active': player2_matches_after_match >= CALIBRATION_MATCHES_REQUIRED,
+            'updated_at': datetime.utcnow().isoformat(),
+        }
+
+        if clean_result_type == 'draw':
+            player1_updates['draws'] = int(player1.get('draws') or 0) + 1
+            player2_updates['draws'] = int(player2.get('draws') or 0) + 1
+        else:
+            player1_updates['wins'] = int(player1.get('wins') or 0) + 1
+            player2_updates['losses'] = int(player2.get('losses') or 0) + 1
+
+        _rest_update('players', player1_updates, filters=[('id', 'eq', player1['id'])])
+        _rest_update('players', player2_updates, filters=[('id', 'eq', player2['id'])])
+
+        if ranked_match:
+            _rest_insert(
+                'rating_history',
+                [
+                    {
+                        'match_id': match_row['id'],
+                        'player_id': player1['id'],
+                        'old_elo': elo_result['player1_old_elo'],
+                        'new_elo': elo_result['player1_new_elo'],
+                        'elo_delta': elo_result['player1_delta'],
+                        'expected_score': elo_result['player1_expected_score'],
+                        'actual_score': elo_result['player1_actual_score'],
+                        'k_factor': elo_result['player1_k_factor'],
+                    },
+                    {
+                        'match_id': match_row['id'],
+                        'player_id': player2['id'],
+                        'old_elo': elo_result['player2_old_elo'],
+                        'new_elo': elo_result['player2_new_elo'],
+                        'elo_delta': elo_result['player2_delta'],
+                        'expected_score': elo_result['player2_expected_score'],
+                        'actual_score': elo_result['player2_actual_score'],
+                        'k_factor': elo_result['player2_k_factor'],
+                    },
+                ],
+            )
+
+        _refresh_priority_race(player1['id'], force_refresh=True)
+        _refresh_priority_race(player2['id'])
+        invalidate_application_cache()
+
+        return {
+            'match_id': match_row['id'],
+            'played_at_label': _format_match_datetime(match_row.get('played_at') or played_at),
+            'result_type': clean_result_type,
+            'is_tie': clean_result_type == 'draw',
+            'winner_player_id': None if clean_result_type == 'draw' else player1['id'],
+            'winner_name': player1['name'],
+            'winner_created': player1.get('created', False),
+            'winner_race': _normalize_race_label(clean_player1_race),
+            'winner_profile_url': f"/players/{player1['id']}",
+            'opponent_player_id': player2['id'],
+            'opponent_name': player2['name'],
+            'opponent_created': player2.get('created', False),
+            'opponent_race': _normalize_race_label(clean_player2_race),
+            'opponent_profile_url': f"/players/{player2['id']}",
+            'is_ranked': ranked_match,
+            'game_type': clean_game_type,
+            'mission_name': clean_mission_name,
+            'comment': clean_comment,
+            'winner_old_elo_display': _normalize_elo_value(elo_result['player1_old_elo']),
+            'winner_new_elo_display': _normalize_elo_value(elo_result['player1_new_elo']),
+            'winner_delta_display': _format_delta(elo_result['player1_delta']),
+            'opponent_old_elo_display': _normalize_elo_value(elo_result['player2_old_elo']),
+            'opponent_new_elo_display': _normalize_elo_value(elo_result['player2_new_elo']),
+            'opponent_delta_display': _format_delta(elo_result['player2_delta']),
+        }
 
 def fetch_player_admin(player_id: int) -> dict | None:
     row = _rest_get_player_by_id(player_id)

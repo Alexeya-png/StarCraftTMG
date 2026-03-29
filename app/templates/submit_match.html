@@ -306,4 +306,29 @@
     });
 })();
 </script>
+<script>
+(function () {
+    const form = document.querySelector('.submit-form');
+    if (!form) {
+        return;
+    }
+
+    const submitButton = form.querySelector('button[type="submit"]');
+    let isSubmitting = false;
+
+    form.addEventListener('submit', function (event) {
+        if (isSubmitting) {
+            event.preventDefault();
+            return;
+        }
+
+        isSubmitting = true;
+
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent = 'Saving...';
+        }
+    });
+})();
+</script>
 {% endblock %}
