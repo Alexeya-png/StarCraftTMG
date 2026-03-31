@@ -227,6 +227,8 @@ def _build_submit_form_state(raw_values: dict | None = None) -> dict:
         'is_ranked': str(source.get('is_ranked', 'yes')).strip() or 'yes',
         'game_type': str(source.get('game_type', '1к')).strip() or '1к',
         'mission_name': str(source.get('mission_name', '')).strip(),
+        'player1_score': str(source.get('player1_score', '')).strip(),
+        'player2_score': str(source.get('player2_score', '')).strip(),
         'comment': str(source.get('comment', '')).strip(),
     }
 
@@ -288,6 +290,8 @@ def _build_admin_match_form_state(match: dict | None = None, source: dict | None
         'is_ranked': str(source.get('is_ranked', 'yes' if match.get('is_ranked', True) else 'no')).strip() or 'yes',
         'game_type': str(source.get('game_type', match.get('game_type', '1к'))).strip() or '1к',
         'mission_name': str(source.get('mission_name', match.get('mission_name', ''))).strip(),
+        'player1_score': str(source.get('player1_score', match.get('player1_score', ''))).strip(),
+        'player2_score': str(source.get('player2_score', match.get('player2_score', ''))).strip(),
         'comment': str(source.get('comment', match.get('comment', ''))).strip(),
         'played_at': str(source.get('played_at', match.get('played_at_input', ''))).strip(),
     }
@@ -460,6 +464,8 @@ def submit_result_post():
             is_ranked=form_state.get('is_ranked', 'yes'),
             game_type=form_state.get('game_type', ''),
             mission_name=form_state.get('mission_name', ''),
+            player1_score=form_state.get('player1_score', ''),
+            player2_score=form_state.get('player2_score', ''),
             comment=form_state.get('comment', ''),
         )
     except Exception as exc:
@@ -648,6 +654,8 @@ def admin_edit_match_post(match_id: int):
             is_ranked=form_state.get('is_ranked', 'yes'),
             game_type=form_state.get('game_type', ''),
             mission_name=form_state.get('mission_name', ''),
+            player1_score=form_state.get('player1_score', ''),
+            player2_score=form_state.get('player2_score', ''),
             comment=form_state.get('comment', ''),
             played_at=played_at,
         )

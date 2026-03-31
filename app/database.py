@@ -143,11 +143,97 @@ _DATA_CACHE: dict[str, Any] = {
 }
 
 
+MATCH_META_PREFIX = '[[match_meta:'
+MATCH_META_PATTERN = re.compile(r'^\[\[match_meta:(\{.*?\})\]\]\s*', re.DOTALL)
+
+
 
 def _normalize_text(value: str | None) -> str:
     if value is None:
         return ''
     return str(value).strip()
+
+
+def _parse_match_meta(comment: str | None) -> tuple[dict[str, Any], str]:
+    clean_comment = _normalize_text(comment)
+    if not clean_comment:
+        return {}, ''
+
+    match = MATCH_META_PATTERN.match(clean_comment)
+    if not match:
+        return {}, clean_comment
+
+    try:
+        metadata = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return {}, clean_comment
+
+    if not isinstance(metadata, dict):
+        return {}, clean_comment
+
+    visible_comment = clean_comment[match.end():].strip()
+    return metadata, visible_comment
+
+
+
+def _coerce_match_score_value(value, *, allow_blank: bool = False, field_label: str = 'Score') -> int | None:
+    clean_value = _normalize_text(value)
+    if not clean_value:
+        if allow_blank:
+            return None
+        raise ValueError(f'{field_label} is required.')
+
+    try:
+        numeric_value = int(clean_value)
+    except (TypeError, ValueError):
+        raise ValueError(f'{field_label} must be a whole number.')
+
+    if numeric_value < 0 or numeric_value > 100:
+        raise ValueError(f'{field_label} must be between 0 and 100.')
+
+    return numeric_value
+
+
+
+def _extract_match_score_details(row: dict | None) -> dict[str, Any]:
+    source = dict(row or {})
+    metadata, visible_comment = _parse_match_meta(source.get('comment'))
+
+    player1_score_source = source.get('player1_score', metadata.get('player1_score'))
+    player2_score_source = source.get('player2_score', metadata.get('player2_score'))
+
+    player1_score = _coerce_match_score_value(player1_score_source, allow_blank=True, field_label='Player 1 score')
+    player2_score = _coerce_match_score_value(player2_score_source, allow_blank=True, field_label='Player 2 score')
+
+    return {
+        'visible_comment': visible_comment,
+        'player1_score': player1_score,
+        'player2_score': player2_score,
+        'has_score': player1_score is not None and player2_score is not None,
+    }
+
+
+
+def _build_match_comment_payload(comment: str | None, player1_score, player2_score) -> str | None:
+    clean_comment = _normalize_text(comment)
+    metadata = {
+        'player1_score': _coerce_match_score_value(player1_score, field_label='Player 1 score'),
+        'player2_score': _coerce_match_score_value(player2_score, field_label='Player 2 score'),
+    }
+    metadata_blob = json.dumps(metadata, ensure_ascii=False, separators=(',', ':'))
+    payload = f'{MATCH_META_PREFIX}{metadata_blob}]]'
+    if clean_comment:
+        payload = f'{payload} {clean_comment}'
+    return payload
+
+
+
+def _format_match_score(player1_score, player2_score) -> str:
+    left_score = _coerce_match_score_value(player1_score, allow_blank=True, field_label='Player 1 score')
+    right_score = _coerce_match_score_value(player2_score, allow_blank=True, field_label='Player 2 score')
+    if left_score is None or right_score is None:
+        return ''
+    return f'{left_score}:{right_score}'
 
 
 def _slugify(value: str | None) -> str:
@@ -201,7 +287,7 @@ def _normalize_discord_url(value: str | None) -> str:
 
 def _normalize_elo_value(value) -> str:
     if value is None:
-        return '—'
+        return ''
     try:
         return str(int(value))
     except (TypeError, ValueError):
@@ -222,7 +308,7 @@ def _format_percent(value) -> str:
 
 def _format_delta(value) -> str:
     if value is None:
-        return '—'
+        return ''
     try:
         numeric = int(value)
     except (TypeError, ValueError):
@@ -258,21 +344,21 @@ def _is_player_active_by_last_match(last_match_at) -> bool:
 def _format_match_datetime(value) -> str:
     parsed = _parse_datetime(value)
     if not parsed:
-        return '—'
+        return ''
     return parsed.strftime('%Y-%m-%d %H:%M')
 
 
 def _format_match_date(value) -> str:
     parsed = _parse_datetime(value)
     if not parsed:
-        return '—'
+        return ''
     return parsed.strftime('%Y-%m-%d')
 
 
 def _humanize_last_played(value) -> str:
     parsed = _parse_datetime(value)
     if not parsed:
-        return '—'
+        return ''
 
     now = datetime.now(parsed.tzinfo) if getattr(parsed, 'tzinfo', None) else datetime.now()
     delta = now - parsed
@@ -865,17 +951,20 @@ def _prepare_game_report_row(row: dict) -> dict:
     match['winner_rating_display'] = (
         f"{_normalize_elo_value(match.get('winner_old_elo'))} → {_normalize_elo_value(match.get('winner_new_elo'))}"
         if match.get('winner_old_elo') is not None and match.get('winner_new_elo') is not None
-        else '—'
+        else ''
     )
     match['loser_rating_display'] = (
         f"{_normalize_elo_value(match.get('loser_old_elo'))} → {_normalize_elo_value(match.get('loser_new_elo'))}"
         if match.get('loser_old_elo') is not None and match.get('loser_new_elo') is not None
-        else '—'
+        else ''
     )
     match['ranked_label'] = 'Ranked' if match.get('is_ranked') else 'Unranked'
-    match['comment_display'] = _normalize_text(match.get('comment')) or '—'
-    match['game_type_display'] = _normalize_text(match.get('game_type')) or '—'
-    match['mission_name_display'] = _normalize_text(match.get('mission_name')) or '—'
+    match['comment_display'] = _normalize_text(match.get('comment'))
+    match['game_type_display'] = _normalize_text(match.get('game_type'))
+    match['mission_name_display'] = _normalize_text(match.get('mission_name'))
+    match['winner_score'] = _coerce_match_score_value(match.get('winner_score'), allow_blank=True, field_label='Winner score')
+    match['loser_score'] = _coerce_match_score_value(match.get('loser_score'), allow_blank=True, field_label='Loser score')
+    match['score_display'] = _format_match_score(match.get('winner_score'), match.get('loser_score'))
     match['result_type'] = _normalize_match_result_type(match.get('result_type'))
     match['is_tie'] = match['result_type'] == 'draw'
     match['result_label'] = 'TIE' if match['is_tie'] else 'WIN'
@@ -1057,7 +1146,7 @@ def _build_rating_chart(current_elo, rating_rows: list[dict]) -> dict:
             x_ticks.append(
                 {
                     'x': point['x'],
-                    'label': point.get('date_label') or point.get('played_at_label') or '—',
+                    'label': point.get('date_label') or point.get('played_at_label') or '',
                 }
             )
 
@@ -1341,6 +1430,17 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25)
         winner_history = history_by_pair.get((int(match['id']), winner_id), {})
         loser_history = history_by_pair.get((int(match['id']), loser_id), {})
 
+        score_details = _extract_match_score_details(match)
+        player1_score = score_details['player1_score']
+        player2_score = score_details['player2_score']
+
+        if is_tie or winner_id == player1_id:
+            winner_score = player1_score
+            loser_score = player2_score
+        else:
+            winner_score = player2_score
+            loser_score = player1_score
+
         item = {
             'id': int(match['id']),
             'played_at': match.get('played_at'),
@@ -1350,10 +1450,12 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25)
             'loser_name': loser_name,
             'winner_race': winner_race,
             'loser_race': loser_race,
+            'winner_score': winner_score,
+            'loser_score': loser_score,
             'is_ranked': bool(match.get('is_ranked')),
             'game_type': match.get('game_type'),
             'mission_name': match.get('mission_name'),
-            'comment': match.get('comment'),
+            'comment': score_details['visible_comment'],
             'winner_old_elo': winner_history.get('old_elo'),
             'winner_new_elo': winner_history.get('new_elo'),
             'winner_elo_delta': winner_history.get('elo_delta'),
@@ -1511,6 +1613,10 @@ def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict
             is_loss = not is_win
             result_label = 'Win' if is_win else 'Loss'
 
+        score_details = _extract_match_score_details(match)
+        player_score = score_details['player1_score'] if player1_id == int(player_id) else score_details['player2_score']
+        opponent_score = score_details['player2_score'] if player1_id == int(player_id) else score_details['player1_score']
+
         prepared = {
             'id': match_id,
             'played_at': match.get('played_at'),
@@ -1522,6 +1628,9 @@ def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict
             'is_tie': is_tie,
             'player_race': match.get('player1_race') if player1_id == int(player_id) else match.get('player2_race'),
             'opponent_race': match.get('player2_race') if player1_id == int(player_id) else match.get('player1_race'),
+            'player_score': player_score,
+            'opponent_score': opponent_score,
+            'score_display': _format_match_score(player_score, opponent_score),
             'old_elo': history_row.get('old_elo') if history_row else None,
             'new_elo': history_row.get('new_elo') if history_row else None,
             'elo_delta': history_row.get('elo_delta') if history_row else None,
@@ -1579,7 +1688,7 @@ def _compute_player_rank_position(player_id: int) -> int | str:
     for index, row in enumerate(rows, start=1):
         if int(row['id']) == int(player_id):
             return index
-    return '—'
+    return ''
 
 
 def _get_or_create_player(player_name: str) -> dict:
@@ -1710,6 +1819,7 @@ def _build_submit_result_from_existing_match(
     clean_result_type = _normalize_match_result_type(match_row.get('result_type'))
     history_rows = _fetch_all_rating_history_raw(force_refresh=True)
     history_by_pair = {(int(row['match_id']), int(row['player_id'])): row for row in history_rows}
+    score_details = _extract_match_score_details(match_row)
 
     player1_history = history_by_pair.get((match_id, int(player1['id'])), {})
     player2_history = history_by_pair.get((match_id, int(player2['id'])), {})
@@ -1732,7 +1842,10 @@ def _build_submit_result_from_existing_match(
         'is_ranked': ranked_match,
         'game_type': _normalize_text(match_row.get('game_type')),
         'mission_name': _normalize_player_name(match_row.get('mission_name')),
-        'comment': _normalize_text(match_row.get('comment')),
+        'comment': score_details['visible_comment'],
+        'player1_score': score_details['player1_score'],
+        'player2_score': score_details['player2_score'],
+        'score_display': _format_match_score(score_details['player1_score'], score_details['player2_score']),
         'winner_old_elo_display': _normalize_elo_value(player1_history.get('old_elo')),
         'winner_new_elo_display': _normalize_elo_value(player1_history.get('new_elo')),
         'winner_delta_display': _format_delta(player1_history.get('elo_delta')),
@@ -1741,17 +1854,20 @@ def _build_submit_result_from_existing_match(
         'opponent_delta_display': _format_delta(player2_history.get('elo_delta')),
     }
 
+
 def submit_match_result(
     *,
     winner_name: str,
     opponent_name: str,
     winner_race: str,
     opponent_race: str,
+    result_type: str,
     is_ranked,
     game_type: str,
     mission_name: str,
-    comment: str = '',
-    result_type: str = 'win',
+    player1_score,
+    player2_score,
+    comment: str,
 ) -> dict:
     with _SUBMIT_MATCH_LOCK:
         clean_player1_name = _normalize_player_name(winner_name)
@@ -1761,6 +1877,9 @@ def submit_match_result(
         clean_game_type = _normalize_text(game_type)
         clean_mission_name = _normalize_player_name(mission_name)
         clean_comment = _normalize_text(comment)
+        clean_player1_score = _coerce_match_score_value(player1_score, field_label='Player 1 score')
+        clean_player2_score = _coerce_match_score_value(player2_score, field_label='Player 2 score')
+        comment_payload = _build_match_comment_payload(clean_comment, clean_player1_score, clean_player2_score)
         clean_result_type = _normalize_match_result_type(result_type)
         ranked_match = _coerce_ranked_value(is_ranked)
 
@@ -1778,7 +1897,7 @@ def submit_match_result(
             raise ValueError('Choose the game type.')
         if not clean_mission_name:
             raise ValueError('Choose the mission.')
-        if len(clean_comment) > 4000:
+        if len(comment_payload or '') > 4000:
             raise ValueError('Comment is too long.')
 
         submitted_at = datetime.now()
@@ -1795,7 +1914,7 @@ def submit_match_result(
             is_ranked=ranked_match,
             game_type=clean_game_type,
             mission_name=clean_mission_name,
-            comment=clean_comment,
+            comment=comment_payload,
             result_type=clean_result_type,
             submitted_at=submitted_at,
         )
@@ -1867,7 +1986,7 @@ def submit_match_result(
             'player1_id': player1['id'],
             'player2_id': player2['id'],
             'played_at': played_at,
-            'comment': clean_comment or None,
+            'comment': comment_payload,
             'player1_race': clean_player1_race,
             'player2_race': clean_player2_race,
             'is_ranked': ranked_match,
@@ -1958,6 +2077,9 @@ def submit_match_result(
             'game_type': clean_game_type,
             'mission_name': clean_mission_name,
             'comment': clean_comment,
+            'player1_score': clean_player1_score,
+            'player2_score': clean_player2_score,
+            'score_display': _format_match_score(clean_player1_score, clean_player2_score),
             'winner_old_elo_display': _normalize_elo_value(elo_result['player1_old_elo']),
             'winner_new_elo_display': _normalize_elo_value(elo_result['player1_new_elo']),
             'winner_delta_display': _format_delta(elo_result['player1_delta']),
@@ -2062,7 +2184,11 @@ def fetch_match_admin(match_id: int) -> dict | None:
     match['player2_race'] = _normalize_race_label(match.get('player2_race'))
     match['game_type'] = _normalize_text(match.get('game_type'))
     match['mission_name'] = _normalize_text(match.get('mission_name'))
-    match['comment'] = _normalize_text(match.get('comment'))
+    score_details = _extract_match_score_details(match)
+    match['player1_score'] = score_details['player1_score']
+    match['player2_score'] = score_details['player2_score']
+    match['score_display'] = _format_match_score(score_details['player1_score'], score_details['player2_score'])
+    match['comment'] = score_details['visible_comment']
     match['played_at_label'] = _format_match_datetime(match.get('played_at'))
     parsed = _parse_datetime(match.get('played_at'))
     match['played_at_input'] = parsed.strftime('%Y-%m-%dT%H:%M') if parsed else ''
@@ -2264,6 +2390,8 @@ def update_match_admin(
     is_ranked,
     game_type: str,
     mission_name: str,
+    player1_score,
+    player2_score,
     comment: str,
     played_at: datetime,
 ) -> dict:
@@ -2275,6 +2403,9 @@ def update_match_admin(
     clean_game_type = _normalize_text(game_type)
     clean_mission_name = _normalize_player_name(mission_name)
     clean_comment = _normalize_text(comment)
+    clean_player1_score = _coerce_match_score_value(player1_score, field_label='Player 1 score')
+    clean_player2_score = _coerce_match_score_value(player2_score, field_label='Player 2 score')
+    comment_payload = _build_match_comment_payload(clean_comment, clean_player1_score, clean_player2_score)
     clean_winner_side = _normalize_text(winner_side)
     clean_result_type = 'draw' if clean_winner_side == 'tie' else 'win'
 
@@ -2296,7 +2427,7 @@ def update_match_admin(
         raise ValueError('Choose the match result.')
     if not isinstance(played_at, datetime):
         raise ValueError('Enter a valid played at date and time.')
-    if len(clean_comment) > 4000:
+    if len(comment_payload or '') > 4000:
         raise ValueError('Comment is too long.')
 
     existing = _rest_select('matches', filters=[('id', 'eq', match_id)], single=True)
@@ -2315,7 +2446,7 @@ def update_match_admin(
             'winner_player_id': winner_player_id,
             'result_type': clean_result_type,
             'played_at': played_at.isoformat(),
-            'comment': clean_comment or None,
+            'comment': comment_payload,
             'player1_race': clean_player1_race,
             'player2_race': clean_player2_race,
             'is_ranked': ranked_match,

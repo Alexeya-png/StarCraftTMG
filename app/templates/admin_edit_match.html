@@ -1,113 +1,119 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<section class="section admin-editor-section">
-    <div class="container">
-        <div class="page-head">
+<section class="section leaderboard-section leaderboard-compact-section game-reports-section">
+    <div class="container leaderboard-container game-reports-container">
+        <div class="page-head leaderboard-page-head game-reports-page-head">
             <div>
-                <span class="eyebrow">Admin</span>
-                <p class="page-text">Changing a saved game recalculates ELO and rating history for all later matches.</p>
-            </div>
-            <div class="page-actions">
-                <a class="button button-secondary" href="/reports">Back to Game Reports</a>
+                <p class="page-text leaderboard-page-subtitle">{{ total_matches if total_matches is defined else matches|length }} matches shown</p>
             </div>
         </div>
 
-        {% if error_message %}
-        <div class="submit-alert submit-alert-error admin-inline-alert">
-            <strong>Could not save match.</strong>
-            <span>{{ error_message }}</span>
+        <div class="leaderboard-shell leaderboard-shell-polished leaderboard-shell-scrollable game-reports-shell">
+            {% if db_error %}
+            <div class="state-card state-card-error leaderboard-state-card">
+                <h2>Database connection error</h2>
+                <p>{{ db_error }}</p>
+            </div>
+            {% elif matches %}
+            <div class="leaderboard-table-wrap leaderboard-table-wrap-vertical polished-table-wrap game-reports-table-wrap">
+                <table class="leaderboard-table leaderboard-table-sc2 leaderboard-table-polished leaderboard-table-tight game-reports-table">
+                    <colgroup>
+                        <col class="col-match-id">
+                        <col class="col-played-at">
+                        <col class="col-match-player">
+                        <col class="col-match-player">
+                        <col class="col-ranked">
+                        <col class="col-game-type">
+                        <col class="col-score">
+                        <col class="col-mission">
+                        <col class="col-comment">
+                        {% if is_admin %}<col class="col-admin-actions">{% endif %}
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th class="col-match-id">ID</th>
+                            <th class="col-played-at">Played at</th>
+                            <th class="col-match-player">Winner</th>
+                            <th class="col-match-player">Loser</th>
+                            <th class="col-ranked">Ranked</th>
+                            <th class="col-game-type">Game type</th>
+                            <th class="col-score">Score</th>
+                            <th class="col-mission">Mission</th>
+                            <th class="col-comment">Comment</th>
+                            {% if is_admin %}<th class="col-admin-actions">Admin</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for match in matches %}
+                        {% set winner_race_slug = match.winner_race|lower if match.winner_race else '' %}
+                        {% set loser_race_slug = match.loser_race|lower if match.loser_race else '' %}
+                        <tr class="{% if match.is_tie %}game-report-row-tie{% endif %}">
+                            <td class="value-match-id">{{ match.id }}</td>
+                            <td class="value-played-at">{{ match.played_at_label }}</td>
+                            <td class="value-player value-player-with-result">
+                                <div class="game-report-player-cell">
+                                    <a class="player-profile-link" href="{{ match.winner_profile_url }}">
+                                        <div class="sc2-player-inline polished-player-inline">
+                                            {% if winner_race_slug in ['terran', 'protoss', 'zerg'] %}
+                                            <img class="race-inline-icon" src="/static/Race/{{ winner_race_slug }}.svg" alt="{{ match.winner_race }} icon">
+                                            {% endif %}
+                                            <span class="player-name sc2-player-name">{{ match.winner_name }}</span>
+                                        </div>
+                                    </a>
+                                    {% if match.is_tie %}
+                                    <span class="inline-result-badge inline-result-badge-tie">TIE</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="value-player">
+                                <a class="player-profile-link" href="{{ match.loser_profile_url }}">
+                                    <div class="sc2-player-inline polished-player-inline">
+                                        {% if loser_race_slug in ['terran', 'protoss', 'zerg'] %}
+                                        <img class="race-inline-icon" src="/static/Race/{{ loser_race_slug }}.svg" alt="{{ match.loser_race }} icon">
+                                        {% endif %}
+                                        <span class="player-name sc2-player-name">{{ match.loser_name }}</span>
+                                    </div>
+                                </a>
+                            </td>
+                            <td class="value-ranked">{{ match.ranked_label }}</td>
+                            <td class="value-game-type">{{ match.game_type_display }}</td>
+                            <td class="value-score">{{ match.score_display }}</td>
+                            <td class="value-mission">{{ match.mission_name_display }}</td>
+                            <td class="value-comment">{{ match.comment_display }}</td>
+                            {% if is_admin %}
+                            <td class="value-admin-action">
+                                <a class="admin-action-link" href="/admin/matches/{{ match.id }}">Edit</a>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if total_pages is defined and total_pages > 1 %}
+            <div class="table-footer-pagination">
+                {% for item in pagination_numbers %}
+                    {% if item == '...' %}
+                        <span class="pagination-ellipsis">...</span>
+                    {% else %}
+                        {% if item == current_page %}
+                            <span class="pagination-link is-active">{{ item }}</span>
+                        {% else %}
+                            <a class="pagination-link" href="/reports?page={{ item }}&per_page={{ per_page }}{% if search %}&search={{ search|urlencode }}{% endif %}">{{ item }}</a>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="state-card leaderboard-state-card">
+                <h2>No matches found</h2>
+                <p>There are no saved matches yet.</p>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
-
-        {% if success_message %}
-        <div class="submit-alert submit-alert-success admin-inline-alert">
-            <strong>{{ success_message }}</strong>
-        </div>
-        {% endif %}
-
-        {% if match %}
-        <div class="leaderboard-shell admin-editor-shell">
-            <form class="admin-form-grid" method="post" action="/admin/matches/{{ match.id }}">
-                <div class="admin-form-two-col">
-                    <div class="toolbar-field">
-                        <label for="player1_name">Player 1</label>
-                        <input id="player1_name" name="player1_name" type="text" value="{{ form_state.player1_name }}" required>
-                    </div>
-                    <div class="toolbar-field">
-                        <label for="player2_name">Player 2</label>
-                        <input id="player2_name" name="player2_name" type="text" value="{{ form_state.player2_name }}" required>
-                    </div>
-                    <div class="toolbar-field">
-                        <label for="winner_side">Winner</label>
-                        <select id="winner_side" name="winner_side" required>
-                            <option value="player1" {% if form_state.winner_side == 'player1' %}selected{% endif %}>Player 1 wins</option>
-                            <option value="player2" {% if form_state.winner_side == 'player2' %}selected{% endif %}>Player 2 wins</option>
-                        </select>
-                    </div>
-                    <div class="toolbar-field">
-                        <label for="played_at">Played at</label>
-                        <input id="played_at" name="played_at" type="datetime-local" value="{{ form_state.played_at }}" required>
-                    </div>
-                    <div class="toolbar-field">
-                        <label for="player1_race">Player 1 race</label>
-                        <select id="player1_race" name="player1_race" required>
-                            {% for race in race_options %}
-                            <option value="{{ race }}" {% if form_state.player1_race == race %}selected{% endif %}>{{ race }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="toolbar-field">
-                        <label for="player2_race">Player 2 race</label>
-                        <select id="player2_race" name="player2_race" required>
-                            {% for race in race_options %}
-                            <option value="{{ race }}" {% if form_state.player2_race == race %}selected{% endif %}>{{ race }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="toolbar-field">
-                        <label for="is_ranked">Ranked</label>
-                        <select id="is_ranked" name="is_ranked" required>
-                            <option value="yes" {% if form_state.is_ranked == 'yes' %}selected{% endif %}>Ranked</option>
-                            <option value="no" {% if form_state.is_ranked == 'no' %}selected{% endif %}>Unranked</option>
-                        </select>
-                    </div>
-                    <div class="toolbar-field">
-                        <label for="game_type">Game type</label>
-                        <select id="game_type" name="game_type" required>
-                            {% for game_type in game_type_options %}
-                            <option value="{{ game_type }}" {% if form_state.game_type == game_type %}selected{% endif %}>{{ game_type }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="toolbar-field form-section-span-2">
-                        <label for="mission_name">Mission</label>
-                        <select id="mission_name" name="mission_name" required>
-                            <option value="">Choose mission</option>
-                            {% for mission in mission_options %}
-                            <option value="{{ mission }}" {% if form_state.mission_name == mission %}selected{% endif %}>{{ mission }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="toolbar-field form-section-span-2">
-                        <label for="comment">Comment</label>
-                        <textarea id="comment" name="comment" rows="5" placeholder="Optional comment">{{ form_state.comment }}</textarea>
-                    </div>
-                </div>
-
-                <div class="admin-editor-meta">
-                    <div><strong>ID:</strong> {{ match.id }}</div>
-                    <div><strong>Current date:</strong> {{ match.played_at_label }}</div>
-                    <div><strong>Current winner:</strong> {{ match.player1_name if match.winner_side == 'player1' else match.player2_name }}</div>
-                </div>
-
-                <div class="admin-form-actions admin-form-actions-split">
-                    <button class="button button-primary" type="submit" name="action" value="save">Save match</button>
-                    <button class="button button-danger" type="submit" name="action" value="delete" onclick="return confirm('Delete this match and recalculate ELO?');">Delete match</button>
-                </div>
-            </form>
-        </div>
-        {% endif %}
     </div>
 </section>
 {% endblock %}

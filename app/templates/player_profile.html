@@ -296,6 +296,7 @@
                         <col style="width: 110px;">
                         <col style="width: 120px;">
                         <col style="width: 120px;">
+                        <col style="width: 110px;">
                         <col style="width: 120px;">
                         <col style="width: 120px;">
                     </colgroup>
@@ -306,6 +307,7 @@
                             <th>Result</th>
                             <th>Player race</th>
                             <th>Opponent race</th>
+                            <th>Score</th>
                             <th>Delta</th>
                             <th>ELO</th>
                         </tr>
@@ -340,6 +342,7 @@
                                     <span>{{ match.opponent_race or '—' }}</span>
                                 </span>
                             </td>
+                            <td>{{ match.score_display }}</td>
                             <td class="{% if match.is_tie %}delta-tie{% elif match.is_win %}delta-win{% else %}delta-loss{% endif %}">{{ match.elo_delta_display }}</td>
                             <td>{{ match.old_elo_display }} → {{ match.new_elo_display }}</td>
                         </tr>

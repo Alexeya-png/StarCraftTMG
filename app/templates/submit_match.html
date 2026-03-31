@@ -54,6 +54,7 @@
                             <span>• {{ success_data.game_type }}</span>
                         </div>
                         <div class="submit-alert-note">{{ success_data.mission_name }}</div>
+                        <div class="submit-alert-note">Score {{ success_data.score_display }}</div>
                     </div>
                 </div>
                 {% if success_data.is_ranked %}
@@ -231,16 +232,27 @@
 
                     <section class="form-section">
                         <div class="form-section-head">
-                            <h2>Mission</h2>
-                            <p>Choose a mission from the list.</p>
+                            <h2>Match details</h2>
+                            <p>Choose a mission and enter the final score.</p>
                         </div>
                         <div class="toolbar-field">
+                            <label for="mission_name">Mission</label>
                             <select id="mission_name" name="mission_name" required>
                                 <option value="">Choose mission</option>
                                 {% for mission in mission_options %}
                                 <option value="{{ mission }}" {% if form_state.mission_name == mission %}selected{% endif %}>{{ mission }}</option>
                                 {% endfor %}
                             </select>
+                        </div>
+                        <div class="score-pair-grid">
+                            <div class="toolbar-field">
+                                <label for="player1_score">Player 1 score</label>
+                                <input id="player1_score" name="player1_score" type="number" min="0" max="100" step="1" value="{{ form_state.player1_score }}" placeholder="0" required>
+                            </div>
+                            <div class="toolbar-field">
+                                <label for="player2_score">Player 2 score</label>
+                                <input id="player2_score" name="player2_score" type="number" min="0" max="100" step="1" value="{{ form_state.player2_score }}" placeholder="0" required>
+                            </div>
                         </div>
                     </section>
 
