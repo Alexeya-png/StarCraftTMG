@@ -3,8 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png', v=asset_version) }}">
     <title>{{ page_title }}</title>
+    <meta name="description" content="{{ meta_description }}">
+    <meta name="robots" content="{{ meta_robots }}">
+    <link rel="canonical" href="{{ canonical_url }}">
+    {% if google_site_verification %}
+    <meta name="google-site-verification" content="{{ google_site_verification }}">
+    {% endif %}
+    <meta property="og:site_name" content="StarCraft ELO">
+    <meta property="og:type" content="{{ og_type }}">
+    <meta property="og:title" content="{{ page_title }}">
+    <meta property="og:description" content="{{ meta_description }}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:image" content="{{ site_url }}{{ url_for('static', filename='Race/logo.png', v=asset_version) }}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ page_title }}">
+    <meta name="twitter:description" content="{{ meta_description }}">
+    <meta name="twitter:image" content="{{ site_url }}{{ url_for('static', filename='Race/logo.png', v=asset_version) }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png', v=asset_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v=asset_version) }}">
 </head>
 <body>
@@ -15,7 +31,7 @@
                 <img class="brand-logo" src="{{ url_for('static', filename='Race/logo.png', v=asset_version) }}" alt="Archon Studio logo" width="96" height="64" decoding="async">
     <div class="brand-meta">
         <span class="brand-title">StarCraft ELO</span>
-        <span class="brand-version">Version 0.1</span>
+        <span class="brand-version">Version 0.3</span>
         <span class="brand-note">Unofficial fan project</span>
     </div>
         </a>

@@ -4,10 +4,11 @@ import hmac
 import json
 import os
 from datetime import datetime, timedelta, timezone
+from html import escape
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, make_response, redirect, render_template, request
+from flask import Flask, Response, jsonify, make_response, redirect, render_template, request, send_from_directory
 
 from app.database import (
     delete_match_admin,
@@ -94,6 +95,24 @@ ADMIN_SESSION_HOURS = 12
 SUBMIT_NAME_SUGGESTION_LIMIT = int(os.getenv('SUBMIT_NAME_SUGGESTION_LIMIT', '200') or '200')
 
 
+def _get_site_url() -> str:
+    raw_value = (os.getenv('SITE_URL') or 'https://tmg-stats.org').strip() or 'https://tmg-stats.org'
+    return raw_value.rstrip('/')
+
+
+def _build_absolute_url(path: str) -> str:
+    clean_path = '/' + str(path or '').lstrip('/')
+    return f"{_get_site_url()}{clean_path}"
+
+
+def _canonical_url(path: str | None = None) -> str:
+    target_path = path if path is not None else request.path
+    return _build_absolute_url(target_path)
+
+
+def _default_meta_description() -> str:
+    return 'StarCraft ELO ratings, player profiles and match reports for the StarCraft TMG community.'
+
 
 @app.after_request
 def apply_fast_page_headers(response):
@@ -107,6 +126,12 @@ def apply_fast_page_headers(response):
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     response.headers['Vary'] = 'Cookie'
+
+    if request.path.startswith('/admin'):
+        response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+    elif request.path == '/health':
+        response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+
     return response
 
 
@@ -187,11 +212,25 @@ def _is_admin() -> bool:
 
 
 
-def _base_context(page_title: str, active_page: str) -> dict:
+def _base_context(
+    page_title: str,
+    active_page: str,
+    *,
+    meta_description: str | None = None,
+    canonical_path: str | None = None,
+    meta_robots: str = 'index,follow',
+    og_type: str = 'website',
+) -> dict:
     return {
         'page_title': page_title,
         'active_page': active_page,
         'is_admin': _is_admin(),
+        'meta_description': (meta_description or _default_meta_description()).strip(),
+        'canonical_url': _canonical_url(canonical_path),
+        'meta_robots': meta_robots,
+        'og_type': og_type,
+        'site_url': _get_site_url(),
+        'google_site_verification': (os.getenv('GOOGLE_SITE_VERIFICATION') or '').strip(),
     }
 
 
@@ -247,7 +286,12 @@ def _render_submit_page(
     except Exception:
         name_suggestions = []
 
-    context = _base_context('Submit Match', 'submit')
+    context = _base_context(
+        'Submit Match – StarCraft ELO',
+        'submit',
+        meta_description='Submit a StarCraft TMG match result to the StarCraft ELO community rating site.',
+        canonical_path='/submit',
+    )
     context.update(
         {
             'race_options': RACE_OPTIONS,
@@ -323,9 +367,59 @@ def _pagination_numbers(current_page: int, total_pages: int) -> list[int | str]:
     return [1, '...', current_page - 1, current_page, current_page + 1, '...', total_pages]
 
 
+@app.route('/robots.txt')
+def robots_txt():
+    sitemap_url = _build_absolute_url('/sitemap.xml')
+    lines = [
+        'User-agent: *',
+        'Allow: /',
+        'Disallow: /admin',
+        f'Sitemap: {sitemap_url}',
+    ]
+    response = make_response('\n'.join(lines) + '\n')
+    response.mimetype = 'text/plain'
+    return response
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    entries: list[tuple[str, str | None]] = [
+        (_build_absolute_url('/'), None),
+        (_build_absolute_url('/leaderboard'), None),
+        (_build_absolute_url('/reports'), None),
+        (_build_absolute_url('/submit'), None),
+    ]
+
+    unique_entries: list[tuple[str, str | None]] = []
+    seen_urls: set[str] = set()
+    for url, lastmod in entries:
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        unique_entries.append((url, lastmod))
+
+    xml_parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for url, lastmod in unique_entries:
+        xml_parts.append('  <url>')
+        xml_parts.append(f'    <loc>{escape(url)}</loc>')
+        if lastmod:
+            xml_parts.append(f'    <lastmod>{escape(lastmod)}</lastmod>')
+        xml_parts.append('  </url>')
+    xml_parts.append('</urlset>')
+
+    return Response('\n'.join(xml_parts), mimetype='application/xml')
+
 @app.route('/')
 def home():
-    context = _base_context('StarCraft ELO', 'home')
+    context = _base_context(
+        'StarCraft ELO – StarCraft TMG Community Ratings',
+        'home',
+        meta_description='StarCraft ELO ratings, match reports and player profiles for the StarCraft TMG community.',
+        canonical_path='/',
+    )
     return render_template('home.html', **context)
 
 
@@ -361,7 +455,14 @@ def leaderboard():
     except Exception as exc:
         db_error = str(exc)
 
-    context = _base_context('Global Rating', 'leaderboard')
+    is_filtered_page = bool(str(search).strip()) or not (show_active and not show_inactive)
+    context = _base_context(
+        'Global Rating – StarCraft ELO',
+        'leaderboard',
+        meta_description='Global StarCraft ELO leaderboard with player ratings, win rates and active community rankings.',
+        canonical_path='/leaderboard',
+        meta_robots='noindex,follow' if is_filtered_page else 'index,follow',
+    )
     context.update(
         {
             'players': players,
@@ -377,6 +478,9 @@ def leaderboard():
 @app.route('/reports')
 @app.route('/players')
 def game_reports():
+    if request.path == '/players':
+        return redirect('/reports', code=301)
+
     db_error = None
     matches = []
     total_matches = 0
@@ -396,7 +500,14 @@ def game_reports():
     except Exception as exc:
         db_error = str(exc)
 
-    context = _base_context('Game Reports', 'reports')
+    is_filtered_page = bool(str(search).strip()) or current_page > 1 or per_page != 25
+    context = _base_context(
+        'Game Reports – StarCraft ELO',
+        'reports',
+        meta_description='Recent StarCraft TMG game reports with results, races, missions and rating changes.',
+        canonical_path='/reports',
+        meta_robots='noindex,follow' if is_filtered_page else 'index,follow',
+    )
     context.update(
         {
             'matches': matches,
@@ -423,16 +534,39 @@ def player_profile(player_id: int):
         db_error = str(exc)
 
     if db_error:
-        context = _base_context('Player Profile', 'players')
+        context = _base_context(
+            'Player Profile – StarCraft ELO',
+            'players',
+            meta_description='StarCraft ELO player profile with rating history and recent match results.',
+            canonical_path=f'/players/{player_id}',
+        )
         context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'priority_matchup_report': None, 'db_error': db_error})
         return make_response(render_template('player_profile.html', **context), 500)
 
     if not profile:
-        context = _base_context('Player Not Found', 'players')
+        context = _base_context(
+            'Player Not Found – StarCraft ELO',
+            'players',
+            meta_description='StarCraft ELO player profile page.',
+            canonical_path=f'/players/{player_id}',
+            meta_robots='noindex,follow',
+        )
         context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'priority_matchup_report': None, 'db_error': None})
         return make_response(render_template('player_profile.html', **context), 404)
 
-    context = _base_context(f"{profile['player']['name']} – Player Profile", 'players')
+    player_name = profile['player']['name']
+    priority_race = str(profile['player'].get('priority_race') or '').strip()
+    meta_description = f"{player_name} player profile on StarCraft ELO with current rating, recent matches and rating history."
+    if priority_race:
+        meta_description = f"{player_name} {priority_race} player profile on StarCraft ELO with current rating, recent matches and rating history."
+
+    context = _base_context(
+        f"{player_name} – Player Profile – StarCraft ELO",
+        'players',
+        meta_description=meta_description,
+        canonical_path=f'/players/{player_id}',
+        og_type='profile',
+    )
     context.update(
         {
             'player': profile['player'],
@@ -476,7 +610,7 @@ def submit_result_post():
 
 @app.route('/admin', methods=['GET'])
 def admin():
-    context = _base_context('Admin Panel', 'admin')
+    context = _base_context('Admin Panel', 'admin', meta_description='Admin area.', canonical_path='/admin', meta_robots='noindex,nofollow')
     context.update({'login_error': None, 'admin_login_default': _get_admin_login()})
     template_name = 'admin_dashboard.html' if context['is_admin'] else 'admin_login.html'
     return render_template(template_name, **context)
@@ -488,7 +622,7 @@ def admin_login():
     password = str(request.form.get('password', '')).strip()
 
     if login != _get_admin_login() or password != _get_admin_password():
-        context = _base_context('Admin Panel', 'admin')
+        context = _base_context('Admin Panel', 'admin', meta_description='Admin area.', canonical_path='/admin', meta_robots='noindex,nofollow')
         context.update({'login_error': 'Wrong login or password.', 'admin_login_default': login})
         return make_response(render_template('admin_login.html', **context), 401)
 
@@ -519,7 +653,7 @@ def admin_edit_player(player_id: int):
 
     player = fetch_player_admin(player_id)
     if not player:
-        context = _base_context('Player Not Found', 'admin')
+        context = _base_context('Player Not Found', 'admin', meta_description='Admin area.', canonical_path=f'/admin/players/{player_id}', meta_robots='noindex,nofollow')
         context.update(
             {
                 'player': None,
@@ -531,7 +665,7 @@ def admin_edit_player(player_id: int):
         )
         return make_response(render_template('admin_edit_player.html', **context), 404)
 
-    context = _base_context(f"Edit Player – {player['name']}", 'admin')
+    context = _base_context(f"Edit Player – {player['name']}", 'admin', meta_description='Admin area.', canonical_path=f'/admin/players/{player_id}', meta_robots='noindex,nofollow')
     context.update(
         {
             'player': player,
@@ -563,7 +697,7 @@ def admin_edit_player_post(player_id: int):
         )
     except Exception as exc:
         existing_player = fetch_player_admin(player_id)
-        context = _base_context('Edit Player', 'admin')
+        context = _base_context('Edit Player', 'admin', meta_description='Admin area.', canonical_path=f'/admin/players/{player_id}', meta_robots='noindex,nofollow')
         context.update(
             {
                 'player': existing_player,
@@ -585,7 +719,7 @@ def admin_edit_match(match_id: int):
 
     match = fetch_match_admin(match_id)
     if not match:
-        context = _base_context('Match Not Found', 'admin')
+        context = _base_context('Match Not Found', 'admin', meta_description='Admin area.', canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
         context.update(
             {
                 'match': None,
@@ -599,7 +733,7 @@ def admin_edit_match(match_id: int):
         )
         return make_response(render_template('admin_edit_match.html', **context), 404)
 
-    context = _base_context(f'Edit Match – #{match_id}', 'admin')
+    context = _base_context(f'Edit Match – #{match_id}', 'admin', meta_description='Admin area.', canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
     context.update(
         {
             'match': match,
@@ -627,7 +761,7 @@ def admin_edit_match_post(match_id: int):
             delete_match_admin(match_id)
         except Exception as exc:
             existing_match = fetch_match_admin(match_id)
-            context = _base_context('Edit Match', 'admin')
+            context = _base_context('Edit Match', 'admin', meta_description='Admin area.', canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
             context.update(
                 {
                     'match': existing_match,
@@ -661,7 +795,7 @@ def admin_edit_match_post(match_id: int):
         )
     except Exception as exc:
         existing_match = fetch_match_admin(match_id)
-        context = _base_context('Edit Match', 'admin')
+        context = _base_context('Edit Match', 'admin', meta_description='Admin area.', canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
         context.update(
             {
                 'match': existing_match,
@@ -677,6 +811,9 @@ def admin_edit_match_post(match_id: int):
 
     return redirect(f'/admin/matches/{match["id"]}?saved=1', code=303)
 
+@app.route('/google35d0caf8d54d36f2.html')
+def google_site_verification():
+    return send_from_directory(app.static_folder, 'google35d0caf8d54d36f2.html', mimetype='text/html')
 
 application = app
 
