@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import json
@@ -146,8 +147,10 @@ _DATA_CACHE: dict[str, Any] = {
     'version': 0,
 }
 
+
 MATCH_META_PREFIX = '[[match_meta:'
 MATCH_META_PATTERN = re.compile(r'^\[\[match_meta:(\{.*?\})\]\]\s*', re.DOTALL)
+
 
 
 def _normalize_text(value: str | None) -> str:
@@ -177,6 +180,7 @@ def _parse_match_meta(comment: str | None) -> tuple[dict[str, Any], str]:
     return metadata, visible_comment
 
 
+
 def _coerce_match_score_value(value, *, allow_blank: bool = False, field_label: str = 'Score') -> int | None:
     clean_value = _normalize_text(value)
     if not clean_value:
@@ -193,6 +197,7 @@ def _coerce_match_score_value(value, *, allow_blank: bool = False, field_label: 
         raise ValueError(f'{field_label} must be between 0 and 100.')
 
     return numeric_value
+
 
 
 def _extract_match_score_details(row: dict | None) -> dict[str, Any]:
@@ -213,6 +218,7 @@ def _extract_match_score_details(row: dict | None) -> dict[str, Any]:
     }
 
 
+
 def _build_match_comment_payload(comment: str | None, player1_score, player2_score) -> str | None:
     clean_comment = _normalize_text(comment)
     metadata = {
@@ -224,6 +230,7 @@ def _build_match_comment_payload(comment: str | None, player1_score, player2_sco
     if clean_comment:
         payload = f'{payload} {clean_comment}'
     return payload
+
 
 
 def _format_match_score(player1_score, player2_score) -> str:
@@ -484,13 +491,14 @@ def _determine_k_factor(current_elo: int, matches_played_before_match: int) -> i
     return BASE_RATING_K_FACTOR
 
 
+
 def _calculate_elo_result_for_actual_scores(
-        player1_elo: int,
-        player2_elo: int,
-        player1_actual_score: float,
-        player2_actual_score: float,
-        player1_matches_played_before_match: int = 0,
-        player2_matches_played_before_match: int = 0,
+    player1_elo: int,
+    player2_elo: int,
+    player1_actual_score: float,
+    player2_actual_score: float,
+    player1_matches_played_before_match: int = 0,
+    player2_matches_played_before_match: int = 0,
 ) -> dict:
     expected_player1 = _calculate_expected_score(player1_elo, player2_elo)
     expected_player2 = _calculate_expected_score(player2_elo, player1_elo)
@@ -522,10 +530,10 @@ def _calculate_elo_result_for_actual_scores(
 
 
 def _calculate_elo_result(
-        winner_elo: int,
-        loser_elo: int,
-        winner_matches_played_before_match: int = 0,
-        loser_matches_played_before_match: int = 0,
+    winner_elo: int,
+    loser_elo: int,
+    winner_matches_played_before_match: int = 0,
+    loser_matches_played_before_match: int = 0,
 ) -> dict:
     base_result = _calculate_elo_result_for_actual_scores(
         winner_elo,
@@ -554,10 +562,10 @@ def _calculate_elo_result(
 
 
 def _calculate_draw_elo_result(
-        player1_elo: int,
-        player2_elo: int,
-        player1_matches_played_before_match: int = 0,
-        player2_matches_played_before_match: int = 0,
+    player1_elo: int,
+    player2_elo: int,
+    player1_matches_played_before_match: int = 0,
+    player2_matches_played_before_match: int = 0,
 ) -> dict:
     base_result = _calculate_elo_result_for_actual_scores(
         player1_elo,
@@ -584,7 +592,6 @@ def _calculate_draw_elo_result(
         'k_factor': base_result['k_factor'],
     }
 
-
 def _get_supabase_settings() -> dict[str, str]:
     explicit_url = _normalize_text(os.getenv('SUPABASE_URL'))
     project_ref = ''
@@ -608,9 +615,9 @@ def _get_supabase_settings() -> dict[str, str]:
         url = f'https://{project_ref}.supabase.co'
 
     key = (
-            _normalize_text(os.getenv('SUPABASE_SERVICE_ROLE_KEY'))
-            or _normalize_text(os.getenv('SUPABASE_KEY'))
-            or _normalize_text(os.getenv('SUPABASE_ANON_KEY'))
+        _normalize_text(os.getenv('SUPABASE_SERVICE_ROLE_KEY'))
+        or _normalize_text(os.getenv('SUPABASE_KEY'))
+        or _normalize_text(os.getenv('SUPABASE_ANON_KEY'))
     )
     if not key:
         raise DatabaseConfigError(
@@ -633,13 +640,13 @@ def _encode_filter_value(value) -> str:
 
 
 def _supabase_request(
-        method: str,
-        path: str,
-        *,
-        query: dict[str, Any] | None = None,
-        payload: Any | None = None,
-        prefer: str | None = None,
-        return_headers: bool = False,
+    method: str,
+    path: str,
+    *,
+    query: dict[str, Any] | None = None,
+    payload: Any | None = None,
+    prefer: str | None = None,
+    return_headers: bool = False,
 ):
     settings = _get_supabase_settings()
     query = query or {}
@@ -700,15 +707,15 @@ def _supabase_request(
 
 
 def _rest_select(
-        table: str,
-        *,
-        select: str = '*',
-        filters: list[tuple[str, str, Any]] | None = None,
-        order: str | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-        single: bool = False,
-        count: bool = False,
+    table: str,
+    *,
+    select: str = '*',
+    filters: list[tuple[str, str, Any]] | None = None,
+    order: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    single: bool = False,
+    count: bool = False,
 ):
     query: dict[str, Any] = {'select': select}
     if order:
@@ -755,11 +762,11 @@ def _rest_select(
 
 
 def _rest_select_raw(
-        table: str,
-        *,
-        query: dict[str, Any] | None = None,
-        single: bool = False,
-        count: bool = False,
+    table: str,
+    *,
+    query: dict[str, Any] | None = None,
+    single: bool = False,
+    count: bool = False,
 ):
     prefer = 'count=exact' if count else None
     body, headers = _supabase_request(
@@ -789,12 +796,12 @@ def _rest_select_raw(
 
 
 def _rest_fetch_all(
-        table: str,
-        *,
-        select: str = '*',
-        filters: list[tuple[str, str, Any]] | None = None,
-        order: str | None = None,
-        page_size: int = 1000,
+    table: str,
+    *,
+    select: str = '*',
+    filters: list[tuple[str, str, Any]] | None = None,
+    order: str | None = None,
+    page_size: int = 1000,
 ) -> list[dict]:
     items: list[dict] = []
     offset = 0
@@ -882,8 +889,7 @@ def invalidate_application_cache() -> None:
 
 def warmup_application_cache(*, force_refresh: bool = False) -> dict[str, Any]:
     with _DATA_CACHE_LOCK:
-        if not force_refresh and _cache_is_fresh() and all(
-                _DATA_CACHE.get(key) is not None for key in ('players', 'matches', 'rating_history')):
+        if not force_refresh and _cache_is_fresh() and all(_DATA_CACHE.get(key) is not None for key in ('players', 'matches', 'rating_history')):
             return {
                 'players': [dict(row) for row in _DATA_CACHE['players']],
                 'matches': [dict(row) for row in _DATA_CACHE['matches']],
@@ -937,6 +943,7 @@ def _prepare_player_row(row: dict) -> dict:
     return player
 
 
+
 def _prepare_game_report_row(row: dict) -> dict:
     match = dict(row)
     match['played_at_label'] = _format_match_date(match.get('played_at'))
@@ -960,16 +967,13 @@ def _prepare_game_report_row(row: dict) -> dict:
     match['comment_display'] = _normalize_text(match.get('comment'))
     match['game_type_display'] = _normalize_text(match.get('game_type'))
     match['mission_name_display'] = _normalize_text(match.get('mission_name'))
-    match['winner_score'] = _coerce_match_score_value(match.get('winner_score'), allow_blank=True,
-                                                      field_label='Winner score')
-    match['loser_score'] = _coerce_match_score_value(match.get('loser_score'), allow_blank=True,
-                                                     field_label='Loser score')
+    match['winner_score'] = _coerce_match_score_value(match.get('winner_score'), allow_blank=True, field_label='Winner score')
+    match['loser_score'] = _coerce_match_score_value(match.get('loser_score'), allow_blank=True, field_label='Loser score')
     match['score_display'] = _format_match_score(match.get('winner_score'), match.get('loser_score'))
     match['result_type'] = _normalize_match_result_type(match.get('result_type'))
     match['is_tie'] = match['result_type'] == 'draw'
     match['result_label'] = 'TIE' if match['is_tie'] else 'WIN'
     return match
-
 
 def _build_rating_chart(current_elo, rating_rows: list[dict]) -> dict:
     series: list[dict] = []
@@ -1095,8 +1099,7 @@ def _build_rating_chart(current_elo, rating_rows: list[dict]) -> dict:
                 'smoothed_elo': round(ema_values[index], 2),
                 'label': point.get('full_label') or point['label'],
                 'played_at_label': point.get('played_at_label') or point.get('full_label') or point['label'],
-                'date_label': _format_match_date(point.get('played_at')) if point.get('played_at') else point.get(
-                    'label') or '',
+                'date_label': _format_match_date(point.get('played_at')) if point.get('played_at') else point.get('label') or '',
                 'elo_delta_display': _format_delta(point.get('elo_delta')),
                 'old_elo_display': _normalize_elo_value(point.get('old_elo')),
                 'new_elo_display': _normalize_elo_value(point.get('elo')),
@@ -1233,10 +1236,10 @@ def fetch_mission_suggestions(limit: int = 50) -> list[str]:
 
 
 def fetch_leaderboard(
-        search: str = '',
-        *,
-        include_active: bool = True,
-        include_inactive: bool = False,
+    search: str = '',
+    *,
+    include_active: bool = True,
+    include_inactive: bool = False,
 ) -> list[dict]:
     normalized_search = _normalize_search_term(search)
 
@@ -1268,8 +1271,7 @@ def fetch_leaderboard(
         if include_inactive and not include_active and prepared['is_active']:
             continue
 
-        prepared['win_rate'] = round((prepared['wins'] / prepared['matches_count']) * 100, 1) if prepared[
-                                                                                                     'matches_count'] > 0 else 0
+        prepared['win_rate'] = round((prepared['wins'] / prepared['matches_count']) * 100, 1) if prepared['matches_count'] > 0 else 0
         rank_position += 1
         prepared['rank_position'] = rank_position
         prepared_rows.append(_prepare_player_row(prepared))
@@ -1484,6 +1486,8 @@ def fetch_game_reports(search: str = '', limit: int = 100) -> list[dict]:
     return page_data['items']
 
 
+
+
 def _race_matchup_report_from_matches(player_id: int, priority_race: str | None, matches: list[dict]) -> dict:
     normalized_priority_race = _normalize_race_label(priority_race)
     race_code_by_name = {
@@ -1575,8 +1579,7 @@ def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict
     player_base['matches_count'] = int(player_row.get('matches_count') or 0)
     player_base['wins'] = int(player_row.get('wins') or 0)
     player_base['losses'] = int(player_row.get('losses') or 0)
-    player_base['win_rate'] = round((player_base['wins'] / player_base['matches_count']) * 100, 1) if player_base[
-                                                                                                          'matches_count'] > 0 else 0
+    player_base['win_rate'] = round((player_base['wins'] / player_base['matches_count']) * 100, 1) if player_base['matches_count'] > 0 else 0
     player = _prepare_player_row(player_base)
     player['rank_position'] = _compute_player_rank_position(int(player_id))
 
@@ -1616,10 +1619,8 @@ def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict
             result_label = 'Win' if is_win else 'Loss'
 
         score_details = _extract_match_score_details(match)
-        player_score = score_details['player1_score'] if player1_id == int(player_id) else score_details[
-            'player2_score']
-        opponent_score = score_details['player2_score'] if player1_id == int(player_id) else score_details[
-            'player1_score']
+        player_score = score_details['player1_score'] if player1_id == int(player_id) else score_details['player2_score']
+        opponent_score = score_details['player2_score'] if player1_id == int(player_id) else score_details['player1_score']
 
         prepared = {
             'id': match_id,
@@ -1674,7 +1675,6 @@ def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict
         'rating_chart': rating_chart,
         'priority_matchup_report': priority_matchup_report,
     }
-
 
 def _rest_get_player_by_name_key(name_key: str) -> dict | None:
     return _rest_select('players', filters=[('name_normalized', 'eq', name_key)], single=True)
@@ -1760,18 +1760,18 @@ def _refresh_priority_race(player_id: int, *, force_refresh: bool = False) -> No
 
 
 def _find_recent_duplicate_match(
-        *,
-        player1_id: int,
-        player2_id: int,
-        player1_race: str,
-        player2_race: str,
-        is_ranked: bool,
-        game_type: str,
-        mission_name: str,
-        comment: str,
-        result_type: str,
-        submitted_at: datetime,
-        window_seconds: int = 5,
+    *,
+    player1_id: int,
+    player2_id: int,
+    player1_race: str,
+    player2_race: str,
+    is_ranked: bool,
+    game_type: str,
+    mission_name: str,
+    comment: str,
+    result_type: str,
+    submitted_at: datetime,
+    window_seconds: int = 5,
 ) -> dict | None:
     rows = _rest_select(
         'matches',
@@ -1814,10 +1814,10 @@ def _find_recent_duplicate_match(
 
 
 def _build_submit_result_from_existing_match(
-        match_row: dict,
-        *,
-        player1: dict,
-        player2: dict,
+    match_row: dict,
+    *,
+    player1: dict,
+    player2: dict,
 ) -> dict:
     match_id = int(match_row['id'])
     ranked_match = bool(match_row.get('is_ranked'))
@@ -1876,10 +1876,10 @@ def _format_seconds_as_wait_label(total_seconds: int) -> str:
 
 
 def _find_recent_match_for_any_player(
-        *,
-        player_ids: list[int],
-        submitted_at: datetime,
-        window_seconds: int,
+    *,
+    player_ids: list[int],
+    submitted_at: datetime,
+    window_seconds: int,
 ) -> dict | None:
     unique_ids = sorted({int(value) for value in player_ids if value is not None})
     if not unique_ids or window_seconds <= 0:
@@ -1924,10 +1924,10 @@ def _find_recent_match_for_any_player(
 
 
 def _enforce_tts_player_submit_cooldown(
-        *,
-        player1: dict,
-        player2: dict,
-        submitted_at: datetime,
+    *,
+    player1: dict,
+    player2: dict,
+    submitted_at: datetime,
 ) -> None:
     if TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS <= 0:
         return
@@ -1970,18 +1970,18 @@ def _enforce_tts_player_submit_cooldown(
 
 
 def submit_tts_match_result(
-        *,
-        winner_name: str,
-        opponent_name: str,
-        winner_race: str,
-        opponent_race: str,
-        result_type: str,
-        is_ranked,
-        game_type: str,
-        mission_name: str,
-        player1_score,
-        player2_score,
-        comment: str = '',
+    *,
+    winner_name: str,
+    opponent_name: str,
+    winner_race: str,
+    opponent_race: str,
+    result_type: str,
+    is_ranked,
+    game_type: str,
+    mission_name: str,
+    player1_score,
+    player2_score,
+    comment: str = '',
 ) -> dict:
     with _SUBMIT_MATCH_LOCK:
         clean_player1_name = _normalize_player_name(winner_name)
@@ -2019,25 +2019,25 @@ def submit_tts_match_result(
 
 
 def submit_match_result(
-        *,
-        winner_name: str,
-        opponent_name: str,
-        winner_race: str,
-        opponent_race: str,
-        result_type: str,
-        is_ranked,
-        game_type: str,
-        mission_name: str,
-        player1_score,
-        player2_score,
-        comment: str,
+    *,
+    winner_name: str,
+    opponent_name: str,
+    winner_race: str,
+    opponent_race: str,
+    result_type: str,
+    is_ranked,
+    game_type: str,
+    mission_name: str,
+    player1_score,
+    player2_score,
+    comment: str,
 ) -> dict:
     with _SUBMIT_MATCH_LOCK:
         clean_player1_name = _normalize_player_name(winner_name)
         clean_player2_name = _normalize_player_name(opponent_name)
         race_input1 = _normalize_text(winner_race)
         race_input2 = _normalize_text(opponent_race)
-
+        
         race_map = {
             'Terran': 'Терран',
             'Protoss': 'Протосс',
@@ -2046,7 +2046,7 @@ def submit_match_result(
             'Протосс': 'Протосс',
             'Зерг': 'Зерг',
         }
-
+        
         clean_player1_race = race_map.get(race_input1, race_input1)
         clean_player2_race = race_map.get(race_input2, race_input2)
         clean_game_type = _normalize_text(game_type)
@@ -2263,7 +2263,6 @@ def submit_match_result(
             'opponent_delta_display': _format_delta(elo_result['player2_delta']),
         }
 
-
 def fetch_player_admin(player_id: int) -> dict | None:
     row = _rest_get_player_by_id(player_id)
     if not row:
@@ -2277,15 +2276,15 @@ def fetch_player_admin(player_id: int) -> dict | None:
 
 
 def update_player_admin(
-        *,
-        player_id: int,
-        name: str,
-        country_code: str,
-        country_name: str,
-        discord_url: str,
-        priority_race: str,
-        current_elo,
-        is_active,
+    *,
+    player_id: int,
+    name: str,
+    country_code: str,
+    country_name: str,
+    discord_url: str,
+    priority_race: str,
+    current_elo,
+    is_active,
 ) -> dict:
     clean_name = _normalize_player_name(name)
     clean_key = _normalize_player_key(name)
@@ -2334,6 +2333,7 @@ def update_player_admin(
     if not updated:
         raise ValueError('Player not found after update.')
     return updated
+
 
 
 def fetch_match_admin(match_id: int) -> dict | None:
@@ -2401,12 +2401,8 @@ def _rebuild_ratings_and_player_stats() -> None:
         ranked_match = bool(match.get('is_ranked'))
         result_type = _normalize_match_result_type(match.get('result_type'))
 
-        player1_state = player_state.setdefault(player1_id,
-                                                {'elo': 1000, 'matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0,
-                                                 'last_match_at': None})
-        player2_state = player_state.setdefault(player2_id,
-                                                {'elo': 1000, 'matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0,
-                                                 'last_match_at': None})
+        player1_state = player_state.setdefault(player1_id, {'elo': 1000, 'matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
+        player2_state = player_state.setdefault(player2_id, {'elo': 1000, 'matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
 
         player1_old_elo = int(player1_state['elo'])
         player2_old_elo = int(player2_state['elo'])
@@ -2535,8 +2531,7 @@ def _rebuild_ratings_and_player_stats() -> None:
 
     for player in players:
         player_id = int(player['id'])
-        state = player_state.get(player_id, {'elo': 1000, 'matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0,
-                                             'last_match_at': None})
+        state = player_state.get(player_id, {'elo': 1000, 'matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
         _rest_update(
             'players',
             {
@@ -2560,20 +2555,20 @@ def _rebuild_ratings_and_player_stats() -> None:
 
 
 def update_match_admin(
-        *,
-        match_id: int,
-        player1_name: str,
-        player2_name: str,
-        winner_side: str,
-        player1_race: str,
-        player2_race: str,
-        is_ranked,
-        game_type: str,
-        mission_name: str,
-        player1_score,
-        player2_score,
-        comment: str,
-        played_at: datetime,
+    *,
+    match_id: int,
+    player1_name: str,
+    player2_name: str,
+    winner_side: str,
+    player1_race: str,
+    player2_race: str,
+    is_ranked,
+    game_type: str,
+    mission_name: str,
+    player1_score,
+    player2_score,
+    comment: str,
+    played_at: datetime,
 ) -> dict:
     clean_player1_name = _normalize_player_name(player1_name)
     clean_player2_name = _normalize_player_name(player2_name)
@@ -2616,8 +2611,7 @@ def update_match_admin(
 
     player1 = _get_or_create_player(clean_player1_name)
     player2 = _get_or_create_player(clean_player2_name)
-    winner_player_id = None if clean_result_type == 'draw' else (
-        player1['id'] if clean_winner_side == 'player1' else player2['id'])
+    winner_player_id = None if clean_result_type == 'draw' else (player1['id'] if clean_winner_side == 'player1' else player2['id'])
 
     rows = _rest_update(
         'matches',
@@ -2646,7 +2640,6 @@ def update_match_admin(
     if not updated:
         raise ValueError('Match not found after update.')
     return updated
-
 
 def delete_match_admin(match_id: int) -> None:
     existing = _rest_select('matches', filters=[('id', 'eq', match_id)], single=True)
