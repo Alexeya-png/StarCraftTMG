@@ -164,32 +164,27 @@ def _get_admin_login() -> str:
     return (os.getenv('ADMIN_LOGIN') or os.getenv('ADMIN_USERNAME') or 'admin').strip() or 'admin'
 
 
-
 def _get_admin_password() -> str:
     return (os.getenv('ADMIN_PASSWORD') or 'admin').strip() or 'admin'
 
 
-
 def _get_admin_secret() -> str:
     secret = (
-        os.getenv('ADMIN_SECRET')
-        or os.getenv('SECRET_KEY')
-        or os.getenv('password')
-        or 'starcraft-local-admin-secret'
+            os.getenv('ADMIN_SECRET')
+            or os.getenv('SECRET_KEY')
+            or os.getenv('password')
+            or 'starcraft-local-admin-secret'
     )
     return secret.strip() or 'starcraft-local-admin-secret'
-
 
 
 def _b64encode(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode('utf-8').rstrip('=')
 
 
-
 def _b64decode(value: str) -> bytes:
     padding = '=' * (-len(value) % 4)
     return base64.urlsafe_b64decode(value + padding)
-
 
 
 def _build_admin_cookie(login: str) -> str:
@@ -199,7 +194,6 @@ def _build_admin_cookie(login: str) -> str:
     payload_part = _b64encode(payload_bytes)
     signature = hmac.new(_get_admin_secret().encode('utf-8'), payload_part.encode('utf-8'), hashlib.sha256).hexdigest()
     return f'{payload_part}.{signature}'
-
 
 
 def _read_admin_cookie(token: str | None) -> dict | None:
@@ -228,7 +222,6 @@ def _read_admin_cookie(token: str | None) -> dict | None:
     return payload
 
 
-
 def _is_admin() -> bool:
     payload = _read_admin_cookie(request.cookies.get(ADMIN_COOKIE_NAME))
     if not payload:
@@ -236,15 +229,14 @@ def _is_admin() -> bool:
     return payload.get('login') == _get_admin_login()
 
 
-
 def _base_context(
-    page_title: str,
-    active_page: str,
-    *,
-    meta_description: str | None = None,
-    canonical_path: str | None = None,
-    meta_robots: str = 'index,follow',
-    og_type: str = 'website',
+        page_title: str,
+        active_page: str,
+        *,
+        meta_description: str | None = None,
+        canonical_path: str | None = None,
+        meta_robots: str = 'index,follow',
+        og_type: str = 'website',
 ) -> dict:
     return {
         'page_title': page_title,
@@ -259,10 +251,8 @@ def _base_context(
     }
 
 
-
 def _redirect_to_admin_login():
     return redirect('/admin', code=303)
-
 
 
 def _merge_mission_options() -> list[str]:
@@ -277,7 +267,6 @@ def _merge_mission_options() -> list[str]:
         if clean_value and clean_value not in merged:
             merged.append(clean_value)
     return merged
-
 
 
 def _build_submit_form_state(raw_values: dict | None = None) -> dict:
@@ -297,13 +286,12 @@ def _build_submit_form_state(raw_values: dict | None = None) -> dict:
     }
 
 
-
 def _render_submit_page(
-    *,
-    form_state: dict | None = None,
-    error_message: str | None = None,
-    success_data: dict | None = None,
-    status_code: int = 200,
+        *,
+        form_state: dict | None = None,
+        error_message: str | None = None,
+        success_data: dict | None = None,
+        status_code: int = 200,
 ):
     name_suggestions: list[str] = []
     try:
@@ -331,7 +319,6 @@ def _render_submit_page(
     return make_response(render_template('submit_match.html', **context), status_code)
 
 
-
 def _build_admin_player_form_state(player: dict | None = None, source: dict | None = None) -> dict:
     player = player or {}
     source = source or {}
@@ -344,7 +331,6 @@ def _build_admin_player_form_state(player: dict | None = None, source: dict | No
         'current_elo': str(source.get('current_elo', player.get('current_elo_input', 1000))).strip(),
         'is_active': str(source.get('is_active', 'on' if player.get('is_active', True) else '')).strip(),
     }
-
 
 
 def _build_admin_match_form_state(match: dict | None = None, source: dict | None = None) -> dict:
@@ -366,7 +352,6 @@ def _build_admin_match_form_state(match: dict | None = None, source: dict | None
     }
 
 
-
 def _parse_admin_datetime(value: str) -> datetime:
     clean_value = str(value or '').strip()
     if not clean_value:
@@ -379,7 +364,6 @@ def _parse_admin_datetime(value: str) -> datetime:
             continue
 
     raise ValueError('Use date format YYYY-MM-DDTHH:MM.')
-
 
 
 def _pagination_numbers(current_page: int, total_pages: int) -> list[int | str]:
@@ -436,6 +420,7 @@ def sitemap_xml():
     xml_parts.append('</urlset>')
 
     return Response('\n'.join(xml_parts), mimetype='application/xml')
+
 
 @app.route('/')
 def home():
@@ -565,7 +550,8 @@ def player_profile(player_id: int):
             meta_description='StarCraft ELO player profile with rating history and recent match results.',
             canonical_path=f'/players/{player_id}',
         )
-        context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'priority_matchup_report': None, 'db_error': db_error})
+        context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'priority_matchup_report': None,
+                        'db_error': db_error})
         return make_response(render_template('player_profile.html', **context), 500)
 
     if not profile:
@@ -576,7 +562,8 @@ def player_profile(player_id: int):
             canonical_path=f'/players/{player_id}',
             meta_robots='noindex,follow',
         )
-        context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'priority_matchup_report': None, 'db_error': None})
+        context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'priority_matchup_report': None,
+                        'db_error': None})
         return make_response(render_template('player_profile.html', **context), 404)
 
     player_name = profile['player']['name']
@@ -642,12 +629,36 @@ def submit_tts_match():
     if expected_token and provided_token != expected_token:
         return jsonify({'ok': False, 'message': 'Invalid TTS submit token.'}), 403
 
+    first_player_name = str(
+        payload.get('first_player_name')
+        or payload.get('winner_name')
+        or ''
+    ).strip()
+
+    second_player_name = str(
+        payload.get('second_player_name')
+        or payload.get('opponent_name')
+        or ''
+    ).strip()
+
+    first_player_race = str(
+        payload.get('first_player_race')
+        or payload.get('winner_race')
+        or ''
+    ).strip()
+
+    second_player_race = str(
+        payload.get('second_player_race')
+        or payload.get('opponent_race')
+        or ''
+    ).strip()
+
     try:
         success_data = submit_tts_match_result(
-            winner_name=str(payload.get('winner_name', '') or ''),
-            opponent_name=str(payload.get('opponent_name', '') or ''),
-            winner_race=str(payload.get('winner_race', '') or ''),
-            opponent_race=str(payload.get('opponent_race', '') or ''),
+            winner_name=first_player_name,
+            opponent_name=second_player_name,
+            winner_race=first_player_race,
+            opponent_race=second_player_race,
             result_type=str(payload.get('result_type', 'win') or 'win'),
             is_ranked=str(payload.get('is_ranked', 'yes') or 'yes'),
             game_type=_coerce_tts_game_type(payload.get('game_type', '')),
@@ -666,7 +677,8 @@ def submit_tts_match():
 
 @app.route('/admin', methods=['GET'])
 def admin():
-    context = _base_context('Admin Panel', 'admin', meta_description='Admin area.', canonical_path='/admin', meta_robots='noindex,nofollow')
+    context = _base_context('Admin Panel', 'admin', meta_description='Admin area.', canonical_path='/admin',
+                            meta_robots='noindex,nofollow')
     context.update({'login_error': None, 'admin_login_default': _get_admin_login()})
     template_name = 'admin_dashboard.html' if context['is_admin'] else 'admin_login.html'
     return render_template(template_name, **context)
@@ -678,7 +690,8 @@ def admin_login():
     password = str(request.form.get('password', '')).strip()
 
     if login != _get_admin_login() or password != _get_admin_password():
-        context = _base_context('Admin Panel', 'admin', meta_description='Admin area.', canonical_path='/admin', meta_robots='noindex,nofollow')
+        context = _base_context('Admin Panel', 'admin', meta_description='Admin area.', canonical_path='/admin',
+                                meta_robots='noindex,nofollow')
         context.update({'login_error': 'Wrong login or password.', 'admin_login_default': login})
         return make_response(render_template('admin_login.html', **context), 401)
 
@@ -709,7 +722,8 @@ def admin_edit_player(player_id: int):
 
     player = fetch_player_admin(player_id)
     if not player:
-        context = _base_context('Player Not Found', 'admin', meta_description='Admin area.', canonical_path=f'/admin/players/{player_id}', meta_robots='noindex,nofollow')
+        context = _base_context('Player Not Found', 'admin', meta_description='Admin area.',
+                                canonical_path=f'/admin/players/{player_id}', meta_robots='noindex,nofollow')
         context.update(
             {
                 'player': None,
@@ -721,7 +735,8 @@ def admin_edit_player(player_id: int):
         )
         return make_response(render_template('admin_edit_player.html', **context), 404)
 
-    context = _base_context(f"Edit Player – {player['name']}", 'admin', meta_description='Admin area.', canonical_path=f'/admin/players/{player_id}', meta_robots='noindex,nofollow')
+    context = _base_context(f"Edit Player – {player['name']}", 'admin', meta_description='Admin area.',
+                            canonical_path=f'/admin/players/{player_id}', meta_robots='noindex,nofollow')
     context.update(
         {
             'player': player,
@@ -753,7 +768,8 @@ def admin_edit_player_post(player_id: int):
         )
     except Exception as exc:
         existing_player = fetch_player_admin(player_id)
-        context = _base_context('Edit Player', 'admin', meta_description='Admin area.', canonical_path=f'/admin/players/{player_id}', meta_robots='noindex,nofollow')
+        context = _base_context('Edit Player', 'admin', meta_description='Admin area.',
+                                canonical_path=f'/admin/players/{player_id}', meta_robots='noindex,nofollow')
         context.update(
             {
                 'player': existing_player,
@@ -775,7 +791,8 @@ def admin_edit_match(match_id: int):
 
     match = fetch_match_admin(match_id)
     if not match:
-        context = _base_context('Match Not Found', 'admin', meta_description='Admin area.', canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
+        context = _base_context('Match Not Found', 'admin', meta_description='Admin area.',
+                                canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
         context.update(
             {
                 'match': None,
@@ -789,7 +806,8 @@ def admin_edit_match(match_id: int):
         )
         return make_response(render_template('admin_edit_match.html', **context), 404)
 
-    context = _base_context(f'Edit Match – #{match_id}', 'admin', meta_description='Admin area.', canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
+    context = _base_context(f'Edit Match – #{match_id}', 'admin', meta_description='Admin area.',
+                            canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
     context.update(
         {
             'match': match,
@@ -817,7 +835,8 @@ def admin_edit_match_post(match_id: int):
             delete_match_admin(match_id)
         except Exception as exc:
             existing_match = fetch_match_admin(match_id)
-            context = _base_context('Edit Match', 'admin', meta_description='Admin area.', canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
+            context = _base_context('Edit Match', 'admin', meta_description='Admin area.',
+                                    canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
             context.update(
                 {
                     'match': existing_match,
@@ -851,7 +870,8 @@ def admin_edit_match_post(match_id: int):
         )
     except Exception as exc:
         existing_match = fetch_match_admin(match_id)
-        context = _base_context('Edit Match', 'admin', meta_description='Admin area.', canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
+        context = _base_context('Edit Match', 'admin', meta_description='Admin area.',
+                                canonical_path=f'/admin/matches/{match_id}', meta_robots='noindex,nofollow')
         context.update(
             {
                 'match': existing_match,
@@ -867,12 +887,13 @@ def admin_edit_match_post(match_id: int):
 
     return redirect(f'/admin/matches/{match["id"]}?saved=1', code=303)
 
+
 @app.route('/google35d0caf8d54d36f2.html')
 def google_site_verification():
     return send_from_directory(app.static_folder, 'google35d0caf8d54d36f2.html', mimetype='text/html')
 
-application = app
 
+application = app
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8000, debug=True)
