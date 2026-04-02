@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, make_response, redirect, render_template, request, send_from_directory
 
 from app.database import (
+    MatchSubmissionRateLimitError,
     delete_match_admin,
     fetch_game_reports_page,
     fetch_leaderboard,
@@ -21,6 +22,7 @@ from app.database import (
     fetch_player_profile,
     ping_database,
     submit_match_result,
+    submit_tts_match_result,
     update_match_admin,
     update_player_admin,
 )
@@ -98,6 +100,29 @@ SUBMIT_NAME_SUGGESTION_LIMIT = int(os.getenv('SUBMIT_NAME_SUGGESTION_LIMIT', '20
 def _get_site_url() -> str:
     raw_value = (os.getenv('SITE_URL') or 'https://tmg-stats.org').strip() or 'https://tmg-stats.org'
     return raw_value.rstrip('/')
+
+
+def _get_tts_submit_token() -> str:
+    return (os.getenv('TTS_SUBMIT_TOKEN') or '').strip()
+
+
+def _coerce_tts_game_type(value: str | None) -> str:
+    clean_value = str(value or '').strip()
+    mapping = {
+        '1k': '1к',
+        '2k': '2к',
+        '1к': '1к',
+        '2к': '2к',
+        'Grand Offensive': 'Grand Offensive',
+    }
+    return mapping.get(clean_value, clean_value)
+
+
+def _parse_tts_request_payload() -> dict:
+    payload = request.get_json(silent=True)
+    if isinstance(payload, dict):
+        return {str(key): value for key, value in payload.items()}
+    return {key: value for key, value in request.form.items()}
 
 
 def _build_absolute_url(path: str) -> str:
@@ -606,6 +631,37 @@ def submit_result_post():
         return _render_submit_page(form_state=form_state, error_message=str(exc), status_code=400)
 
     return _render_submit_page(form_state=None, success_data=success_data, status_code=200)
+
+
+@app.route('/api/tts/submit-match', methods=['POST'])
+def submit_tts_match():
+    payload = _parse_tts_request_payload()
+
+    expected_token = _get_tts_submit_token()
+    provided_token = str(payload.get('api_token', '') or '').strip()
+    if expected_token and provided_token != expected_token:
+        return jsonify({'ok': False, 'message': 'Invalid TTS submit token.'}), 403
+
+    try:
+        success_data = submit_tts_match_result(
+            winner_name=str(payload.get('winner_name', '') or ''),
+            opponent_name=str(payload.get('opponent_name', '') or ''),
+            winner_race=str(payload.get('winner_race', '') or ''),
+            opponent_race=str(payload.get('opponent_race', '') or ''),
+            result_type=str(payload.get('result_type', 'win') or 'win'),
+            is_ranked=str(payload.get('is_ranked', 'yes') or 'yes'),
+            game_type=_coerce_tts_game_type(payload.get('game_type', '')),
+            mission_name=str(payload.get('mission_name', '') or ''),
+            player1_score=payload.get('player1_score', ''),
+            player2_score=payload.get('player2_score', ''),
+            comment='',
+        )
+    except MatchSubmissionRateLimitError as exc:
+        return jsonify({'ok': False, 'message': str(exc)}), 429
+    except Exception as exc:
+        return jsonify({'ok': False, 'message': str(exc)}), 400
+
+    return jsonify({'ok': True, 'message': 'Match submitted successfully.', 'data': success_data}), 200
 
 
 @app.route('/admin', methods=['GET'])

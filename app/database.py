@@ -28,6 +28,10 @@ class DatabaseConfigError(RuntimeError):
     pass
 
 
+class MatchSubmissionRateLimitError(ValueError):
+    pass
+
+
 RACE_LABELS = {
     'Терран': 'Terran',
     'Протосс': 'Protoss',
@@ -131,6 +135,7 @@ NEW_PLAYER_K_FACTOR = 40
 NEW_PLAYER_MATCHES_LIMIT = 5
 ACTIVE_PLAYER_DAYS_WINDOW = 365
 DATA_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_DATA_CACHE_TTL_SECONDS', '300') or '300'))
+TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS = max(0, int(os.getenv('TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS', '3600') or '3600'))
 
 _DATA_CACHE_LOCK = threading.RLock()
 _SUBMIT_MATCH_LOCK = threading.RLock()
@@ -1853,6 +1858,164 @@ def _build_submit_result_from_existing_match(
         'opponent_new_elo_display': _normalize_elo_value(player2_history.get('new_elo')),
         'opponent_delta_display': _format_delta(player2_history.get('elo_delta')),
     }
+
+
+def _format_seconds_as_wait_label(total_seconds: int) -> str:
+    seconds = max(1, int(total_seconds))
+    minutes, remaining_seconds = divmod(seconds, 60)
+    hours, remaining_minutes = divmod(minutes, 60)
+
+    parts: list[str] = []
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if remaining_minutes > 0:
+        parts.append(f"{remaining_minutes}m")
+    if not parts:
+        parts.append(f"{remaining_seconds}s")
+    return ' '.join(parts)
+
+
+def _find_recent_match_for_any_player(
+    *,
+    player_ids: list[int],
+    submitted_at: datetime,
+    window_seconds: int,
+) -> dict | None:
+    unique_ids = sorted({int(value) for value in player_ids if value is not None})
+    if not unique_ids or window_seconds <= 0:
+        return None
+
+    candidate_rows: dict[int, dict[str, Any]] = {}
+    for field_name in ('player1_id', 'player2_id'):
+        rows = _rest_select(
+            'matches',
+            select='id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,is_ranked,game_type,mission_name,comment,result_type',
+            filters=[(field_name, 'in', unique_ids)],
+            order='played_at.desc,id.desc',
+            limit=50,
+        )
+        for row in rows:
+            try:
+                candidate_rows[int(row['id'])] = dict(row)
+            except (KeyError, TypeError, ValueError):
+                continue
+
+    nearest_row = None
+    nearest_delta = None
+    for row in candidate_rows.values():
+        played_at = _parse_datetime(row.get('played_at'))
+        if not played_at:
+            continue
+
+        if getattr(played_at, 'tzinfo', None):
+            played_at_naive = played_at.replace(tzinfo=None)
+        else:
+            played_at_naive = played_at
+
+        delta_seconds = (submitted_at - played_at_naive).total_seconds()
+        if delta_seconds < 0 or delta_seconds > window_seconds:
+            continue
+
+        if nearest_delta is None or delta_seconds < nearest_delta:
+            nearest_delta = delta_seconds
+            nearest_row = row
+
+    return nearest_row
+
+
+def _enforce_tts_player_submit_cooldown(
+    *,
+    player1: dict,
+    player2: dict,
+    submitted_at: datetime,
+) -> None:
+    if TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS <= 0:
+        return
+
+    recent_match = _find_recent_match_for_any_player(
+        player_ids=[int(player1['id']), int(player2['id'])],
+        submitted_at=submitted_at,
+        window_seconds=TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS,
+    )
+    if not recent_match:
+        return
+
+    played_at = _parse_datetime(recent_match.get('played_at'))
+    if not played_at:
+        return
+
+    if getattr(played_at, 'tzinfo', None):
+        played_at_naive = played_at.replace(tzinfo=None)
+    else:
+        played_at_naive = played_at
+
+    remaining_seconds = TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS - int((submitted_at - played_at_naive).total_seconds())
+    if remaining_seconds <= 0:
+        return
+
+    blocked_names: list[str] = []
+    recent_player_ids = {int(recent_match.get('player1_id') or 0), int(recent_match.get('player2_id') or 0)}
+    if int(player1['id']) in recent_player_ids:
+        blocked_names.append(str(player1.get('name') or 'Player 1'))
+    if int(player2['id']) in recent_player_ids and int(player2['id']) != int(player1['id']):
+        blocked_names.append(str(player2.get('name') or 'Player 2'))
+
+    if not blocked_names:
+        blocked_names = [str(player1.get('name') or 'Player 1'), str(player2.get('name') or 'Player 2')]
+
+    wait_label = _format_seconds_as_wait_label(remaining_seconds)
+    raise MatchSubmissionRateLimitError(
+        f"Submission cooldown is active for: {', '.join(blocked_names)}. Try again in {wait_label}."
+    )
+
+
+def submit_tts_match_result(
+    *,
+    winner_name: str,
+    opponent_name: str,
+    winner_race: str,
+    opponent_race: str,
+    result_type: str,
+    is_ranked,
+    game_type: str,
+    mission_name: str,
+    player1_score,
+    player2_score,
+    comment: str = '',
+) -> dict:
+    with _SUBMIT_MATCH_LOCK:
+        clean_player1_name = _normalize_player_name(winner_name)
+        clean_player2_name = _normalize_player_name(opponent_name)
+
+        if not clean_player1_name:
+            raise ValueError('Enter the first player name.')
+        if not clean_player2_name:
+            raise ValueError('Enter the second player name.')
+        if _normalize_player_key(clean_player1_name) == _normalize_player_key(clean_player2_name):
+            raise ValueError('Players must be different.')
+
+        submitted_at = datetime.now()
+        player1 = _get_or_create_player(clean_player1_name)
+        player2 = _get_or_create_player(clean_player2_name)
+        _enforce_tts_player_submit_cooldown(
+            player1=player1,
+            player2=player2,
+            submitted_at=submitted_at,
+        )
+
+        return submit_match_result(
+            winner_name=clean_player1_name,
+            opponent_name=clean_player2_name,
+            winner_race=winner_race,
+            opponent_race=opponent_race,
+            result_type=result_type,
+            is_ranked=is_ranked,
+            game_type=game_type,
+            mission_name=mission_name,
+            player1_score=player1_score,
+            player2_score=player2_score,
+            comment=comment,
+        )
 
 
 def submit_match_result(
