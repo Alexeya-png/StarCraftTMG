@@ -12,7 +12,9 @@ from flask import Flask, Response, jsonify, make_response, redirect, render_temp
 
 from app.database import (
     MatchSubmissionRateLimitError,
+    delete_admin_feedback_message,
     delete_match_admin,
+    fetch_admin_feedback_messages,
     fetch_game_reports_page,
     fetch_leaderboard,
     fetch_match_admin,
@@ -21,6 +23,7 @@ from app.database import (
     fetch_player_name_suggestions,
     fetch_player_profile,
     ping_database,
+    submit_admin_feedback_message,
     submit_match_result,
     submit_tts_match_result,
     update_match_admin,
@@ -95,6 +98,7 @@ DEFAULT_MISSION_OPTIONS = [
 ADMIN_COOKIE_NAME = 'starcraft_admin_session'
 ADMIN_SESSION_HOURS = 12
 SUBMIT_NAME_SUGGESTION_LIMIT = int(os.getenv('SUBMIT_NAME_SUGGESTION_LIMIT', '200') or '200')
+FEEDBACK_MESSAGE_MAX_LENGTH = 300
 
 
 def _get_site_url() -> str:
@@ -347,6 +351,65 @@ def _build_admin_player_form_state(player: dict | None = None, source: dict | No
 
 
 
+
+
+def _build_feedback_form_state(raw_values: dict | None = None) -> dict:
+    source = raw_values or {}
+    return {
+        'player_name': str(source.get('player_name', '')).strip(),
+        'message_text': str(source.get('message_text', '')).strip(),
+    }
+
+
+def _client_ip_address() -> str:
+    forwarded_for = str(request.headers.get('X-Forwarded-For', '')).strip()
+    if forwarded_for:
+        return forwarded_for.split(',', 1)[0].strip()
+    return str(request.remote_addr or '').strip()
+
+
+def _render_feedback_page(
+    *,
+    form_state: dict | None = None,
+    error_message: str | None = None,
+    success_message: str | None = None,
+    status_code: int = 200,
+):
+    name_suggestions: list[str] = []
+    feedback_messages: list[dict] = []
+    feedback_load_error: str | None = None
+
+    try:
+        name_suggestions = fetch_player_name_suggestions(limit=SUBMIT_NAME_SUGGESTION_LIMIT)
+    except Exception:
+        name_suggestions = []
+
+    if _is_admin():
+        try:
+            feedback_messages = fetch_admin_feedback_messages(limit=200)
+        except Exception as exc:
+            feedback_load_error = str(exc)
+
+    context = _base_context(
+        'Contact Admin – StarCraft ELO',
+        'feedback',
+        meta_description='Leave a short message for the StarCraft ELO admin team.',
+        canonical_path='/feedback',
+        meta_robots='noindex,follow',
+    )
+    context.update(
+        {
+            'form_state': _build_feedback_form_state(form_state),
+            'error_message': error_message,
+            'success_message': success_message,
+            'feedback_messages': feedback_messages,
+            'feedback_load_error': feedback_load_error,
+            'name_suggestions': name_suggestions,
+            'feedback_message_max_length': FEEDBACK_MESSAGE_MAX_LENGTH,
+        }
+    )
+    return make_response(render_template('feedback.html', **context), status_code)
+
 def _build_admin_match_form_state(match: dict | None = None, source: dict | None = None) -> dict:
     match = match or {}
     source = source or {}
@@ -413,6 +476,7 @@ def sitemap_xml():
         (_build_absolute_url('/leaderboard'), None),
         (_build_absolute_url('/reports'), None),
         (_build_absolute_url('/submit'), None),
+        (_build_absolute_url('/feedback'), None),
     ]
 
     unique_entries: list[tuple[str, str | None]] = []
@@ -687,6 +751,46 @@ def submit_tts_match():
 
     return jsonify({'ok': True, 'message': 'Match submitted successfully.', 'data': success_data}), 200
     
+
+
+@app.route('/feedback', methods=['GET'])
+def feedback_page():
+    success_message = None
+    if request.args.get('sent') == '1':
+        success_message = 'Your message has been sent to the admin.'
+    elif request.args.get('deleted') == '1':
+        success_message = 'Message deleted.'
+    return _render_feedback_page(success_message=success_message)
+
+
+@app.route('/feedback', methods=['POST'])
+def feedback_page_post():
+    form_state = {key: value for key, value in request.form.items()}
+
+    try:
+        submit_admin_feedback_message(
+            player_name=form_state.get('player_name', ''),
+            message_text=form_state.get('message_text', ''),
+            ip_address=_client_ip_address(),
+        )
+    except Exception as exc:
+        return _render_feedback_page(form_state=form_state, error_message=str(exc), status_code=400)
+
+    return redirect('/feedback?sent=1', code=303)
+
+
+@app.route('/feedback/<int:message_id>/delete', methods=['POST'])
+def feedback_delete_message(message_id: int):
+    if not _is_admin():
+        return _redirect_to_admin_login()
+
+    try:
+        delete_admin_feedback_message(message_id)
+    except Exception as exc:
+        return _render_feedback_page(error_message=str(exc), status_code=400)
+
+    return redirect('/feedback?deleted=1', code=303)
+
 @app.route('/admin', methods=['GET'])
 def admin():
     context = _base_context('Admin Panel', 'admin', meta_description='Admin area.', canonical_path='/admin', meta_robots='noindex,nofollow')

@@ -113,6 +113,25 @@
     </div>
 </section>
 
+
+<div class="app-notice-backdrop" id="appNotice" hidden>
+    <div class="app-notice-modal" role="dialog" aria-modal="true" aria-labelledby="appNoticeTitle">
+        <div class="app-notice-head">
+            <div>
+                <p class="app-notice-badge">Profile options</p>
+                <h2 id="appNoticeTitle">Personalize your profile</h2>
+            </div>
+            <button class="app-notice-close" type="button" id="appNoticeClose" aria-label="Close notification">×</button>
+        </div>
+        <div class="app-notice-body">
+            <p>If you want to add a flag to your profile, please write in <a class="inline-link" href="/feedback">Contact Admin</a>.</p>
+        </div>
+        <div class="app-notice-actions">
+            <button class="button button-primary" type="button" id="appNoticeOk">Got it</button>
+        </div>
+    </div>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         document.body.classList.add('page-leaderboard-scroll-lock');
@@ -120,6 +139,56 @@
         const rows = document.querySelectorAll('.leaderboard-row-link');
         const statusInputs = document.querySelectorAll('.leaderboard-status-input');
         const filterForm = document.querySelector('.leaderboard-filter-status-form');
+        const notice = document.getElementById('appNotice');
+        const noticeClose = document.getElementById('appNoticeClose');
+        const noticeOk = document.getElementById('appNoticeOk');
+        const noticeVersion = 'leaderboard-profile-flag-notice-v1';
+        const noticeStorageKey = 'seen_' + noticeVersion;
+
+        function openNotice() {
+            if (!notice) {
+                return;
+            }
+            notice.hidden = false;
+        }
+
+        function closeNotice() {
+            if (!notice) {
+                return;
+            }
+            notice.hidden = true;
+            try {
+                window.localStorage.setItem(noticeStorageKey, '1');
+            } catch (error) {
+            }
+        }
+
+        if (notice) {
+            let alreadySeen = false;
+            try {
+                alreadySeen = window.localStorage.getItem(noticeStorageKey) === '1';
+            } catch (error) {
+                alreadySeen = false;
+            }
+
+            if (!alreadySeen) {
+                openNotice();
+            }
+        }
+
+        if (noticeClose) {
+            noticeClose.addEventListener('click', closeNotice);
+        }
+
+        if (noticeOk) {
+            noticeOk.addEventListener('click', closeNotice);
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && notice && !notice.hidden) {
+                closeNotice();
+            }
+        });
 
         rows.forEach(function (row) {
             const href = row.dataset.href;
@@ -160,6 +229,7 @@
                 }
             });
         });
+
         window.addEventListener('beforeunload', function () {
             document.body.classList.remove('page-leaderboard-scroll-lock');
         });

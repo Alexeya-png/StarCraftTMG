@@ -136,6 +136,9 @@ NEW_PLAYER_MATCHES_LIMIT = 5
 ACTIVE_PLAYER_DAYS_WINDOW = 365
 DATA_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_DATA_CACHE_TTL_SECONDS', '300') or '300'))
 TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS = max(0, int(os.getenv('TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS', '3600') or '3600'))
+FEEDBACK_MESSAGE_MAX_LENGTH = 300
+FEEDBACK_PLAYER_NAME_MAX_LENGTH = 80
+FEEDBACK_TABLE_NAME = 'admin_feedback_messages'
 
 _DATA_CACHE_LOCK = threading.RLock()
 _SUBMIT_MATCH_LOCK = threading.RLock()
@@ -2262,6 +2265,101 @@ def submit_match_result(
             'opponent_new_elo_display': _normalize_elo_value(elo_result['player2_new_elo']),
             'opponent_delta_display': _format_delta(elo_result['player2_delta']),
         }
+
+
+
+def _feedback_storage_error(exc: Exception) -> Exception:
+    message = str(exc)
+    lowered = message.lower()
+    if FEEDBACK_TABLE_NAME in lowered and (
+        'does not exist' in lowered
+        or 'schema cache' in lowered
+        or 'could not find the table' in lowered
+    ):
+        return RuntimeError(
+            'Feedback storage is not ready yet. Create the public.admin_feedback_messages table first.'
+        )
+    return exc
+
+
+def _prepare_feedback_message_row(row: dict) -> dict:
+    item = dict(row)
+    item['player_name'] = _normalize_player_name(item.get('player_name'))
+    item['message_text'] = _normalize_text(item.get('message_text'))
+    item['created_at_label'] = _format_match_datetime(item.get('created_at'))
+    return item
+
+
+def fetch_admin_feedback_messages(limit: int = 200) -> list[dict]:
+    clean_limit = max(1, min(int(limit or 200), 500))
+    try:
+        rows = _rest_select(
+            FEEDBACK_TABLE_NAME,
+            order='created_at.desc,id.desc',
+            limit=clean_limit,
+        )
+    except Exception as exc:
+        raise _feedback_storage_error(exc) from None
+    return [_prepare_feedback_message_row(row) for row in rows]
+
+
+def submit_admin_feedback_message(
+    *,
+    player_name: str,
+    message_text: str,
+    ip_address: str | None = None,
+) -> dict:
+    clean_player_name = _normalize_player_name(player_name)
+    clean_player_name_key = _normalize_player_key(clean_player_name)
+    clean_message_text = _normalize_text(message_text)
+    clean_ip = _normalize_text(ip_address)
+
+    if not clean_player_name:
+        raise ValueError('Enter your player name.')
+    if len(clean_player_name) > FEEDBACK_PLAYER_NAME_MAX_LENGTH:
+        raise ValueError(f'Player name must be at most {FEEDBACK_PLAYER_NAME_MAX_LENGTH} characters long.')
+    if len(clean_message_text) < 3:
+        raise ValueError('Message must contain at least 3 characters.')
+    if len(clean_message_text) > FEEDBACK_MESSAGE_MAX_LENGTH:
+        raise ValueError(f'Message must be at most {FEEDBACK_MESSAGE_MAX_LENGTH} characters long.')
+
+    payload = {
+        'player_name': clean_player_name,
+        'player_name_normalized': clean_player_name_key,
+        'message_text': clean_message_text,
+        'created_at': datetime.utcnow().isoformat(),
+        'ip_address': clean_ip or None,
+    }
+
+    try:
+        rows = _rest_insert(FEEDBACK_TABLE_NAME, payload)
+    except Exception as exc:
+        raise _feedback_storage_error(exc) from None
+
+    if isinstance(rows, list) and rows:
+        return _prepare_feedback_message_row(rows[0])
+    return _prepare_feedback_message_row(payload)
+
+
+def delete_admin_feedback_message(message_id: int) -> None:
+    try:
+        clean_message_id = int(message_id)
+    except (TypeError, ValueError):
+        raise ValueError('Invalid message id.')
+
+    if clean_message_id <= 0:
+        raise ValueError('Invalid message id.')
+
+    try:
+        deleted_rows = _rest_delete(
+            FEEDBACK_TABLE_NAME,
+            filters=[('id', 'eq', clean_message_id)],
+        )
+    except Exception as exc:
+        raise _feedback_storage_error(exc) from None
+
+    if not deleted_rows:
+        raise ValueError('Message not found.')
 
 def fetch_player_admin(player_id: int) -> dict | None:
     row = _rest_get_player_by_id(player_id)
