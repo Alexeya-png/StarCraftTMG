@@ -12,7 +12,6 @@ from flask import Flask, Response, jsonify, make_response, redirect, render_temp
 
 from app.database import (
     MatchSubmissionRateLimitError,
-    delete_admin_feedback_message,
     delete_match_admin,
     fetch_admin_feedback_messages,
     fetch_game_reports_page,
@@ -83,6 +82,7 @@ RACE_OPTIONS = [
     {'label': 'Зерг', 'slug': 'zerg'},
 ]
 RACE_LABELS = [item['label'] for item in RACE_OPTIONS]
+ADMIN_MATCH_RACE_OPTIONS = ['Terran', 'Protoss', 'Zerg']
 
 GAME_TYPE_OPTIONS = ['1к', '2к', 'Grand Offensive']
 DEFAULT_MISSION_OPTIONS = [
@@ -350,6 +350,22 @@ def _build_admin_player_form_state(player: dict | None = None, source: dict | No
     }
 
 
+def _normalize_admin_race_option(value: str | None, default: str = 'Terran') -> str:
+    clean_value = str(value or '').strip()
+    mapping = {
+        'Терран': 'Terran',
+        'Протосс': 'Protoss',
+        'Зерг': 'Zerg',
+        'Terran': 'Terran',
+        'Protoss': 'Protoss',
+        'Zerg': 'Zerg',
+    }
+    normalized = mapping.get(clean_value, clean_value)
+    if normalized in ADMIN_MATCH_RACE_OPTIONS:
+        return normalized
+    return default
+
+
 
 
 
@@ -417,8 +433,8 @@ def _build_admin_match_form_state(match: dict | None = None, source: dict | None
         'player1_name': str(source.get('player1_name', match.get('player1_name', ''))).strip(),
         'player2_name': str(source.get('player2_name', match.get('player2_name', ''))).strip(),
         'winner_side': str(source.get('winner_side', match.get('winner_side', 'player1'))).strip() or 'player1',
-        'player1_race': str(source.get('player1_race', match.get('player1_race', 'Терран'))).strip() or 'Терран',
-        'player2_race': str(source.get('player2_race', match.get('player2_race', 'Протосс'))).strip() or 'Протосс',
+        'player1_race': _normalize_admin_race_option(source.get('player1_race', match.get('player1_race', 'Terran')), 'Terran'),
+        'player2_race': _normalize_admin_race_option(source.get('player2_race', match.get('player2_race', 'Protoss')), 'Protoss'),
         'is_ranked': str(source.get('is_ranked', 'yes' if match.get('is_ranked', True) else 'no')).strip() or 'yes',
         'game_type': str(source.get('game_type', match.get('game_type', '1к'))).strip() or '1к',
         'mission_name': str(source.get('mission_name', match.get('mission_name', ''))).strip(),
@@ -758,8 +774,6 @@ def feedback_page():
     success_message = None
     if request.args.get('sent') == '1':
         success_message = 'Your message has been sent to the admin.'
-    elif request.args.get('deleted') == '1':
-        success_message = 'Message deleted.'
     return _render_feedback_page(success_message=success_message)
 
 
@@ -777,19 +791,6 @@ def feedback_page_post():
         return _render_feedback_page(form_state=form_state, error_message=str(exc), status_code=400)
 
     return redirect('/feedback?sent=1', code=303)
-
-
-@app.route('/feedback/<int:message_id>/delete', methods=['POST'])
-def feedback_delete_message(message_id: int):
-    if not _is_admin():
-        return _redirect_to_admin_login()
-
-    try:
-        delete_admin_feedback_message(message_id)
-    except Exception as exc:
-        return _render_feedback_page(error_message=str(exc), status_code=400)
-
-    return redirect('/feedback?deleted=1', code=303)
 
 @app.route('/admin', methods=['GET'])
 def admin():
@@ -843,7 +844,7 @@ def admin_edit_player(player_id: int):
                 'form_state': _build_admin_player_form_state(),
                 'error_message': 'Player not found.',
                 'success_message': None,
-                'race_options': RACE_LABELS,
+                'race_options': ADMIN_MATCH_RACE_OPTIONS,
             }
         )
         return make_response(render_template('admin_edit_player.html', **context), 404)
@@ -909,7 +910,7 @@ def admin_edit_match(match_id: int):
                 'form_state': _build_admin_match_form_state(),
                 'error_message': 'Match not found.',
                 'success_message': None,
-                'race_options': RACE_LABELS,
+                'race_options': ADMIN_MATCH_RACE_OPTIONS,
                 'game_type_options': GAME_TYPE_OPTIONS,
                 'mission_options': _merge_mission_options(),
             }
@@ -923,7 +924,7 @@ def admin_edit_match(match_id: int):
             'form_state': _build_admin_match_form_state(match),
             'error_message': None,
             'success_message': 'Match saved and ELO recalculated.' if request.args.get('saved') == '1' else None,
-            'race_options': RACE_LABELS,
+            'race_options': ADMIN_MATCH_RACE_OPTIONS,
             'game_type_options': GAME_TYPE_OPTIONS,
             'mission_options': _merge_mission_options(),
         }
@@ -951,7 +952,7 @@ def admin_edit_match_post(match_id: int):
                     'form_state': _build_admin_match_form_state(existing_match, form_state),
                     'error_message': str(exc),
                     'success_message': None,
-                    'race_options': RACE_LABELS,
+                    'race_options': ADMIN_MATCH_RACE_OPTIONS,
                     'game_type_options': GAME_TYPE_OPTIONS,
                     'mission_options': _merge_mission_options(),
                 }
@@ -985,7 +986,7 @@ def admin_edit_match_post(match_id: int):
                 'form_state': _build_admin_match_form_state(existing_match, form_state),
                 'error_message': str(exc),
                 'success_message': None,
-                'race_options': RACE_LABELS,
+                'race_options': ADMIN_MATCH_RACE_OPTIONS,
                 'game_type_options': GAME_TYPE_OPTIONS,
                 'mission_options': _merge_mission_options(),
             }

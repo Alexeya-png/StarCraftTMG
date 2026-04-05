@@ -41,6 +41,15 @@ RACE_LABELS = {
     'Zerg': 'Zerg',
 }
 
+RACE_DB_LABELS = {
+    'Терран': 'Терран',
+    'Протосс': 'Протосс',
+    'Зерг': 'Зерг',
+    'Terran': 'Терран',
+    'Protoss': 'Протосс',
+    'Zerg': 'Зерг',
+}
+
 COUNTRY_ALIASES = {
     'ua': 'ua',
     'ukraine': 'ua',
@@ -280,6 +289,13 @@ def _normalize_race_label(value: str | None) -> str:
     if not clean_value:
         return ''
     return RACE_LABELS.get(clean_value, clean_value)
+
+
+def _normalize_race_db_label(value: str | None) -> str:
+    clean_value = _normalize_text(value)
+    if not clean_value:
+        return ''
+    return RACE_DB_LABELS.get(clean_value, clean_value)
 
 
 def _normalize_discord_url(value: str | None) -> str:
@@ -1743,10 +1759,13 @@ def _refresh_priority_race(player_id: int, *, force_refresh: bool = False) -> No
     counts: dict[str, int] = defaultdict(int)
 
     for row in match_rows:
-        if int(row['player1_id']) == int(player_id) and _normalize_text(row.get('player1_race')):
-            counts[_normalize_text(row.get('player1_race'))] += 1
-        if int(row['player2_id']) == int(player_id) and _normalize_text(row.get('player2_race')):
-            counts[_normalize_text(row.get('player2_race'))] += 1
+        player1_race = _normalize_race_db_label(row.get('player1_race'))
+        player2_race = _normalize_race_db_label(row.get('player2_race'))
+
+        if int(row['player1_id']) == int(player_id) and player1_race in RACE_OPTIONS:
+            counts[player1_race] += 1
+        if int(row['player2_id']) == int(player_id) and player2_race in RACE_OPTIONS:
+            counts[player2_race] += 1
 
     selected = ''
     if counts:
@@ -2038,20 +2057,8 @@ def submit_match_result(
     with _SUBMIT_MATCH_LOCK:
         clean_player1_name = _normalize_player_name(winner_name)
         clean_player2_name = _normalize_player_name(opponent_name)
-        race_input1 = _normalize_text(winner_race)
-        race_input2 = _normalize_text(opponent_race)
-        
-        race_map = {
-            'Terran': 'Терран',
-            'Protoss': 'Протосс',
-            'Zerg': 'Зерг',
-            'Терран': 'Терран',
-            'Протосс': 'Протосс',
-            'Зерг': 'Зерг',
-        }
-        
-        clean_player1_race = race_map.get(race_input1, race_input1)
-        clean_player2_race = race_map.get(race_input2, race_input2)
+        clean_player1_race = _normalize_race_db_label(winner_race)
+        clean_player2_race = _normalize_race_db_label(opponent_race)
         clean_game_type = _normalize_text(game_type)
         clean_mission_name = _normalize_player_name(mission_name)
         clean_comment = _normalize_text(comment)
@@ -2339,27 +2346,6 @@ def submit_admin_feedback_message(
     if isinstance(rows, list) and rows:
         return _prepare_feedback_message_row(rows[0])
     return _prepare_feedback_message_row(payload)
-
-
-def delete_admin_feedback_message(message_id: int) -> None:
-    try:
-        clean_message_id = int(message_id)
-    except (TypeError, ValueError):
-        raise ValueError('Invalid message id.')
-
-    if clean_message_id <= 0:
-        raise ValueError('Invalid message id.')
-
-    try:
-        deleted_rows = _rest_delete(
-            FEEDBACK_TABLE_NAME,
-            filters=[('id', 'eq', clean_message_id)],
-        )
-    except Exception as exc:
-        raise _feedback_storage_error(exc) from None
-
-    if not deleted_rows:
-        raise ValueError('Message not found.')
 
 def fetch_player_admin(player_id: int) -> dict | None:
     row = _rest_get_player_by_id(player_id)
@@ -2670,8 +2656,8 @@ def update_match_admin(
 ) -> dict:
     clean_player1_name = _normalize_player_name(player1_name)
     clean_player2_name = _normalize_player_name(player2_name)
-    clean_player1_race = _normalize_text(player1_race)
-    clean_player2_race = _normalize_text(player2_race)
+    clean_player1_race = _normalize_race_db_label(player1_race)
+    clean_player2_race = _normalize_race_db_label(player2_race)
     ranked_match = _coerce_ranked_value(is_ranked)
     clean_game_type = _normalize_text(game_type)
     clean_mission_name = _normalize_player_name(mission_name)
