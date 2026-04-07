@@ -461,6 +461,90 @@ def _parse_admin_datetime(value: str) -> datetime:
 
 
 
+
+def _serialize_leaderboard_players(players: list[dict]) -> list[dict]:
+    serialized: list[dict] = []
+
+    for player in players:
+        serialized.append(
+            {
+                'id': int(player['id']),
+                'name': str(player.get('name') or ''),
+                'rank_position': int(player.get('rank_position') or 0),
+                'current_elo': int(player.get('current_elo') or 0),
+                'current_elo_display': str(player.get('current_elo_display') or player.get('current_elo') or ''),
+                'matches_count': int(player.get('matches_count') or 0),
+                'win_rate': player.get('win_rate') or 0,
+                'win_rate_display': str(player.get('win_rate_display') or ''),
+                'wins': int(player.get('wins') or 0),
+                'losses': int(player.get('losses') or 0),
+                'profile_url': str(player.get('profile_url') or f"/players/{player['id']}"),
+                'flag_url': str(player.get('flag_url') or ''),
+                'priority_race': str(player.get('priority_race') or ''),
+                'priority_race_slug': str(player.get('priority_race') or '').strip().lower(),
+            }
+        )
+
+    return serialized
+
+
+def _parse_leaderboard_filters() -> tuple[str, bool, bool, bool, bool]:
+    search = request.args.get('search', '')
+
+    selected_statuses = {
+        value.strip().lower()
+        for value in request.args.getlist('status')
+        if value and value.strip()
+    }
+    if not selected_statuses:
+        selected_statuses = {'active'}
+
+    show_active = 'active' in selected_statuses
+    show_inactive = 'inactive' in selected_statuses
+
+    active_ranked_raw = request.args.get('active_ranked')
+    show_active_ranked = str(active_ranked_raw or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+    active_ranked_query_present = active_ranked_raw is not None
+
+    return search, show_active, show_inactive, show_active_ranked, active_ranked_query_present
+
+
+def _leaderboard_payload(
+    *,
+    search: str,
+    show_active: bool,
+    show_inactive: bool,
+    show_active_ranked: bool,
+) -> tuple[dict, str | None]:
+    try:
+        players = fetch_leaderboard(
+            search=search,
+            include_active=show_active,
+            include_inactive=show_inactive,
+            active_ranked_only=show_active_ranked,
+        )
+        return {
+            'ok': True,
+            'players': _serialize_leaderboard_players(players),
+            'players_count': len(players),
+            'show_active': show_active,
+            'show_inactive': show_inactive,
+            'show_active_ranked': show_active_ranked,
+            'search': search,
+        }, None
+    except Exception as exc:
+        return {
+            'ok': False,
+            'players': [],
+            'players_count': 0,
+            'show_active': show_active,
+            'show_inactive': show_inactive,
+            'show_active_ranked': show_active_ranked,
+            'search': search,
+            'error': str(exc),
+        }, str(exc)
+
+
 def _pagination_numbers(current_page: int, total_pages: int) -> list[int | str]:
     if total_pages <= 7:
         return list(range(1, total_pages + 1))
@@ -536,31 +620,16 @@ def health():
 
 @app.route('/leaderboard')
 def leaderboard():
-    db_error = None
-    players = []
-    search = request.args.get('search', '')
+    search, show_active, show_inactive, show_active_ranked, active_ranked_query_present = _parse_leaderboard_filters()
+    payload, db_error = _leaderboard_payload(
+        search=search,
+        show_active=show_active,
+        show_inactive=show_inactive,
+        show_active_ranked=show_active_ranked,
+    )
+    players = payload['players']
 
-    selected_statuses = {
-        value.strip().lower()
-        for value in request.args.getlist('status')
-        if value and value.strip()
-    }
-    if not selected_statuses:
-        selected_statuses = {'active'}
-
-    show_active = 'active' in selected_statuses
-    show_inactive = 'inactive' in selected_statuses
-
-    try:
-        players = fetch_leaderboard(
-            search=search,
-            include_active=show_active,
-            include_inactive=show_inactive,
-        )
-    except Exception as exc:
-        db_error = str(exc)
-
-    is_filtered_page = bool(str(search).strip()) or not (show_active and not show_inactive)
+    is_filtered_page = bool(str(search).strip()) or not (show_active and not show_inactive) or show_active_ranked
     context = _base_context(
         'Global Rating – StarCraft ELO',
         'leaderboard',
@@ -574,10 +643,27 @@ def leaderboard():
             'search': search,
             'show_active': show_active,
             'show_inactive': show_inactive,
+            'show_active_ranked': show_active_ranked,
+            'active_ranked_query_present': active_ranked_query_present,
             'db_error': db_error,
         }
     )
     return render_template('leaderboard.html', **context)
+
+
+@app.route('/api/leaderboard', methods=['GET'])
+def leaderboard_api():
+    search, show_active, show_inactive, show_active_ranked, _ = _parse_leaderboard_filters()
+    payload, db_error = _leaderboard_payload(
+        search=search,
+        show_active=show_active,
+        show_inactive=show_inactive,
+        show_active_ranked=show_active_ranked,
+    )
+    status_code = 200 if payload.get('ok') else 500
+    if db_error:
+        payload['error'] = db_error
+    return jsonify(payload), status_code
 
 
 @app.route('/reports')
@@ -592,11 +678,18 @@ def game_reports():
     current_page = max(1, request.args.get('page', 1, type=int) or 1)
     per_page = max(1, min(request.args.get('per_page', 25, type=int) or 25, 100))
     search = request.args.get('search', '')
+    show_ranked_only = request.args.get('ranked_only') == '1'
+    ranked_only_query_present = 'ranked_only' in request.args
     total_pages = 1
     pagination_numbers: list[int | str] = []
 
     try:
-        page_data = fetch_game_reports_page(search=search, page=current_page, per_page=per_page)
+        page_data = fetch_game_reports_page(
+            search=search,
+            page=current_page,
+            per_page=per_page,
+            ranked_only=show_ranked_only,
+        )
         matches = page_data['items']
         total_matches = page_data['total_count']
         current_page = page_data['page']
@@ -605,7 +698,7 @@ def game_reports():
     except Exception as exc:
         db_error = str(exc)
 
-    is_filtered_page = bool(str(search).strip()) or current_page > 1 or per_page != 25
+    is_filtered_page = bool(str(search).strip()) or current_page > 1 or per_page != 25 or show_ranked_only
     context = _base_context(
         'Game Reports – StarCraft ELO',
         'reports',
@@ -623,6 +716,8 @@ def game_reports():
             'current_page': current_page,
             'total_pages': total_pages,
             'pagination_numbers': pagination_numbers,
+            'show_ranked_only': show_ranked_only,
+            'ranked_only_query_present': ranked_only_query_present,
         }
     )
     return render_template('game_reports.html', **context)

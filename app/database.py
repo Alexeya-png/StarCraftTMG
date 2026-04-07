@@ -17,6 +17,11 @@ from urllib.parse import urlencode
 
 from dotenv import load_dotenv
 
+try:
+    from .players import resolve_player_canonical_name
+except ImportError:
+    from players import resolve_player_canonical_name
+
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1213,6 +1218,23 @@ def _fetch_all_matches_raw(*, force_refresh: bool = False) -> list[dict]:
     return [dict(row) for row in snapshot['matches']]
 
 
+def _fetch_ranked_player_ids(*, force_refresh: bool = False) -> set[int]:
+    matches = _fetch_all_matches_raw(force_refresh=force_refresh)
+    ranked_player_ids: set[int] = set()
+
+    for match in matches:
+        if not bool(match.get('is_ranked')):
+            continue
+
+        try:
+            ranked_player_ids.add(int(match['player1_id']))
+            ranked_player_ids.add(int(match['player2_id']))
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    return ranked_player_ids
+
+
 def _fetch_all_rating_history_raw(*, force_refresh: bool = False) -> list[dict]:
     snapshot = _cache_snapshot(force_refresh=force_refresh)
     return [dict(row) for row in snapshot['rating_history']]
@@ -1259,39 +1281,49 @@ def fetch_leaderboard(
     *,
     include_active: bool = True,
     include_inactive: bool = False,
+    active_ranked_only: bool = False,
 ) -> list[dict]:
-    normalized_search = _normalize_search_term(search)
+    normalized_search = _normalize_search_term(search).casefold()
 
     if not include_active and not include_inactive:
         include_active = True
 
-    filters: list[tuple[str, str, Any]] = []
-    if normalized_search:
-        filters.append(('name', 'ilike', f'*{normalized_search}*'))
+    rows = _fetch_all_players_raw()
+    ranked_player_ids = _fetch_ranked_player_ids() if active_ranked_only else set()
 
-    rows = _rest_fetch_all(
-        'players',
-        select='id,name,country_code,priority_race,discord_url,last_match_at,current_elo,wins,losses,draws,matches_count,is_active,created_at',
-        filters=filters,
-        order='current_elo.desc,wins.desc,matches_count.desc,name.asc',
-    )
-
-    prepared_rows = []
-    rank_position = 0
+    filtered_rows: list[dict] = []
     for row in rows:
         prepared = dict(row)
         prepared['matches_count'] = int(row.get('matches_count') or 0)
         prepared['wins'] = int(row.get('wins') or 0)
         prepared['losses'] = int(row.get('losses') or 0)
+        prepared['draws'] = int(row.get('draws') or 0)
+        prepared['current_elo'] = int(row.get('current_elo') or 0)
         prepared['is_active'] = _is_player_active_by_last_match(row.get('last_match_at'))
 
+        if normalized_search and normalized_search not in _normalize_player_name(prepared.get('name')).casefold():
+            continue
         if include_active and not include_inactive and not prepared['is_active']:
             continue
         if include_inactive and not include_active and prepared['is_active']:
             continue
+        if active_ranked_only and int(prepared['id']) not in ranked_player_ids:
+            continue
 
+        filtered_rows.append(prepared)
+
+    filtered_rows.sort(
+        key=lambda row: (
+            -int(row.get('current_elo') or 0),
+            -int(row.get('wins') or 0),
+            -int(row.get('matches_count') or 0),
+            _normalize_player_name(row.get('name')).casefold(),
+        )
+    )
+
+    prepared_rows = []
+    for rank_position, prepared in enumerate(filtered_rows, start=1):
         prepared['win_rate'] = round((prepared['wins'] / prepared['matches_count']) * 100, 1) if prepared['matches_count'] > 0 else 0
-        rank_position += 1
         prepared['rank_position'] = rank_position
         prepared_rows.append(_prepare_player_row(prepared))
     return prepared_rows
@@ -1357,7 +1389,7 @@ def _build_match_search_or_clause(search: str) -> str:
     return '(' + ','.join(or_parts) + ')'
 
 
-def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25) -> dict:
+def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25, *, ranked_only: bool = False) -> dict:
     safe_per_page = max(1, min(int(per_page or 25), 100))
     safe_page = max(1, int(page or 1))
     offset = (safe_page - 1) * safe_per_page
@@ -1374,13 +1406,18 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25)
             'limit': safe_per_page,
             'offset': offset,
         }
+        if ranked_only:
+            count_query['is_ranked'] = 'eq.true'
+            page_query['is_ranked'] = 'eq.true'
         _, total_count = _rest_select_raw('matches', query=count_query, count=True)
         match_rows = _rest_select_raw('matches', query=page_query)
     else:
-        _, total_count = _rest_select('matches', select='id', count=True)
+        base_filters = [('is_ranked', 'eq', True)] if ranked_only else None
+        _, total_count = _rest_select('matches', select='id', filters=base_filters, count=True)
         match_rows = _rest_select(
             'matches',
             select=match_select,
+            filters=base_filters,
             order='id.desc',
             limit=safe_per_page,
             offset=offset,
@@ -1392,20 +1429,25 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25)
     if not match_rows and safe_page != page and total_count:
         offset = (safe_page - 1) * safe_per_page
         if normalized_search:
+            fallback_page_query = {
+                'select': match_select,
+                'or': or_clause,
+                'order': 'id.desc',
+                'limit': safe_per_page,
+                'offset': offset,
+            }
+            if ranked_only:
+                fallback_page_query['is_ranked'] = 'eq.true'
             match_rows = _rest_select_raw(
                 'matches',
-                query={
-                    'select': match_select,
-                    'or': or_clause,
-                    'order': 'id.desc',
-                    'limit': safe_per_page,
-                    'offset': offset,
-                },
+                query=fallback_page_query,
             )
         else:
+            fallback_filters = [('is_ranked', 'eq', True)] if ranked_only else None
             match_rows = _rest_select(
                 'matches',
                 select=match_select,
+                filters=fallback_filters,
                 order='id.desc',
                 limit=safe_per_page,
                 offset=offset,
@@ -1500,8 +1542,8 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25)
     }
 
 
-def fetch_game_reports(search: str = '', limit: int = 100) -> list[dict]:
-    page_data = fetch_game_reports_page(search=search, page=1, per_page=limit)
+def fetch_game_reports(search: str = '', limit: int = 100, *, ranked_only: bool = False) -> list[dict]:
+    page_data = fetch_game_reports_page(search=search, page=1, per_page=limit, ranked_only=ranked_only)
     return page_data['items']
 
 
@@ -1716,8 +1758,9 @@ def _compute_player_rank_position(player_id: int) -> int | str:
 
 
 def _get_or_create_player(player_name: str) -> dict:
-    normalized_name = _normalize_player_name(player_name)
-    normalized_key = _normalize_player_key(player_name)
+    resolved_player_name = resolve_player_canonical_name(player_name)
+    normalized_name = _normalize_player_name(resolved_player_name)
+    normalized_key = _normalize_player_key(resolved_player_name)
 
     existing = _rest_get_player_by_name_key(normalized_key)
     if existing:

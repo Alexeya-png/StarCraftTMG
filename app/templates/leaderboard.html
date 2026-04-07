@@ -11,30 +11,43 @@
         <div class="leaderboard-shell leaderboard-shell-polished leaderboard-shell-scrollable">
             <div class="leaderboard-toolbar leaderboard-toolbar-polished leaderboard-toolbar-top">
                 <form class="leaderboard-filter leaderboard-filter-polished leaderboard-filter-status-form" method="get" action="/leaderboard">
+                    <input type="hidden" name="active_ranked" value="{{ '1' if show_active_ranked else '0' }}" data-active-ranked-input>
                     <div class="leaderboard-filter-row leaderboard-filter-row-status">
-                        <div class="leaderboard-status-group" role="group" aria-label="Player status filter">
-                            <label class="leaderboard-status-toggle {% if show_active %}is-active{% endif %}">
-                                <input class="leaderboard-status-input" type="checkbox" name="status" value="active" {% if show_active %}checked{% endif %}>
-                                <span>Active</span>
-                            </label>
-                            <label class="leaderboard-status-toggle {% if show_inactive %}is-active{% endif %}">
-                                <input class="leaderboard-status-input" type="checkbox" name="status" value="inactive" {% if show_inactive %}checked{% endif %}>
-                                <span>Inactive</span>
-                            </label>
-                        </div>
-                        <div class="leaderboard-status-help" data-status-help>
-                            <button
-                                class="leaderboard-status-help-button"
-                                type="button"
-                                aria-label="About Active and Inactive statuses"
-                            >
-                                !
-                            </button>
-                            <div class="leaderboard-status-help-popover" role="note">
-                                <strong>Status</strong>
-                                <p><span>Active</span> – player is currently active in the ladder.</p>
-                                <p><span>Inactive</span> – player has not played for more than 1 year.</p>
+                        <div class="leaderboard-filter-primary">
+                            <div class="leaderboard-status-group" role="group" aria-label="Player status filter">
+                                <label class="leaderboard-status-toggle {% if show_active %}is-active{% endif %}">
+                                    <input class="leaderboard-status-input" type="checkbox" name="status" value="active" {% if show_active %}checked{% endif %}>
+                                    <span>Active</span>
+                                </label>
+                                <label class="leaderboard-status-toggle {% if show_inactive %}is-active{% endif %}">
+                                    <input class="leaderboard-status-input" type="checkbox" name="status" value="inactive" {% if show_inactive %}checked{% endif %}>
+                                    <span>Inactive</span>
+                                </label>
                             </div>
+                            <div class="leaderboard-status-help" data-status-help>
+                                <button
+                                    class="leaderboard-status-help-button"
+                                    type="button"
+                                    aria-label="About Active and Inactive statuses"
+                                >
+                                    !
+                                </button>
+                                <div class="leaderboard-status-help-popover" role="note">
+                                    <strong>Status</strong>
+                                    <p><span>Active</span> – player is currently active in the ladder.</p>
+                                    <p><span>Inactive</span> – player has not played for more than 1 year.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="leaderboard-filter-secondary">
+                            <button
+                                class="leaderboard-toolbar-toggle {% if show_active_ranked %}is-active{% endif %}"
+                                type="button"
+                                aria-pressed="{{ 'true' if show_active_ranked else 'false' }}"
+                                data-active-ranked-toggle
+                            >
+                                Ladder Players
+                            </button>
                         </div>
                     </div>
                 </form>
@@ -61,7 +74,7 @@
                     <thead>
                         <tr>
                             <th class="col-rank">Rank</th>
-                            <th class="col-elo">ELO</th>
+<th class="col-elo">ELO</th>
                             <th class="col-player">Player</th>
                             <th class="col-games-all">Games All time</th>
                             <th class="col-winrate">Winrate</th>
@@ -106,7 +119,7 @@
             {% else %}
             <div class="state-card leaderboard-state-card">
                 <h2>No players found</h2>
-                <p>The current Active and Inactive filter returned nothing.</p>
+                <p>The current filters returned nothing.</p>
             </div>
             {% endif %}
         </div>
@@ -139,6 +152,10 @@
         const rows = document.querySelectorAll('.leaderboard-row-link');
         const statusInputs = document.querySelectorAll('.leaderboard-status-input');
         const filterForm = document.querySelector('.leaderboard-filter-status-form');
+        const activeRankedToggle = document.querySelector('[data-active-ranked-toggle]');
+        const activeRankedInput = document.querySelector('[data-active-ranked-input]');
+        const activeRankedStorageKey = 'leaderboard_active_ranked_v1';
+        const hasActiveRankedQuery = {{ 'true' if active_ranked_query_present else 'false' }};
         const notice = document.getElementById('appNotice');
         const noticeClose = document.getElementById('appNoticeClose');
         const noticeOk = document.getElementById('appNoticeOk');
@@ -189,6 +206,55 @@
                 closeNotice();
             }
         });
+
+        function isActiveRankedEnabled() {
+            return Boolean(activeRankedInput && activeRankedInput.value === '1');
+        }
+
+        function applyActiveRankedState(enabled, options) {
+            const settings = options || {};
+            const shouldPersist = settings.persist !== false;
+            const shouldSubmit = settings.submit === true;
+            const normalizedEnabled = Boolean(enabled);
+
+            if (activeRankedInput) {
+                activeRankedInput.value = normalizedEnabled ? '1' : '0';
+            }
+
+            if (activeRankedToggle) {
+                activeRankedToggle.classList.toggle('is-active', normalizedEnabled);
+                activeRankedToggle.setAttribute('aria-pressed', normalizedEnabled ? 'true' : 'false');
+            }
+
+            if (shouldPersist) {
+                try {
+                    window.localStorage.setItem(activeRankedStorageKey, normalizedEnabled ? '1' : '0');
+                } catch (error) {
+                }
+            }
+
+            if (shouldSubmit && filterForm) {
+                filterForm.submit();
+            }
+        }
+
+        if (!hasActiveRankedQuery) {
+            try {
+                if (window.localStorage.getItem(activeRankedStorageKey) === '1' && !isActiveRankedEnabled()) {
+                    applyActiveRankedState(true, { persist: false, submit: true });
+                    return;
+                }
+            } catch (error) {
+            }
+        } else {
+            applyActiveRankedState(isActiveRankedEnabled(), { persist: true, submit: false });
+        }
+
+        if (activeRankedToggle) {
+            activeRankedToggle.addEventListener('click', function () {
+                applyActiveRankedState(!isActiveRankedEnabled(), { persist: true, submit: true });
+            });
+        }
 
         rows.forEach(function (row) {
             const href = row.dataset.href;
