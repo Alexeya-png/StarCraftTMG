@@ -119,7 +119,27 @@
                         {% if race_slug in ['terran', 'protoss', 'zerg'] %}
                         <img class="profile-race-icon" src="/static/Race/{{ race_slug }}.svg" alt="{{ player.priority_race }} icon">
                         {% endif %}
-                        <h1 class="profile-player-name">{{ player.name }}</h1>
+                        <h1 class="profile-player-name ">{{ player.name }}</h1>
+                        {% if player.badges %}
+                        <div class="profile-name-badges" aria-label="Player achievements">
+                            {% for badge in player.badges %}
+                            {% set badge_variant = badge.variant if badge.variant else (badge.code|replace('_', '-')) %}
+                            {% if badge_variant %}
+                            <span
+                                class="profile-name-badge profile-name-badge-{{ badge_variant }} profile-name-badge-race-{{ badge.race_slug }}"
+                                title="{{ badge.description }}"
+                            >
+                                <img
+                                    class="profile-name-badge-icon"
+                                    src="{{ url_for('static', filename='badges/' ~ badge_variant ~ '.webp') }}?v=20260428"
+                                    alt=""
+                                    loading="eager"
+                                >
+                            </span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                     </div>
                     <p class="profile-subtitle">
                         Rank #{{ player.rank_position }}
@@ -131,6 +151,7 @@
                         {% endif %}
                     </p>
                 </div>
+
 
                 <div class="profile-elo-card">
                     <span class="profile-elo-label">Current ELO</span>

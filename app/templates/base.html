@@ -10,7 +10,7 @@
     {% if google_site_verification %}
     <meta name="google-site-verification" content="{{ google_site_verification }}">
     {% endif %}
-    <meta property="og:site_name" content="StarCraft ELO">
+    <meta property="og:site_name" content="TMG Stats">
     <meta property="og:type" content="{{ og_type }}">
     <meta property="og:title" content="{{ page_title }}">
     <meta property="og:description" content="{{ meta_description }}">
@@ -30,8 +30,8 @@
             <a class="brand-block" href="/">
                 <img class="brand-logo" src="{{ url_for('static', filename='Race/logo.png', v=asset_version) }}" alt="Archon Studio logo" width="96" height="64" decoding="async">
     <div class="brand-meta">
-        <span class="brand-title">StarCraft ELO</span>
-        <span class="brand-version">Version 0.5</span>
+        <span class="brand-title">TMG Stats</span>
+        <span class="brand-version">Version 0.73</span>
         <span class="brand-note">Unofficial fan project</span>
     </div>
         </a>
@@ -40,6 +40,7 @@
                 <a class="{% if active_page == 'leaderboard' %}is-active{% endif %}" href="/leaderboard">Ratings</a>
                 <a class="{% if active_page == 'submit' %}is-active{% endif %}" href="/submit">Submit Match</a>
                 <a class="{% if active_page == 'reports' %}is-active{% endif %}" href="/reports">Game Reports</a>
+                <a class="{% if active_page == 'leagues' %}is-active{% endif %}" href="/leagues">Leagues</a>
                 <a class="{% if active_page == 'feedback' %}is-active{% endif %}" href="/feedback">Contact Admin</a>
                 <a class="{% if active_page == 'admin' %}is-active{% endif %}" href="/admin">Admin</a>
             </nav>

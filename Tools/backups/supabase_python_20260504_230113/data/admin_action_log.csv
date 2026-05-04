@@ -1,0 +1,7 @@
+id,admin_user_id,action_type,entity_type,entity_id,details_json,created_at,ip_address
+1,1,seed_admin_upsert,admin_user,1,"{""username"": ""admin""}",2026-03-26 01:45:28.719768,
+2,1,seed_settings_upsert,system_settings,,"{""default_elo"": 1000, ""elo_k_factor"": 32}",2026-03-26 01:45:28.719768,
+3,1,seed_demo_data,matches,,"{""seed_matches"": 30}",2026-03-26 01:45:28.719768,
+4,1,seed_admin_upsert,admin_user,1,"{""username"": ""admin""}",2026-03-27 05:26:06.754813,
+5,1,seed_settings_upsert,system_settings,,"{""default_elo"": 1000, ""elo_k_factor"": 32}",2026-03-27 05:26:06.754813,
+6,1,seed_demo_data,matches,,"{""seed_matches"": 30}",2026-03-27 05:26:06.754813,

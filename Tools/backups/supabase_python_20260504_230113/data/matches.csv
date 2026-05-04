@@ -1,0 +1,177 @@
+id,player1_id,player2_id,winner_player_id,played_at,created_at,comment,player1_race,player2_race,is_ranked,game_type,mission_name,result_type,player1_roster_id,player2_roster_id,league_id
+669,188,190,188,2026-03-27 07:04:10.051946,2026-03-27 11:04:11.204814,First game for stats,Терран,Терран,f,2к,Divide and Conquer,win,,,1
+676,191,192,191,2026-03-28 10:27:55.96365,2026-03-28 14:27:57.27837,25 to 13,Терран,Зерг,f,2к,Supply Drop,win,,,1
+678,193,188,193,2026-03-28 14:00:51.606598,2026-03-28 18:00:52.876037,"Awesome game!
+But 4 hours is a lot:)",Протосс,Терран,f,2к,Frontlines,win,,,1
+679,194,195,194,2026-03-28 14:46:09.251082,2026-03-28 18:46:10.916241,,Терран,Терран,f,2к,Gather the Resources,win,,,1
+680,196,197,196,2026-03-28 17:07:09.159125,2026-03-28 21:07:11.143106,12-1 on Round 4/5,Зерг,Протосс,f,2к,Supply Drop,win,,,1
+683,196,198,196,2026-03-28 20:37:00,2026-03-29 00:37:45.340739,19 to 11 on 5/5,Зерг,Протосс,f,2к,Gather the Resources,win,,,1
+685,188,199,188,2026-03-28 21:18:26.932868,2026-03-29 01:18:28.025325,,Терран,Терран,f,2к,Hold Position,win,,,1
+694,210,188,210,2026-03-28 23:29:17.872306,2026-03-29 03:29:19.688913,,Зерг,Терран,f,1к,Gather the Resources,win,,,1
+695,198,211,198,2026-03-28 23:43:00,2026-03-29 03:43:31.325504,Unranked learning match between protoss and marines. 18-9,Протосс,Терран,f,2к,Supply Drop,win,,,1
+696,212,190,212,2026-03-29 01:55:53.811167,2026-03-29 05:55:55.067254,,Зерг,Терран,f,2к,Hold Position,win,,,1
+697,195,213,195,2026-03-29 03:02:00.814305,2026-03-29 07:02:02.206957,,Терран,Протосс,t,2к,Hold Position,win,,,1
+698,196,194,196,2026-03-29 12:50:48.318988,2026-03-29 16:50:49.270517,,Зерг,Терран,f,2к,Supply Drop,win,,,1
+699,198,214,198,2026-03-29 12:58:14.885332,2026-03-29 16:58:17.431726,20-10,Протосс,Протосс,f,2к,Frontlines,win,,,1
+700,215,216,215,2026-03-29 13:51:03.125961,2026-03-29 17:51:06.265231,stalkers real good in 1k,Протосс,Зерг,f,1к,Hold Position,win,,,1
+701,217,218,217,2026-03-29 15:38:55.955699,2026-03-29 19:38:57.50957,,Терран,Протосс,f,1к,Hold Position,win,,,1
+702,188,196,188,2026-03-29 18:38:35.64475,2026-03-29 22:38:36.835522,"19-16, tought one",Терран,Зерг,f,2к,Hold Position,win,,,1
+703,196,219,196,2026-03-30 15:42:47.846002,2026-03-30 19:42:49.501369,18-13 on 4/4,Зерг,Терран,f,2к,Divide and Conquer,win,,,1
+704,188,220,188,2026-03-30 17:04:56.951281,2026-03-30 21:04:58.496171,Mech terran against Bio,Терран,Терран,f,2к,Hold Position,win,,,1
+706,196,221,196,2026-03-30 19:14:13.562587,2026-03-30 23:14:14.708074,"[[match_meta:{""player1_score"":17,""player2_score"":7}]]",Зерг,Зерг,f,2к,Divide and Conquer,win,,,1
+716,223,224,223,2026-03-31 08:19:16.820448,2026-03-31 12:19:18.456047,"[[match_meta:{""player1_score"":15,""player2_score"":10}]]",Терран,Протосс,f,2к,Frontlines,win,,,1
+717,216,215,216,2026-03-31 13:21:55.50118,2026-03-31 17:21:56.393659,"[[match_meta:{""player1_score"":9,""player2_score"":5}]]",Терран,Зерг,f,1к,Supply Drop,win,,,1
+718,216,225,216,2026-03-31 15:55:37.964229,2026-03-31 19:55:39.916492,"[[match_meta:{""player1_score"":9,""player2_score"":4}]]",Зерг,Терран,f,1к,Frontlines,win,,,1
+719,188,226,188,2026-03-31 15:56:26.084998,2026-03-31 19:56:26.937068,"[[match_meta:{""player1_score"":7,""player2_score"":5}]]",Терран,Протосс,f,1к,Gather the Resources,win,,,1
+720,193,227,193,2026-03-31 16:41:15.790474,2026-03-31 20:41:17.648959,"[[match_meta:{""player1_score"":14,""player2_score"":8}]] Again more then 3 hours(((",Протосс,Зерг,f,2к,Gather the Resources,win,,,1
+721,228,190,228,2026-04-01 02:45:43.237909,2026-04-01 06:45:45.794845,"[[match_meta:{""player1_score"":19,""player2_score"":14}]]",Протосс,Терран,f,2к,Frontlines,win,,,1
+722,225,188,225,2026-04-01 04:00:11.018919,2026-04-01 08:00:12.230973,"[[match_meta:{""player1_score"":17,""player2_score"":15}]]",Терран,Терран,f,1к,Frontlines,win,,,1
+723,195,188,195,2026-04-01 08:57:29.450737,2026-04-01 12:57:30.425682,"[[match_meta:{""player1_score"":29,""player2_score"":23}]]",Терран,Терран,t,2к,Hold Position,win,,,1
+724,223,226,223,2026-04-01 14:11:26.610369,2026-04-01 18:11:27.943038,"[[match_meta:{""player1_score"":20,""player2_score"":16}]]",Терран,Протосс,f,2к,Gather the Resources,win,,,1
+725,229,230,229,2026-04-01 14:49:32.559444,2026-04-01 18:49:34.015327,"[[match_meta:{""player1_score"":16,""player2_score"":4}]]",Протосс,Зерг,t,2к,Frontline,win,,,1
+726,231,232,231,2026-04-01 17:47:57.761751,2026-04-01 21:47:59.65263,"[[match_meta:{""player1_score"":10,""player2_score"":9}]]",Терран,Зерг,f,1к,Divide and Conquer,win,,,1
+727,232,233,232,2026-04-01 17:52:18.48989,2026-04-01 21:52:20.553502,"[[match_meta:{""player1_score"":7,""player2_score"":5}]]",Протосс,Протосс,f,1к,Gather the Resources,win,,,1
+728,196,234,196,2026-04-01 18:25:00,2026-04-01 22:25:09.324723,"[[match_meta:{""player1_score"":12,""player2_score"":2}]]",Зерг,Зерг,f,2к,Frontlines,win,,,1
+729,196,235,196,2026-04-01 22:11:00,2026-04-02 02:11:55.198231,"[[match_meta:{""player1_score"":23,""player2_score"":14}]]",Зерг,Зерг,f,2к,Hold Position,win,,,1
+735,238,239,238,2026-04-02 08:21:42.070479,2026-04-02 12:21:44.19845,"[[match_meta:{""player1_score"":10,""player2_score"":7}]] Forfeit in round 5 due to impossibility to catch-up in VP during round 5 scoring.",Протосс,Зерг,t,1к,Frontlines,win,,,1
+736,196,214,196,2026-04-02 12:36:00,2026-04-02 16:36:05.842383,"[[match_meta:{""player1_score"":14,""player2_score"":3}]]",Зерг,Протосс,f,2к,Supply Drop,win,,,1
+737,223,219,223,2026-04-02 14:49:10.488498,2026-04-02 18:49:12.36586,"[[match_meta:{""player1_score"":24,""player2_score"":12}]]",Терран,Терран,f,2к,Divide and Conquer,win,,,1
+738,196,214,196,2026-04-02 15:54:09.543745,2026-04-02 19:54:10.63779,"[[match_meta:{""player1_score"":18,""player2_score"":15}]]",Зерг,Протосс,f,2к,Divide and Conquer,win,,,1
+739,196,228,,2026-04-02 20:37:38.00938,2026-04-03 00:37:39.520741,"[[match_meta:{""player1_score"":15,""player2_score"":15}]]",Зерг,Протосс,f,2к,Frontlines,draw,,,1
+740,188,237,188,2026-04-03 00:45:59.68497,2026-04-03 04:46:00.647682,"[[match_meta:{""player1_score"":9,""player2_score"":5}]]",Терран,Протосс,f,2к,Gather the Resources,win,,,1
+743,188,193,188,2026-04-03 10:23:00,2026-04-03 14:23:41.886782,"[[match_meta:{""player1_score"":12,""player2_score"":6}]]",Терран,Протосс,f,2к,Supply Drop,win,,,1
+744,196,240,196,2026-04-03 15:29:51.122842,2026-04-03 19:29:52.332849,"[[match_meta:{""player1_score"":19,""player2_score"":6}]]",Зерг,Протосс,f,2к,Frontlines,win,,,1
+745,196,241,196,2026-04-03 22:49:58.329315,2026-04-04 02:49:59.717053,"[[match_meta:{""player1_score"":19,""player2_score"":18}]]",Терран,Терран,f,2к,Divide and Conquer,win,,,1
+746,242,195,242,2026-04-04 03:57:48.326534,2026-04-04 07:57:49.282754,"[[match_meta:{""player1_score"":16,""player2_score"":12}]]",Протосс,Терран,t,2к,Hold Position,win,,,1
+747,188,223,188,2026-04-04 06:13:59.952412,2026-04-04 10:14:00.899191,"[[match_meta:{""player1_score"":5,""player2_score"":0}]]",Терран,Терран,f,2к,Hold Position,win,,,1
+748,188,223,188,2026-04-04 08:30:43.183421,2026-04-04 12:30:44.648157,"[[match_meta:{""player1_score"":25,""player2_score"":18}]]",Терран,Терран,f,2к,Hold Position,win,,,1
+749,188,198,188,2026-04-04 11:37:00,2026-04-04 15:37:28.179284,"[[match_meta:{""player1_score"":17,""player2_score"":16}]]",Терран,Протосс,f,2к,Hold Position,win,,,1
+750,198,196,198,2026-04-04 15:54:26.969215,2026-04-04 19:54:27.92508,"[[match_meta:{""player1_score"":17,""player2_score"":7}]]",Терран,Протосс,f,2к,Supply Drop,win,,,1
+751,244,212,,2026-04-05 00:40:00,2026-04-05 04:40:37.081637,"[[match_meta:{""player1_score"":23,""player2_score"":23}]]",Протосс,Зерг,f,2к,Frontlines,draw,,,1
+752,246,228,246,2026-04-05 00:44:00,2026-04-05 04:44:56.601025,"[[match_meta:{""player1_score"":14,""player2_score"":11}]]",Протосс,Протосс,t,2к,Hold Position,win,,,1
+753,188,247,188,2026-04-05 08:00:00,2026-04-05 12:01:00.864851,"[[match_meta:{""player1_score"":17,""player2_score"":16}]]",Терран,Зерг,f,2к,Supply Drop,win,,,1
+754,196,248,196,2026-04-05 10:53:17.617126,2026-04-05 14:53:18.766655,"[[match_meta:{""player1_score"":9,""player2_score"":3}]]",Терран,Протосс,f,2к,Hold Position,win,,,1
+755,246,240,246,2026-04-05 12:24:53.243974,2026-04-05 16:24:54.361968,"[[match_meta:{""player1_score"":17,""player2_score"":4}]]",Протосс,Терран,t,2к,Frontlines,win,,,1
+756,249,198,249,2026-04-05 13:36:46.100004,2026-04-05 17:36:47.659103,"[[match_meta:{""player1_score"":23,""player2_score"":16}]] First ranked matched GG!!!!",Зерг,Протосс,t,2к,Hold Position,win,,,1
+757,246,193,246,2026-04-05 15:45:05.929327,2026-04-05 19:45:07.136838,"[[match_meta:{""player1_score"":17,""player2_score"":9}]]",Протосс,Протосс,t,2к,Divide and Conquer,win,,,1
+758,196,228,196,2026-04-05 16:26:48.425058,2026-04-05 20:26:49.680006,"[[match_meta:{""player1_score"":8,""player2_score"":1}]]",Терран,Протосс,f,2к,Supply Drop,win,,,1
+759,198,250,198,2026-04-05 22:28:00.246207,2026-04-06 02:28:01.60557,"[[match_meta:{""player1_score"":23,""player2_score"":20}]]",Протосс,Протосс,f,2к,Hold Position,win,,,1
+760,246,249,246,2026-04-06 00:48:42.569429,2026-04-06 04:48:45.230525,"[[match_meta:{""player1_score"":22,""player2_score"":18}]]",Протосс,Зерг,t,2к,Hold Position,win,,,1
+761,195,251,195,2026-04-06 09:35:28.090699,2026-04-06 13:35:28.955558,"[[match_meta:{""player1_score"":24,""player2_score"":16}]]",Терран,Терран,t,2к,Gather the Resources,win,,,1
+762,188,192,188,2026-04-06 10:15:05.426855,2026-04-06 14:15:06.458632,"[[match_meta:{""player1_score"":22,""player2_score"":16}]]",Терран,Зерг,f,2к,Supply Drop,win,,,1
+763,252,249,252,2026-04-06 14:31:07.169533,2026-04-06 18:31:08.942795,"[[match_meta:{""player1_score"":27,""player2_score"":19}]]",Зерг,Зерг,t,2к,Frontlines,win,,,1
+764,246,188,246,2026-04-06 14:58:28.142414,2026-04-06 18:58:29.701451,"[[match_meta:{""player1_score"":26,""player2_score"":19}]]",Протосс,Терран,t,2к,Hold Position,win,,,1
+765,249,228,249,2026-04-06 22:57:56.227453,2026-04-07 02:57:57.971787,"[[match_meta:{""player1_score"":20,""player2_score"":19}]]",Зерг,Протосс,t,2к,Hold Position,win,,,1
+766,196,253,196,2026-04-07 01:16:33.563707,2026-04-07 05:16:35.88622,"[[match_meta:{""player1_score"":18,""player2_score"":13}]]",Терран,Протосс,f,2к,Supply Drop,win,,,1
+770,193,240,193,2026-04-07 16:58:25.188757,2026-04-07 20:58:26.567313,"[[match_meta:{""player1_score"":9,""player2_score"":5}]]",Протосс,Протосс,t,1к,Supply Drop,win,,,1
+771,196,223,196,2026-04-07 17:55:02.541384,2026-04-07 21:55:03.626768,"[[match_meta:{""player1_score"":14,""player2_score"":12}]]",Терран,Терран,f,2к,Supply Drop,win,,,1
+772,196,197,196,2026-04-07 20:51:47.289113,2026-04-08 00:51:48.902619,"[[match_meta:{""player1_score"":13,""player2_score"":9}]]",Терран,Терран,f,2к,Hold Position,win,,,1
+773,246,249,246,2026-04-07 22:56:56.283194,2026-04-08 02:56:57.23295,"[[match_meta:{""player1_score"":18,""player2_score"":12}]]",Протосс,Зерг,t,2к,Divide and Conquer,win,,,1
+774,251,254,,2026-04-08 04:40:35.274966,2026-04-08 08:40:36.118962,"[[match_meta:{""player1_score"":20,""player2_score"":20}]]",Терран,Протосс,f,2к,Divide and Conquer,draw,,,1
+775,228,188,228,2026-04-08 05:19:02.412758,2026-04-08 09:19:03.383994,"[[match_meta:{""player1_score"":17,""player2_score"":11}]]",Протосс,Терран,t,2к,Hold Position,win,,,1
+776,210,255,210,2026-04-08 11:41:13.486867,2026-04-08 15:41:14.648061,"[[match_meta:{""player1_score"":9,""player2_score"":5}]] Me left had to leave unfortunately at the end of the 5th there, but Fade would've 101% secured the victory.",Зерг,Зерг,f,1к,Hold Position,win,,,1
+777,196,247,196,2026-04-08 13:46:24.638228,2026-04-08 17:46:25.530916,"[[match_meta:{""player1_score"":29,""player2_score"":8}]]",Терран,Зерг,f,2к,Frontlines,win,,,1
+778,188,256,188,2026-04-08 16:18:46.488375,2026-04-08 20:18:47.329226,"[[match_meta:{""player1_score"":16,""player2_score"":4}]]",Протосс,Зерг,f,2к,Hold Position,win,,,1
+779,252,257,252,2026-04-08 18:26:39.402607,2026-04-08 22:26:40.683116,"[[match_meta:{""player1_score"":18,""player2_score"":16}]]",Зерг,Терран,t,2к,Frontlines,win,,,1
+780,246,228,246,2026-04-08 19:21:48.181197,2026-04-08 23:21:49.507271,"[[match_meta:{""player1_score"":7,""player2_score"":5}]]",Протосс,Протосс,t,2к,Gather the Resources,win,,,1
+781,249,258,249,2026-04-08 21:04:30.863443,2026-04-09 01:04:33.52172,"[[match_meta:{""player1_score"":24,""player2_score"":19}]]",Зерг,Терран,t,2к,Hold Position,win,,,1
+782,251,254,,2026-04-09 02:47:27.381524,2026-04-09 06:47:28.853861,"[[match_meta:{""player1_score"":22,""player2_score"":22}]]",Терран,Протосс,t,2к,Hold Position,draw,"",,1
+783,188,242,188,2026-04-09 06:56:48.512801,2026-04-09 10:56:49.490086,"[[match_meta:{""player1_score"":12,""player2_score"":5}]]",Терран,Протосс,t,2к,Gather the Resources,win,,,1
+784,196,191,196,2026-04-09 08:49:51.363761,2026-04-09 12:49:52.476986,"[[match_meta:{""player1_score"":10,""player2_score"":5}]]",Терран,Терран,f,2к,Divide and Conquer,win,,,1
+785,195,226,195,2026-04-09 11:24:56.25105,2026-04-09 15:24:57.287474,"[[match_meta:{""player1_score"":29,""player2_score"":18}]]",Терран,Протосс,t,2к,Frontlines,win,,,1
+786,193,249,193,2026-04-09 16:59:10.39579,2026-04-09 20:59:11.513385,"[[match_meta:{""player1_score"":21,""player2_score"":16}]]",Протосс,Зерг,t,2к,Hold Position,win,,,1
+787,246,258,246,2026-04-09 21:26:26.80802,2026-04-10 01:26:28.573192,"[[match_meta:{""player1_score"":17,""player2_score"":9}]]",Протосс,Терран,t,2к,Gather the Resources,win,,,1
+789,195,258,195,2026-04-10 09:39:25.891229,2026-04-10 13:39:26.72356,"[[match_meta:{""player1_score"":16,""player2_score"":8}]]",Терран,Терран,t,2к,Hold Position,win,,,1
+790,195,226,195,2026-04-10 12:08:16.452118,2026-04-10 16:08:17.407166,"[[match_meta:{""player1_score"":26,""player2_score"":15}]]",Терран,Протосс,t,2к,Frontlines,win,,,1
+791,246,258,246,2026-04-10 20:30:15.65091,2026-04-11 00:30:17.496136,"[[match_meta:{""player1_score"":10,""player2_score"":3}]]",Протосс,Терран,t,2к,Supply Drop,win,,,1
+792,246,211,246,2026-04-10 22:47:44.580876,2026-04-11 02:47:46.316235,"[[match_meta:{""player1_score"":10,""player2_score"":0}]]",Протосс,Терран,t,2к,Hold Position,win,,,1
+793,259,256,259,2026-04-10 23:41:46.776172,2026-04-11 03:41:48.393232,"[[match_meta:{""player1_score"":12,""player2_score"":6}]]",Зерг,Зерг,f,2к,Gather the Resources,win,,,1
+795,195,261,195,2026-04-11 03:03:45.694967,2026-04-11 07:03:46.587649,"[[match_meta:{""player1_score"":20,""player2_score"":7}]]",Терран,Протосс,t,2к,Hold Position,win,,,1
+796,254,251,254,2026-04-11 06:44:32.109234,2026-04-11 10:44:33.018956,"[[match_meta:{""player1_score"":30,""player2_score"":15}]]",Протосс,Терран,f,2к,Hold Position,win,,,1
+797,188,242,188,2026-04-11 06:49:35.234756,2026-04-11 10:49:36.182055,"[[match_meta:{""player1_score"":17,""player2_score"":8}]]",Терран,Протосс,t,2к,Hold Position,win,,,1
+798,249,198,249,2026-04-11 13:03:42.66922,2026-04-11 17:03:44.180557,"[[match_meta:{""player1_score"":14,""player2_score"":3}]]",Зерг,Протосс,t,2к,Gather the Resources,win,,,1
+799,193,258,193,2026-04-11 17:40:42.155431,2026-04-11 21:40:43.674795,"[[match_meta:{""player1_score"":22,""player2_score"":18}]] Tyronin list modified",Протосс,Терран,t,2к,Hold Position,win,,,1
+800,188,262,188,2026-04-11 18:46:00,2026-04-11 22:46:07.45446,"[[match_meta:{""player1_score"":6,""player2_score"":7}]]",Терран,Протосс,f,2к,Gather the Resources,win,,,1
+801,258,263,258,2026-04-11 20:47:12.170185,2026-04-12 00:47:13.014814,"[[match_meta:{""player1_score"":19,""player2_score"":16}]]",Терран,Зерг,t,2к,Hold Position,win,,,1
+802,196,249,196,2026-04-11 22:05:51.483498,2026-04-12 02:05:52.749378,"[[match_meta:{""player1_score"":23,""player2_score"":12}]]",Протосс,Зерг,f,2к,Divide and Conquer,win,,,1
+803,196,264,196,2026-04-12 08:00:44.928929,2026-04-12 12:00:46.218996,"[[match_meta:{""player1_score"":17,""player2_score"":9}]]",Протосс,Протосс,f,2к,Supply Drop,win,,,1
+804,195,254,195,2026-04-12 10:20:47.765455,2026-04-12 14:20:49.162027,"[[match_meta:{""player1_score"":23,""player2_score"":14}]]",Терран,Протосс,t,2к,Hold Position,win,"","",1
+811,195,266,195,2026-04-12 15:40:24.082563,2026-04-12 19:40:24.9282,"[[match_meta:{""player1_score"":14,""player2_score"":3}]]",Терран,Зерг,t,2к,Hold Position,win,,,1
+815,258,198,258,2026-04-12 17:45:25.417399,2026-04-12 21:45:26.30585,"[[match_meta:{""player1_score"":20,""player2_score"":19}]]",Терран,Протосс,t,1к,Hold Position,win,,,1
+817,208,209,,2026-04-13 00:16:27.989192,2026-04-12 22:16:30.364657,"[[match_meta:{""player1_score"":4,""player2_score"":4,""player1_roster_id"":""VL8RWD"",""player2_roster_id"":""WCT0ZR""}]] Showmatch",Терран,Протосс,f,2к,Frontlines,draw,VL8RWD,WCT0ZR,1
+819,249,196,249,2026-04-12 21:50:30.27155,2026-04-13 01:50:32.270031,"[[match_meta:{""player1_score"":21,""player2_score"":12,""player2_roster_id"":""QE0KL3""}]]",Зерг,Зерг,t,2к,Hold Position,win,,QE0KL3,1
+820,195,251,195,2026-04-13 02:31:48.973227,2026-04-13 06:31:49.998445,"[[match_meta:{""player1_score"":23,""player2_score"":10}]]",Зерг,Терран,t,2к,Hold Position,win,,,1
+821,267,188,267,2026-04-13 08:52:18.097449,2026-04-13 12:52:19.181707,"[[match_meta:{""player1_score"":17,""player2_score"":12}]]",Протосс,Терран,f,1к,Hold Position,win,,,1
+822,196,262,196,2026-04-13 11:42:33.564802,2026-04-13 15:42:34.626033,"[[match_meta:{""player1_score"":21,""player2_score"":11}]]",Протосс,Терран,f,2к,Hold Position,win,,,1
+823,261,247,261,2026-04-13 16:00:51.254722,2026-04-13 20:00:52.693923,"[[match_meta:{""player1_score"":21,""player2_score"":15}]] Forfeit at the the of 3 round. (Replace statistics)",Протосс,Зерг,f,2к,Frontlines,win,,,1
+824,196,193,196,2026-04-13 16:47:52.190063,2026-04-13 20:47:53.461568,"[[match_meta:{""player1_score"":15,""player2_score"":14,""player1_roster_id"":""FETBZ9"",""player2_roster_id"":""VOZLV5""}]] Very close game.",Зерг,Протосс,t,2к,Supply Drop,win,FETBZ9,VOZLV5,1
+825,249,196,249,2026-04-13 23:51:39.395898,2026-04-14 03:51:41.041845,"[[match_meta:{""player1_score"":20,""player2_score"":17}]]",Зерг,Зерг,t,2к,Divide and Conquer,win,,,1
+826,188,228,188,2026-04-14 05:12:33.638719,2026-04-14 09:12:35.284488,"[[match_meta:{""player1_score"":16,""player2_score"":9,""player1_roster_id"":""FGWVSU"",""player2_roster_id"":""XIY2U9""}]]",Терран,Протосс,t,2к,Gather the Resources,win,FGWVSU,XIY2U9,1
+827,196,195,196,2026-04-14 10:14:09.601775,2026-04-14 14:14:11.089804,"[[match_meta:{""player1_score"":9,""player2_score"":5}]]",Зерг,Терран,t,2к,Hold Position,win,FBT00N,,1
+828,249,188,249,2026-04-14 16:13:41.536661,2026-04-14 20:13:42.615364,"[[match_meta:{""player1_score"":18,""player2_score"":13,""player1_roster_id"":""Y2RZUF"",""player2_roster_id"":""FGWVSU""}]]",Зерг,Терран,t,2к,Hold Position,win,Y2RZUF,FGWVSU,1
+829,193,255,193,2026-04-14 16:47:10.085302,2026-04-14 20:47:11.214222,"[[match_meta:{""player1_score"":6,""player2_score"":1}]]",Протосс,Терран,f,1к,Supply Drop,win,,,1
+830,249,262,249,2026-04-14 21:08:28.66736,2026-04-15 01:08:30.280236,"[[match_meta:{""player1_score"":22,""player2_score"":17}]]",Зерг,Протосс,t,2к,Frontlines,win,,,1
+831,196,256,196,2026-04-14 23:43:11.454855,2026-04-15 03:43:13.194912,"[[match_meta:{""player1_score"":22,""player2_score"":6,""player1_roster_id"":""WVILVS""}]]",Протосс,Зерг,f,2к,Divide and Conquer,win,WVILVS,,1
+832,268,261,268,2026-04-15 00:45:28.886597,2026-04-15 04:45:29.749083,"[[match_meta:{""player1_score"":14,""player2_score"":5}]]",Зерг,Протосс,t,2к,Hold Position,win,,,1
+833,269,270,269,2026-04-15 02:27:03.527628,2026-04-15 06:27:05.634106,"[[match_meta:{""player1_score"":15,""player2_score"":6}]] Starter box game with a couple extras. First game",Протосс,Терран,t,1к,Frontlines,win,,,1
+834,196,214,196,2026-04-15 12:49:54.288495,2026-04-15 16:49:55.608373,"[[match_meta:{""player1_score"":20,""player2_score"":15,""player1_roster_id"":""1IP661"",""player2_roster_id"":""02YM01""}]]",Зерг,Протосс,t,2к,Hold Position,win,1IP661,02YM01,1
+835,188,271,188,2026-04-16 15:08:03.263318,2026-04-16 19:08:05.66535,"[[match_meta:{""player1_score"":17,""player2_score"":6,""player1_roster_id"":""FGWVSU""}]]",Терран,Терран,t,2к,Hold Position,win,FGWVSU,,1
+836,196,272,196,2026-04-16 22:11:23.193238,2026-04-17 02:11:24.930183,"[[match_meta:{""player1_score"":12,""player2_score"":3}]]",Протосс,Протосс,f,2к,Gather the Resources,win,,,1
+837,195,251,195,2026-04-17 07:07:27.237665,2026-04-17 11:07:28.100375,"[[match_meta:{""player1_score"":26,""player2_score"":5}]]",Терран,Терран,t,2к,Hold Position,win,,,1
+838,259,271,259,2026-04-17 09:04:16.450049,2026-04-17 13:04:18.145923,"[[match_meta:{""player1_score"":18,""player2_score"":16}]]",Зерг,Терран,t,2к,Divide and Conquer,win,,,1
+839,195,258,195,2026-04-17 11:12:03.9208,2026-04-17 15:12:04.743541,"[[match_meta:{""player1_score"":7,""player2_score"":6}]]",Терран,Протосс,t,2к,Frontlines,win,,,1
+840,192,198,192,2026-04-17 13:00:09.471092,2026-04-17 17:00:10.63762,"[[match_meta:{""player1_score"":25,""player2_score"":14}]]",Зерг,Протосс,t,2к,Hold Position,win,,,1
+841,258,198,258,2026-04-18 00:09:38.867443,2026-04-18 04:09:40.077362,"[[match_meta:{""player1_score"":21,""player2_score"":14}]]",Терран,Протосс,t,2к,Frontlines,win,,,1
+842,273,240,273,2026-04-18 07:02:53.267039,2026-04-18 11:02:55.33406,"[[match_meta:{""player1_score"":25,""player2_score"":19}]]",Зерг,Протосс,t,2к,Frontlines,win,,,1
+843,273,240,273,2026-04-18 07:04:57.177496,2026-04-18 11:04:58.938214,"[[match_meta:{""player1_score"":23,""player2_score"":17}]]",Зерг,Протосс,t,2к,Hold Position,win,,,1
+844,195,192,195,2026-04-18 15:13:30.967874,2026-04-18 19:13:31.969517,"[[match_meta:{""player1_score"":26,""player2_score"":20}]]",Терран,Зерг,t,2к,Hold Position,win,,,1
+845,258,228,258,2026-04-18 19:57:39.754046,2026-04-18 23:57:41.150858,"[[match_meta:{""player1_score"":9,""player2_score"":7}]]",Терран,Протосс,t,1к,Hold Position,win,,,1
+846,193,249,193,2026-04-19 16:05:40.373414,2026-04-19 20:05:41.609351,"[[match_meta:{""player1_score"":21,""player2_score"":16}]]",Протосс,Зерг,t,2к,Hold Position,win,,,1
+847,198,247,198,2026-04-19 17:11:50.232817,2026-04-19 21:11:51.255023,"[[match_meta:{""player1_score"":18,""player2_score"":12}]]",Протосс,Зерг,f,2к,Frontlines,win,,,1
+848,195,192,195,2026-04-20 06:45:39.259786,2026-04-20 10:45:40.184591,"[[match_meta:{""player1_score"":23,""player2_score"":19}]]",Терран,Зерг,t,2к,Gather the Resources,win,,,1
+849,188,242,188,2026-04-20 17:47:00,2026-04-20 21:47:56.627083,"[[match_meta:{""player1_score"":25,""player2_score"":15}]] Bloody game",Терран,Протосс,f,Grand Offensive,Hold Position,win,,,1
+850,196,219,196,2026-04-20 18:54:03.539131,2026-04-20 22:54:05.093174,"[[match_meta:{""player1_score"":21,""player2_score"":11}]]",Протосс,Терран,f,2к,Divide and Conquer,win,,,1
+851,192,196,192,2026-04-21 13:39:26.115076,2026-04-21 17:39:27.297939,"[[match_meta:{""player1_score"":22,""player2_score"":15}]]",Зерг,Зерг,t,2к,Gather the Resources,win,,,1
+852,249,259,249,2026-04-22 01:48:13.770498,2026-04-22 05:48:15.547514,"[[match_meta:{""player1_score"":16,""player2_score"":6,""player1_roster_id"":""7ICEOI""}]]",Зерг,Зерг,t,2к,Hold Position,win,7ICEOI,,1
+853,273,236,273,2026-04-22 03:50:19.37327,2026-04-22 07:50:20.478509,"[[match_meta:{""player1_score"":9,""player2_score"":6}]]",Протосс,Зерг,f,1к,Supply Drop,win,,,1
+854,210,236,210,2026-04-22 07:32:07.746565,2026-04-22 11:32:09.463501,"[[match_meta:{""player1_score"":15,""player2_score"":9}]] fun casual game =D",Зерг,Зерг,f,1к,Frontline,win,,,1
+856,242,188,242,2026-04-22 07:35:51.947098,2026-04-22 11:35:52.742699,"[[match_meta:{""player1_score"":20,""player2_score"":16}]]",Протосс,Терран,t,2к,Divide and Conquer,win,,,1
+857,195,196,195,2026-04-22 13:01:04.517994,2026-04-22 17:01:05.679431,"[[match_meta:{""player1_score"":23,""player2_score"":15}]]",Терран,Зерг,t,2к,Gather the Resources,win,,,1
+858,193,275,193,2026-04-22 15:10:31.743359,2026-04-22 19:10:33.776438,"[[match_meta:{""player1_score"":17,""player2_score"":7}]]",Протосс,Терран,f,2к,Frontlines,win,,,1
+862,196,276,196,2026-04-22 23:01:51.222626,2026-04-23 03:01:53.54401,"[[match_meta:{""player1_score"":21,""player2_score"":18,""player1_roster_id"":""HOZHST"",""player2_roster_id"":""OUF0LX""}]]",Зерг,Протосс,t,2к,Gather the Resources,win,HOZHST,OUF0LX,1
+863,188,271,188,2026-04-23 07:26:13.704304,2026-04-23 11:26:14.754008,"[[match_meta:{""player1_score"":24,""player2_score"":17,""player1_roster_id"":""KS5MAI"",""player2_roster_id"":""Z2VS16""}]]",Терран,Терран,t,2к,Divide & Conquer,win,VZ8G57,Z2VS16,1
+864,188,266,188,2026-04-23 12:04:57.271159,2026-04-23 16:04:58.271482,"[[match_meta:{""player1_score"":18,""player2_score"":8}]]",Терран,Зерг,t,2к,Gather the Resources,win,,,1
+865,192,196,192,2026-04-23 16:24:20.116971,2026-04-23 20:24:21.489072,"[[match_meta:{""player1_score"":28,""player2_score"":19}]]",Зерг,Зерг,t,2к,Hold Position,win,,,1
+866,196,276,196,2026-04-23 23:31:01.919229,2026-04-24 03:31:03.296736,"[[match_meta:{""player1_score"":17,""player2_score"":7,""player1_roster_id"":""HOZHST"",""player2_roster_id"":""LU2HV2""}]]",Зерг,Протосс,t,2к,Divide and Conquer,win,HOZHST,LU2HV2,1
+867,249,256,249,2026-04-24 01:32:58.938902,2026-04-24 05:33:00.126297,"[[match_meta:{""player1_score"":19,""player2_score"":12}]]",Зерг,Зерг,t,2к,Divide and Conquer,win,,,1
+868,242,271,242,2026-04-24 06:20:42.412835,2026-04-24 10:20:43.2092,"[[match_meta:{""player1_score"":19,""player2_score"":5}]]",Протосс,Терран,t,2к,Divide & Conquer,win,,,1
+869,196,240,196,2026-04-24 15:06:31.440021,2026-04-24 19:06:32.723977,"[[match_meta:{""player1_score"":16,""player2_score"":12,""player1_roster_id"":""KSS9NM""}]]",Зерг,Протосс,t,2к,Hold Position,win,KSS9NM,,1
+870,196,261,196,2026-04-25 00:35:27.867398,2026-04-25 04:35:29.326349,"[[match_meta:{""player1_score"":23,""player2_score"":13,""player1_roster_id"":""KSS9NM""}]]",Зерг,Протосс,t,2к,Frontline,win,KSS9NM,,1
+871,249,277,249,2026-04-25 02:43:44.627024,2026-04-25 06:43:46.511509,"[[match_meta:{""player1_score"":18,""player2_score"":14,""player1_roster_id"":""7ICE0I""}]]",Зерг,Терран,t,2к,Hold Position,win,7ICEOI,,1
+872,277,196,277,2026-04-25 14:40:17.129684,2026-04-25 18:40:22.727992,"[[match_meta:{""player1_score"":23,""player2_score"":11}]]",Терран,Зерг,t,2к,Divide and Conquer,win,,,1
+873,196,277,196,2026-04-25 21:42:46.661345,2026-04-26 01:42:48.023381,"[[match_meta:{""player1_score"":18,""player2_score"":13,""player1_roster_id"":""KSS9NM""}]]",Зерг,Терран,t,2к,Gather the Resources,win,KSS9NM,,1
+879,242,214,242,2026-04-26 07:37:45.211429,2026-04-26 11:37:46.166848,"[[match_meta:{""player1_score"":17,""player2_score"":8,""player2_roster_id"":""LI1YBK""}]]",Протосс,Протосс,t,2к,Gather the Resources,win,,LI1YBK,1
+884,192,249,192,2026-04-26 14:31:38.364213,2026-04-26 18:31:39.285802,"[[match_meta:{""player1_score"":16,""player2_score"":6}]]",Зерг,Зерг,t,2к,Hold Position,win,,,1
+885,196,193,196,2026-04-26 15:18:25.262197,2026-04-26 19:18:26.426921,"[[match_meta:{""player1_score"":17,""player2_score"":10,""player1_roster_id"":""KSS9NM"",""player2_roster_id"":""EKDGJ7""}]]",Зерг,Протосс,t,2к,Frontlines,win,KSS9NM,EKDGJ7,1
+886,193,277,193,2026-04-26 16:01:47.462416,2026-04-26 20:01:48.349289,"[[match_meta:{""player1_score"":12,""player2_score"":8}]] Game was aborted due to Lunarcultist had to leave earlier, agreed to end the game at the end of round 4",Протосс,Зерг,t,2к,Hold Position,win,,,1
+887,249,226,249,2026-04-27 11:42:49.358759,2026-04-27 15:42:50.979847,"[[match_meta:{""player1_score"":22,""player2_score"":17}]]",Зерг,Протосс,f,2к,Hold Position,win,,,
+888,196,278,196,2026-04-27 21:29:48.540515,2026-04-28 01:29:49.790235,"[[match_meta:{""player1_score"":7,""player2_score"":1}]]",Протосс,Терран,f,2к,Supply Drop,win,,,
+891,193,192,193,2026-04-28 17:39:00,2026-04-28 21:39:44.7122,"[[match_meta:{""player1_score"":24,""player2_score"":23}]] Really close game",Протосс,Зерг,t,2к,Hold Position,win,,,1
+892,188,246,188,2026-04-28 19:01:00,2026-04-28 23:01:49.16085,"[[match_meta:{""player1_score"":18,""player2_score"":13}]]",Терран,Протосс,t,2к,Divide and Conquer,win,VZ8G57,,1
+893,242,279,242,2026-04-29 02:41:03.206231,2026-04-29 06:41:04.198106,"[[match_meta:{""player1_score"":25,""player2_score"":19}]]",Протосс,Терран,t,2к,Hold Position,win,,,1
+894,192,188,192,2026-04-29 14:17:08.915028,2026-04-29 18:17:09.758078,"[[match_meta:{""player1_score"":17,""player2_score"":15,""player2_roster_id"":""VZ8G57""}]]",Зерг,Терран,t,2к,Supply Drop,win,,VZ8G57,1
+895,196,240,196,2026-04-29 14:26:02.35763,2026-04-29 18:26:03.647481,"[[match_meta:{""player1_score"":21,""player2_score"":13,""player1_roster_id"":""RW869W"",""player2_roster_id"":""82IF6G""}]]",Зерг,Протосс,t,2к,Gather the Resources,win,RW869W,82IF6G,1
+896,246,196,246,2026-04-29 19:50:24.391327,2026-04-29 23:50:25.485981,"[[match_meta:{""player1_score"":19,""player2_score"":10}]]",Протосс,Зерг,t,2к,Frontlines,win,,,1
+897,195,254,195,2026-04-30 09:26:48.34851,2026-04-30 13:26:49.46384,"[[match_meta:{""player1_score"":14,""player2_score"":6}]]",Терран,Протосс,t,2к,Divide and Conquer,win,,,1
+898,249,195,249,2026-04-30 17:02:43.756616,2026-04-30 21:02:44.679559,"[[match_meta:{""player1_score"":19,""player2_score"":18}]]",Зерг,Терран,t,2к,Divide and Conquer,win,,,1
+899,195,242,195,2026-05-01 06:45:01.662905,2026-05-01 10:45:02.601899,"[[match_meta:{""player1_score"":23,""player2_score"":12}]]",Терран,Протосс,t,2к,Hold Position,win,,,1
+900,246,188,246,2026-05-01 11:25:00,2026-05-01 15:25:14.540846,"[[match_meta:{""player1_score"":22,""player2_score"":15}]]",Протосс,Терран,t,2к,Gather the Resources,win,,,1
+901,192,246,192,2026-05-01 14:18:32.070142,2026-05-01 18:18:33.156159,"[[match_meta:{""player1_score"":12,""player2_score"":11}]]",Зерг,Протосс,t,2к,Hold Position,win,,,1
+902,249,226,249,2026-05-01 14:53:11.730483,2026-05-01 18:53:12.839092,"[[match_meta:{""player1_score"":22,""player2_score"":20}]]",Зерг,Протосс,t,2к,Hold Position,win,,,1
+903,249,246,249,2026-05-01 19:15:17.465197,2026-05-01 23:15:18.752664,"[[match_meta:{""player1_score"":19,""player2_score"":18}]]",Зерг,Протосс,t,2к,Hold Position,win,,,1
+904,242,193,242,2026-05-02 10:53:55.174591,2026-05-02 14:53:56.091324,"[[match_meta:{""player1_score"":18,""player2_score"":15}]]",Протосс,Протосс,t,2к,Gather the Resources,win,,,1
+905,188,249,188,2026-05-02 17:51:21.853974,2026-05-02 21:51:22.987472,"[[match_meta:{""player1_score"":22,""player2_score"":20,""player1_roster_id"":""NUZ2NE""}]]",Терран,Зерг,t,2к,Hold Position,win,NUZ2NE,,1
+907,242,195,242,2026-05-03 09:18:00,2026-05-03 13:18:48.308622,"[[match_meta:{""player1_score"":18,""player2_score"":8}]]",Протосс,Зерг,t,2к,Gather the Resources,win,,,1
+908,192,214,192,2026-05-03 13:38:33.023527,2026-05-03 17:38:34.462695,"[[match_meta:{""player1_score"":27,""player2_score"":25}]]",Зерг,Протосс,t,2к,Frontlines,win,,,1
+909,193,198,193,2026-05-03 15:21:00,2026-05-03 19:21:53.763944,"[[match_meta:{""player1_score"":17,""player2_score"":1}]]",Протосс,Протосс,t,2к,Hold Position,win,,,1
+910,193,226,193,2026-05-04 14:38:08.910739,2026-05-04 18:38:10.423125,"[[match_meta:{""player1_score"":19,""player2_score"":10}]]",Протосс,Протосс,t,2к,Hold Position,win,,,1

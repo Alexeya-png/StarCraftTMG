@@ -762,6 +762,41 @@ h3 {
     filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35));
 }
 
+.profile-name-badges {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-left: 2px;
+}
+
+.profile-name-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 146px;
+    height: 146px;
+    flex: 0 0 auto;
+    cursor: help;
+}
+
+.profile-name-badge-icon {
+    display: block;
+    width: 146px;
+    height: 146px;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.42));
+}
+
+.profile-name-badge-icon[hidden],
+.profile-name-badge[hidden] {
+    display: none;
+}
+
+.profile-name-badge img {
+    max-width: 100%;
+}
+
 .profile-elo-card {
     display: flex;
     flex-direction: column;
@@ -891,8 +926,13 @@ h3 {
     .profile-player-name {
         font-size: 30px;
     }
-}
 
+    .profile-name-badge,
+    .profile-name-badge-icon {
+        width: 40px;
+        height: 40px;
+    }
+}
 
 .profile-meta-grid {
     display: grid;
@@ -937,6 +977,90 @@ h3 {
 
 .profile-meta-empty {
     color: rgba(255, 255, 255, 0.48);
+}
+
+.profile-achievements-section {
+    margin-bottom: 20px;
+}
+
+.profile-achievements-head h2 {
+    margin: 0;
+}
+
+.profile-achievements-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.profile-achievement-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 76px;
+    padding: 10px 14px 10px 10px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: inset 0 0 0 1px rgba(140, 167, 255, 0.05);
+}
+
+.profile-achievement-icon {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    flex: 0 0 auto;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.35));
+}
+
+.profile-achievement-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.profile-achievement-copy strong {
+    color: #ffffff;
+    font-size: 15px;
+    line-height: 1.15;
+}
+
+.profile-achievement-copy span {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.1;
+}
+
+.profile-achievement-badge-champion-terran,
+.profile-achievement-badge-champion-protoss,
+.profile-achievement-badge-champion-zerg {
+    background: linear-gradient(180deg, rgba(245, 186, 73, 0.12), rgba(255, 255, 255, 0.025));
+    border-color: rgba(245, 186, 73, 0.22);
+}
+
+.profile-achievement-badge-contender-terran,
+.profile-achievement-badge-contender-protoss,
+.profile-achievement-badge-contender-zerg {
+    background: linear-gradient(180deg, rgba(74, 207, 152, 0.12), rgba(255, 255, 255, 0.025));
+    border-color: rgba(74, 207, 152, 0.22);
+}
+
+.profile-achievement-badge-race-terran {
+    box-shadow: inset 0 0 0 1px rgba(97, 181, 255, 0.14);
+}
+
+.profile-achievement-badge-race-protoss {
+    box-shadow: inset 0 0 0 1px rgba(245, 211, 95, 0.16);
+}
+
+.profile-achievement-badge-race-zerg {
+    box-shadow: inset 0 0 0 1px rgba(191, 112, 255, 0.14);
+}
+
+@media (max-width: 640px) {
+    .profile-achievement-badge {
+        width: 100%;
+    }
 }
 
 .profile-rating-chart-section {
@@ -1565,26 +1689,20 @@ h3 {
     }
 }
 
-
-
 .game-reports-table {
     min-width: 1120px;
 }
 
 .leaderboard-table-polished col.col-match-id {
-    width: 84px;
+    width: 70px;
 }
 
 .leaderboard-table-polished col.col-played-at {
-    width: 152px;
-}
-
-.leaderboard-table-polished col.col-match-player {
-    width: 190px;
+    width: 120px;
 }
 
 .leaderboard-table-polished col.col-ranked {
-    width: 128px;
+    width: 200px;
 }
 
 .leaderboard-table-polished col.col-game-type {
@@ -1790,7 +1908,6 @@ h3 {
     }
 }
 
-
 .page-leaderboard-scroll-lock {
     overflow: hidden;
 }
@@ -1989,7 +2106,6 @@ h3 {
         flex: 1 1 auto;
     }
 }
-
 
 .game-reports-section {
     padding: 20px 0 24px;
@@ -2540,7 +2656,6 @@ h3 {
     }
 }
 
-
 .submit-alert-head-main {
     display: inline-flex;
     align-items: center;
@@ -2579,19 +2694,125 @@ h3 {
     color: #c7e6ff;
 }
 
-.game-report-player-cell {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+/* Fixed column width for player columns in game reports */
+.leaderboard-table-polished col.col-match-player {
+    width: 180px;
 }
 
+/* Fixed dimensions for player columns */
+.leaderboard-table-polished tbody td.value-player,
+.leaderboard-table-polished thead th.col-match-player {
+    width: 180px;
+    white-space: nowrap;
+    overflow: clip;
+    overflow-clip-margin: 0;
+}
+
+/* Fixed row height for player cells */
+.leaderboard-table-polished tbody td.value-player {
+    height: 50.8px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* Gap between Winner and Loser columns */
+.leaderboard-table-polished tbody td.value-player-with-result {
+    padding-right: 16px;
+}
+
+/* Player cell: flex row [main] [tie badge] */
+.game-report-player-cell {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+    min-width: 0;
+}
+
+/* Meta: position:relative so seed can be absolute inside it */
+.game-report-player-meta {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    position: relative;
+}
+
+/* race icon + name link */
+.game-report-player-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.game-report-player-identity {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.game-report-player-name-link {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.game-report-player-name-link .sc2-player-name {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Seed badge: absolute, below the name, slightly to the right.
+   To move it further right вЂ” increase `left`. Currently aligned
+   to start of name text: icon ~20px + gap 8px = 28px. Each +1px
+   moves it 1px to the right. */
+.game-report-seed-link,
+.game-report-seed-link-empty {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 45px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1px 5px;
+    border-radius: 6px;
+    border: 1px solid rgba(151, 159, 176, 0.26);
+    background: rgba(120, 128, 144, 0.22);
+    color: rgba(225, 232, 245, 0.82);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    white-space: nowrap;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+.game-report-seed-link:hover {
+    color: #eef4ff;
+    border-color: rgba(171, 180, 197, 0.38);
+    background: rgba(132, 141, 158, 0.28);
+}
+
+.game-report-seed-link-empty,
+.game-report-seed-link-static {
+    pointer-events: none;
+}
+
+/* TIE badge: flex item inside player-cell, doesn't shrink */
 .game-report-row-tie .value-player-with-result {
     position: relative;
 }
 
 .game-report-row-tie .inline-result-badge-tie {
     flex: 0 0 auto;
+    transform: translateX(50px);
 }
 
 .match-result-tie {
@@ -2599,7 +2820,7 @@ h3 {
 }
 
 .delta-tie {
-    color: #bfe3ff;
+    color: #bf3ff;
 }
 
 .leaderboard-status-help {
@@ -2995,7 +3216,6 @@ h3 {
     }
 }
 
-
 .leaderboard-filter-row-status {
     position: relative;
 }
@@ -3024,7 +3244,6 @@ h3 {
         width: 100%;
     }
 }
-
 
 .leaderboard-toolbar-toggle {
     display: inline-flex;
@@ -3061,3 +3280,589 @@ h3 {
     outline: 2px solid rgba(121, 200, 255, 0.9);
     outline-offset: 2px;
 }
+
+.league-results-page {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.league-page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 1rem;
+}
+
+.league-page-subtitle {
+    margin: 0.5rem 0 0;
+    color: var(--muted-text, #9aa4c7);
+    max-width: 840px;
+}
+
+.league-section-card {
+    background: rgba(10, 18, 48, 0.72);
+    border: 1px solid rgba(116, 139, 255, 0.2);
+    border-radius: 24px;
+    padding: 1.5rem;
+    display: grid;
+    gap: 1rem;
+    box-shadow: 0 18px 50px rgba(5, 10, 30, 0.28);
+}
+
+.league-section-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: start;
+}
+
+.league-kicker {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #91a7ff;
+    margin-bottom: 0.3rem;
+}
+
+.league-date-range {
+    margin: 0.35rem 0 0;
+    color: #a9b4d0;
+}
+
+.league-summary-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.league-meta-pill, .player-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0.45rem 0.8rem;
+    font-size: 0.9rem;
+    background: rgba(69, 91, 206, 0.16);
+    border: 1px solid rgba(116, 139, 255, 0.28);
+    color: #eef2ff;
+}
+
+.league-hero-grid, .league-race-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.league-hero-card, .league-race-card, .league-standings-card, .profile-badges-row {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+}
+
+.league-hero-card, .league-race-card {
+    padding: 1rem 1.1rem;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.league-hero-label, .league-race-label {
+    color: #a9b4d0;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.league-player-link {
+    color: #ffffff;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.league-player-link:hover, .league-player-link:focus-visible {
+    text-decoration: underline;
+}
+
+.league-hero-meta, .league-race-meta, .league-empty, .league-empty-block {
+    color: #b7c1dc;
+}
+
+.league-standings-card {
+    padding: 1rem;
+}
+
+.league-standings-head h3 {
+    margin: 0 0 0.75rem;
+}
+
+.profile-badges-row {
+    padding: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    max-width: 560px;
+}
+
+.player-badge {
+    cursor: help;
+    min-height: 42px;
+}
+
+.player-badge-icon {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+
+.league-badge-icon {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    display: block;
+}
+
+.player-badge-text {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.15;
+}
+
+.league-race-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.league-race-badge {
+    width: auto;
+    margin: 0;
+}
+
+.league-race-badge-icon-only {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    flex: 0 0 64px;
+}
+
+.league-race-badge-icon-only.player-badge-race-terran,
+.league-race-badge-icon-only.player-badge-race-protoss,
+.league-race-badge-icon-only.player-badge-race-zerg {
+    box-shadow: none;
+}
+
+.league-meta-pill-badge {
+    border-color: rgba(245, 186, 73, 0.28);
+    background: rgba(245, 186, 73, 0.1);
+}
+
+.player-badge-champion-terran,
+.player-badge-champion-protoss,
+.player-badge-champion-zerg {
+    background: rgba(245, 186, 73, 0.16);
+    border-color: rgba(245, 186, 73, 0.34);
+}
+
+.player-badge-contender-terran,
+.player-badge-contender-protoss,
+.player-badge-contender-zerg {
+    background: rgba(74, 207, 152, 0.14);
+    border-color: rgba(74, 207, 152, 0.32);
+}
+
+.player-badge-race-terran {
+    box-shadow: inset 0 0 0 1px rgba(97, 181, 255, 0.18);
+}
+
+.player-badge-race-protoss {
+    box-shadow: inset 0 0 0 1px rgba(245, 211, 95, 0.2);
+}
+
+.player-badge-race-zerg {
+    box-shadow: inset 0 0 0 1px rgba(191, 112, 255, 0.18);
+}
+
+@media (max-width: 900px) {
+    .league-section-head {
+        flex-direction: column;
+    }
+}
+
+.league-table-wrap {
+    overflow-x: auto;
+}
+
+.league-standings-card-leaderboard {
+    padding: 0;
+    overflow: hidden;
+}
+
+.league-standings-card-leaderboard .league-standings-head {
+    padding: 22px 24px 0;
+}
+
+.league-standings-card-leaderboard .league-standings-head h3 {
+    margin-bottom: 18px;
+}
+
+.league-standings-card-leaderboard .leaderboard-table-wrap {
+    border-radius: 0 0 18px 18px;
+}
+
+.league-standings-card-leaderboard .leaderboard-table-polished {
+    min-width: 920px;
+}
+
+.league-player-identity {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.league-player-identity-featured {
+    flex-wrap: wrap;
+}
+
+.league-player-identity-table {
+    gap: 10px;
+}
+
+.league-player-name {
+    color: #18b1ff;
+    font-weight: 800;
+    line-height: 1.05;
+}
+
+.league-player-race {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.league-player-race .race-inline-icon {
+    width: 17px;
+    height: 17px;
+}
+
+.league-table-wrap .league-player-identity {
+    white-space: nowrap;
+}
+
+/* League page cleanup */
+.league-player-race > span {
+    display: none;
+}
+
+.league-player-race {
+    gap: 0;
+}
+
+.race-accent-terran {
+    color: #8dc0ff !important;
+    text-shadow: 0 0 14px rgba(141, 192, 255, 0.28);
+}
+
+.race-accent-protoss {
+    color: #ffd35f !important;
+    text-shadow: 0 0 14px rgba(255, 211, 95, 0.28);
+}
+
+.race-accent-zerg {
+    color: #c690ff !important;
+    text-shadow: 0 0 14px rgba(198, 144, 255, 0.28);
+}
+
+.league-race-card-terran {
+    background:
+        radial-gradient(circle at top right, rgba(141, 192, 255, 0.14), transparent 42%),
+        linear-gradient(180deg, rgba(12, 19, 38, 0.96) 0%, rgba(8, 13, 27, 0.98) 100%);
+    border-color: rgba(141, 192, 255, 0.22);
+}
+
+.league-race-card-protoss {
+    background:
+        radial-gradient(circle at top right, rgba(255, 211, 95, 0.14), transparent 42%),
+        linear-gradient(180deg, rgba(12, 19, 38, 0.96) 0%, rgba(8, 13, 27, 0.98) 100%);
+    border-color: rgba(255, 211, 95, 0.22);
+}
+
+.league-race-card-zerg {
+    background:
+        radial-gradient(circle at top right, rgba(198, 144, 255, 0.14), transparent 42%),
+        linear-gradient(180deg, rgba(12, 19, 38, 0.96) 0%, rgba(8, 13, 27, 0.98) 100%);
+    border-color: rgba(198, 144, 255, 0.22);
+}
+
+.league-race-card-terran .league-race-label {
+    color: #8dc0ff;
+}
+
+.league-race-card-protoss .league-race-label {
+    color: #ffd35f;
+}
+
+.league-race-card-zerg .league-race-label {
+    color: #c690ff;
+}
+
+
+.league-points-help {
+    cursor: help;
+    text-decoration: underline dotted rgba(139, 174, 255, 0.55);
+    text-underline-offset: 3px;
+}
+
+
+.player-badge-0win {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.38);
+    color: #FFFAFA;
+}
+
+
+@media (max-width: 640px) {
+    .league-badge-icon {
+        width: 52px;
+        height: 52px;
+    }
+
+    .league-race-badge-icon-only {
+        width: 52px;
+        height: 52px;
+        flex-basis: 52px;
+    }
+}
+
+
+/* League race badge image placement */
+.league-race-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.league-race-image-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 86px;
+    height: 86px;
+    flex: 0 0 86px;
+    padding: 0;
+    margin: -10px -4px 0 8px;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+.league-race-image-badge-img {
+    display: block;
+    width: 86px;
+    height: 86px;
+    object-fit: contain;
+}
+
+/* Neutralize previous empty pill styles if an old class is still present in browser cache */
+.league-race-badge-icon-only,
+.league-race-badge-icon-only.player-badge-contender-terran,
+.league-race-badge-icon-only.player-badge-contender-protoss,
+.league-race-badge-icon-only.player-badge-contender-zerg,
+.league-race-badge-icon-only.player-badge-champion-terran,
+.league-race-badge-icon-only.player-badge-champion-protoss,
+.league-race-badge-icon-only.player-badge-champion-zerg,
+.league-race-badge-icon-only.player-badge-race-terran,
+.league-race-badge-icon-only.player-badge-race-protoss,
+.league-race-badge-icon-only.player-badge-race-zerg {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+@media (max-width: 640px) {
+    .league-race-image-badge,
+    .league-race-image-badge-img {
+        width: 58px;
+        height: 58px;
+    }
+
+    .league-race-image-badge {
+        flex-basis: 58px;
+        margin-top: -4px;
+    }
+}
+
+
+/* League race badge image fix */
+.league-race-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.league-race-image-badge,
+.league-race-image-badge.league-race-image-badge-terran,
+.league-race-image-badge.league-race-image-badge-protoss,
+.league-race-image-badge.league-race-image-badge-zerg {
+    display: block !important;
+    width: 86px !important;
+    height: 86px !important;
+    flex: 0 0 86px !important;
+    margin: -10px -4px 0 8px !important;
+    padding: 0 !important;
+    background-color: transparent !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: contain !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.league-race-image-badge-contender-terran {
+    background-image: url('/static/badges/contender-terran.webp?v=badge5') !important;
+}
+
+.league-race-image-badge-contender-protoss {
+    background-image: url('/static/badges/contender-protoss.webp?v=badge5') !important;
+}
+
+.league-race-image-badge-contender-zerg {
+    background-image: url('/static/badges/contender-zerg.webp?v=badge5') !important;
+}
+
+.league-race-image-badge-champion-terran {
+    background-image: url('/static/badges/champion-terran.webp?v=badge5') !important;
+}
+
+.league-race-image-badge-champion-protoss {
+    background-image: url('/static/badges/champion-protoss.webp?v=badge5') !important;
+}
+
+.league-race-image-badge-champion-zerg {
+    background-image: url('/static/badges/champion-zerg.webp?v=badge5') !important;
+}
+
+.league-race-image-badge-img {
+    display: none !important;
+}
+
+@media (max-width: 640px) {
+    .league-race-image-badge {
+        width: 58px !important;
+        height: 58px !important;
+        flex-basis: 58px !important;
+        margin-top: -4px !important;
+    }
+}
+
+/* League race badge final placement: large icon centered on the right side */
+.league-race-card {
+    position: relative;
+    min-height: 132px;
+    padding: 1rem 150px 1rem 1.1rem !important;
+}
+
+.league-race-head {
+    display: block !important;
+    margin: 0 0 12px 0 !important;
+}
+
+.league-race-image-badge,
+.league-race-image-badge.league-race-image-badge-terran,
+.league-race-image-badge.league-race-image-badge-protoss,
+.league-race-image-badge.league-race-image-badge-zerg,
+.league-race-image-badge.league-race-image-badge-contender-terran,
+.league-race-image-badge.league-race-image-badge-contender-protoss,
+.league-race-image-badge.league-race-image-badge-contender-zerg,
+.league-race-image-badge.league-race-image-badge-champion-terran,
+.league-race-image-badge.league-race-image-badge-champion-protoss,
+.league-race-image-badge.league-race-image-badge-champion-zerg {
+    position: absolute !important;
+    right: 22px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    display: block !important;
+    width: 120px !important;
+    height: 120px !important;
+    flex: 0 0 120px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: transparent !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: contain !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    pointer-events: auto;
+}
+
+.league-race-image-badge-img {
+    display: none !important;
+}
+
+@media (max-width: 980px) {
+    .league-race-card {
+        padding-right: 132px !important;
+    }
+
+    .league-race-image-badge,
+    .league-race-image-badge.league-race-image-badge-terran,
+    .league-race-image-badge.league-race-image-badge-protoss,
+    .league-race-image-badge.league-race-image-badge-zerg,
+    .league-race-image-badge.league-race-image-badge-contender-terran,
+    .league-race-image-badge.league-race-image-badge-contender-protoss,
+    .league-race-image-badge.league-race-image-badge-contender-zerg,
+    .league-race-image-badge.league-race-image-badge-champion-terran,
+    .league-race-image-badge.league-race-image-badge-champion-protoss,
+    .league-race-image-badge.league-race-image-badge-champion-zerg {
+        right: 18px !important;
+        width: 104px !important;
+        height: 104px !important;
+        flex-basis: 104px !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .league-race-card {
+        min-height: 112px;
+        padding-right: 98px !important;
+    }
+
+    .league-race-image-badge,
+    .league-race-image-badge.league-race-image-badge-terran,
+    .league-race-image-badge.league-race-image-badge-protoss,
+    .league-race-image-badge.league-race-image-badge-zerg,
+    .league-race-image-badge.league-race-image-badge-contender-terran,
+    .league-race-image-badge.league-race-image-badge-contender-protoss,
+    .league-race-image-badge.league-race-image-badge-contender-zerg,
+    .league-race-image-badge.league-race-image-badge-champion-terran,
+    .league-race-image-badge.league-race-image-badge-champion-protoss,
+    .league-race-image-badge.league-race-image-badge-champion-zerg {
+        right: 14px !important;
+        width: 78px !important;
+        height: 78px !important;
+        flex-basis: 78px !important;
+    }
+}
+

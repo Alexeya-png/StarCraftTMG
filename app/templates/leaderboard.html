@@ -5,7 +5,7 @@
     <div class="container leaderboard-container">
         <div class="page-head leaderboard-page-head">
             <div>
-                <p class="page-text leaderboard-page-subtitle">{{ players|length }} players shown</p>
+                <p class="page-text leaderboard-page-subtitle" data-leaderboard-count>Loading data...</p>
             </div>
         </div>
         <div class="leaderboard-shell leaderboard-shell-polished leaderboard-shell-scrollable">
@@ -25,13 +25,7 @@
                                 </label>
                             </div>
                             <div class="leaderboard-status-help" data-status-help>
-                                <button
-                                    class="leaderboard-status-help-button"
-                                    type="button"
-                                    aria-label="About Active and Inactive statuses"
-                                >
-                                    !
-                                </button>
+                                <button class="leaderboard-status-help-button" type="button" aria-label="About Active and Inactive statuses">!</button>
                                 <div class="leaderboard-status-help-popover" role="note">
                                     <strong>Status</strong>
                                     <p><span>Active</span> – player is currently active in the ladder.</p>
@@ -40,12 +34,7 @@
                             </div>
                         </div>
                         <div class="leaderboard-filter-secondary">
-                            <button
-                                class="leaderboard-toolbar-toggle {% if show_active_ranked %}is-active{% endif %}"
-                                type="button"
-                                aria-pressed="{{ 'true' if show_active_ranked else 'false' }}"
-                                data-active-ranked-toggle
-                            >
+                            <button class="leaderboard-toolbar-toggle {% if show_active_ranked %}is-active{% endif %}" type="button" aria-pressed="{{ 'true' if show_active_ranked else 'false' }}" data-active-ranked-toggle>
                                 Ladder Players
                             </button>
                         </div>
@@ -53,79 +42,15 @@
                 </form>
             </div>
 
-            {% if db_error %}
-            <div class="state-card state-card-error leaderboard-state-card">
-                <h2>Database connection error</h2>
-                <p>{{ db_error }}</p>
+            <div class="leaderboard-table-wrap polished-table-wrap leaderboard-table-wrap-vertical" data-leaderboard-content>
+                <div class="table-loader-card" data-loading-state>
+                    <div class="table-loader-spinner" aria-hidden="true"></div>
+                    <div class="table-loader-text">Loading data...</div>
+                </div>
             </div>
-            {% elif players %}
-            <div class="leaderboard-table-wrap polished-table-wrap leaderboard-table-wrap-vertical">
-                <table class="leaderboard-table leaderboard-table-sc2 leaderboard-table-polished leaderboard-table-tight">
-                    <colgroup>
-                        <col class="col-rank">
-                        <col class="col-elo">
-                        <col class="col-player">
-                        <col class="col-games-all">
-                        <col class="col-winrate">
-                        <col class="col-wins">
-                        <col class="col-losses">
-                        {% if is_admin %}<col class="col-admin-actions">{% endif %}
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th class="col-rank">Rank</th>
-<th class="col-elo">ELO</th>
-                            <th class="col-player">Player</th>
-                            <th class="col-games-all">Games All time</th>
-                            <th class="col-winrate">Winrate</th>
-                            <th class="col-wins col-divider-left">Wins</th>
-                            <th class="col-losses">Losses</th>
-                            {% if is_admin %}<th class="col-admin-actions">Admin</th>{% endif %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for player in players %}
-                        {% set race_slug = player.priority_race|lower if player.priority_race else '' %}
-                        <tr class="leaderboard-row-link" data-href="{{ player.profile_url }}" tabindex="0" aria-label="Open {{ player.name }} profile">
-                            <td class="value-rank">{{ player.rank_position }}</td>
-                            <td class="value-elo">{{ player.current_elo_display if player.current_elo_display is defined else player.current_elo }}</td>
-                            <td class="value-player">
-                                <a class="player-profile-link" href="{{ player.profile_url }}">
-                                    <div class="sc2-player-inline polished-player-inline">
-                                        {% if player.flag_url %}
-                                        <img class="country-flag-image player-flag" src="{{ player.flag_url }}" alt="">
-                                        {% endif %}
-                                        {% if race_slug in ['terran', 'protoss', 'zerg'] %}
-                                        <img class="race-inline-icon" src="/static/Race/{{ race_slug }}.svg" alt="{{ player.priority_race }} icon">
-                                        {% endif %}
-                                        <span class="player-name sc2-player-name">{{ player.name }}</span>
-                                    </div>
-                                </a>
-                            </td>
-                            <td class="value-games-all">{{ player.matches_count }}</td>
-                            <td class="value-winrate">{{ player.win_rate_display if player.win_rate_display is defined else player.win_rate }}</td>
-                            <td class="value-wins col-divider-left">{{ player.wins }}</td>
-                            <td class="value-losses">{{ player.losses }}</td>
-                            {% if is_admin %}
-                            <td class="value-admin-action">
-                                <a class="admin-action-link" href="/admin/players/{{ player.id }}">Edit</a>
-                            </td>
-                            {% endif %}
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="state-card leaderboard-state-card">
-                <h2>No players found</h2>
-                <p>The current filters returned nothing.</p>
-            </div>
-            {% endif %}
         </div>
     </div>
 </section>
-
 
 <div class="app-notice-backdrop" id="appNotice" hidden>
     <div class="app-notice-modal" role="dialog" aria-modal="true" aria-labelledby="appNoticeTitle">
@@ -146,12 +71,13 @@
 </div>
 
 <script>
+(function () {
     document.addEventListener('DOMContentLoaded', function () {
         document.body.classList.add('page-leaderboard-scroll-lock');
 
-        const rows = document.querySelectorAll('.leaderboard-row-link');
-        const statusInputs = document.querySelectorAll('.leaderboard-status-input');
-        const filterForm = document.querySelector('.leaderboard-filter-status-form');
+        const content = document.querySelector('[data-leaderboard-content]');
+        const countNode = document.querySelector('[data-leaderboard-count]');
+        const statusInputs = Array.from(document.querySelectorAll('.leaderboard-status-input'));
         const activeRankedToggle = document.querySelector('[data-active-ranked-toggle]');
         const activeRankedInput = document.querySelector('[data-active-ranked-input]');
         const activeRankedStorageKey = 'leaderboard_active_ranked_v1';
@@ -159,146 +85,222 @@
         const notice = document.getElementById('appNotice');
         const noticeClose = document.getElementById('appNoticeClose');
         const noticeOk = document.getElementById('appNoticeOk');
-        const noticeVersion = 'leaderboard-profile-flag-notice-v1';
-        const noticeStorageKey = 'seen_' + noticeVersion;
+        const noticeStorageKey = 'seen_leaderboard-profile-flag-notice-v1';
+        const isAdmin = {{ 'true' if is_admin else 'false' }};
 
-        function openNotice() {
-            if (!notice) {
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function syncStatusToggleClasses() {
+            statusInputs.forEach(function (input) {
+                const label = input.closest('.leaderboard-status-toggle');
+                if (label) {
+                    label.classList.toggle('is-active', input.checked);
+                }
+            });
+        }
+
+        function syncActiveRankedButton() {
+            if (!activeRankedToggle || !activeRankedInput) {
                 return;
             }
-            notice.hidden = false;
+            const isActive = activeRankedInput.value === '1';
+            activeRankedToggle.classList.toggle('is-active', isActive);
+            activeRankedToggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
         }
+
+        function buildQueryString() {
+            const params = new URLSearchParams();
+            statusInputs.forEach(function (input) {
+                if (input.checked) {
+                    params.append('status', input.value);
+                }
+            });
+            if (activeRankedInput && activeRankedInput.value === '1') {
+                params.set('active_ranked', '1');
+            }
+            return params.toString();
+        }
+
+        function renderLoading() {
+            content.innerHTML = '<div class="table-loader-card"><div class="table-loader-spinner" aria-hidden="true"></div><div class="table-loader-text">Loading data...</div></div>';
+            countNode.textContent = 'Loading data...';
+        }
+
+        function renderState(title, text, isError) {
+            content.innerHTML = '<div class="state-card leaderboard-state-card' + (isError ? ' state-card-error' : '') + '"><h2>' + escapeHtml(title) + '</h2><p>' + escapeHtml(text) + '</p></div>';
+        }
+
+        function renderLeaderboard(payload) {
+            countNode.textContent = String(payload.players_count || 0) + ' players shown';
+
+            if (!payload.ok) {
+                renderState('Database connection error', payload.error || 'Could not load the leaderboard.', true);
+                return;
+            }
+
+            const players = Array.isArray(payload.players) ? payload.players : [];
+            if (!players.length) {
+                renderState('No players found', 'The current filters returned nothing.', false);
+                return;
+            }
+
+            const rows = players.map(function (player) {
+                const flagHtml = player.flag_url ? '<img class="country-flag-image player-flag" src="' + escapeHtml(player.flag_url) + '" alt="">' : '';
+                const raceSlug = String(player.priority_race_slug || '').trim().toLowerCase();
+                const raceHtml = ['terran', 'protoss', 'zerg'].includes(raceSlug)
+                    ? '<img class="race-inline-icon" src="/static/Race/' + raceSlug + '.svg" alt="' + escapeHtml(player.priority_race || '') + ' icon">'
+                    : '';
+                const adminHtml = isAdmin ? '<td class="value-admin-action"><a class="admin-action-link" href="/admin/players/' + Number(player.id || 0) + '">Edit</a></td>' : '';
+                return '<tr class="leaderboard-row-link" data-href="' + escapeHtml(player.profile_url || '#') + '" tabindex="0" aria-label="Open ' + escapeHtml(player.name || 'player') + ' profile">'
+                    + '<td class="value-rank">' + escapeHtml(player.rank_position) + '</td>'
+                    + '<td class="value-elo">' + escapeHtml(player.current_elo_display || player.current_elo || '') + '</td>'
+                    + '<td class="value-player"><a class="player-profile-link" href="' + escapeHtml(player.profile_url || '#') + '"><div class="sc2-player-inline polished-player-inline">' + flagHtml + raceHtml + '<span class="player-name sc2-player-name">' + escapeHtml(player.name || '') + '</span></div></a></td>'
+                    + '<td class="value-games-all">' + escapeHtml(player.matches_count || 0) + '</td>'
+                    + '<td class="value-winrate">' + escapeHtml(player.win_rate_display || player.win_rate || '') + '</td>'
+                    + '<td class="value-wins col-divider-left">' + escapeHtml(player.wins || 0) + '</td>'
+                    + '<td class="value-losses">' + escapeHtml(player.losses || 0) + '</td>'
+                    + adminHtml
+                    + '</tr>';
+            }).join('');
+
+            content.innerHTML = ''
+                + '<table class="leaderboard-table leaderboard-table-sc2 leaderboard-table-polished leaderboard-table-tight">'
+                + '  <colgroup>'
+                + '    <col class="col-rank"><col class="col-elo"><col class="col-player"><col class="col-games-all"><col class="col-winrate"><col class="col-wins"><col class="col-losses">'
+                + (isAdmin ? '<col class="col-admin-actions">' : '')
+                + '  </colgroup>'
+                + '  <thead><tr><th class="col-rank">Rank</th><th class="col-elo">ELO</th><th class="col-player">Player</th><th class="col-games-all">Games All time</th><th class="col-winrate">Winrate</th><th class="col-wins col-divider-left">Wins</th><th class="col-losses">Losses</th>'
+                + (isAdmin ? '<th class="col-admin-actions">Admin</th>' : '')
+                + '  </tr></thead>'
+                + '  <tbody>' + rows + '</tbody>'
+                + '</table>';
+        }
+
+function fetchLeaderboard(pushHistory, showLoader) {
+    if (showLoader !== false) {
+        renderLoading();
+    }
+
+                syncStatusToggleClasses();
+                syncActiveRankedButton();
+                const queryString = buildQueryString();
+                const apiUrl = '/api/leaderboard' + (queryString ? '?' + queryString : '');
+                const pageUrl = '/leaderboard' + (queryString ? '?' + queryString : '');
+
+                fetch(apiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (response) {
+                    return response.json().catch(function () {
+                        return { ok: false, error: 'Could not parse leaderboard response.' };
+                    });
+                })
+                .then(function (payload) {
+                    renderLeaderboard(payload);
+                    if (pushHistory) {
+                        window.history.replaceState({}, '', pageUrl);
+                    }
+                })
+                .catch(function () {
+                    countNode.textContent = '0 players shown';
+                    renderState('Database connection error', 'Could not load the leaderboard.', true);
+                });
+        }
+
+        if (!hasActiveRankedQuery && activeRankedInput) {
+            try {
+                const storedValue = window.localStorage.getItem(activeRankedStorageKey);
+                if (storedValue === '1') {
+                    activeRankedInput.value = '1';
+                }
+            } catch (error) {}
+        }
+
+        statusInputs.forEach(function (input) {
+            input.addEventListener('change', function () {
+                const checkedCount = statusInputs.filter(function (item) { return item.checked; }).length;
+                if (checkedCount === 0) {
+                    input.checked = true;
+                }
+                fetchLeaderboard(true);
+            });
+        });
+
+        if (activeRankedToggle && activeRankedInput) {
+            activeRankedToggle.addEventListener('click', function () {
+                activeRankedInput.value = activeRankedInput.value === '1' ? '0' : '1';
+                try {
+                    window.localStorage.setItem(activeRankedStorageKey, activeRankedInput.value);
+                } catch (error) {}
+                fetchLeaderboard(true, false);
+            });
+        }
+
+        content.addEventListener('click', function (event) {
+            const row = event.target.closest('.leaderboard-row-link');
+            const inlineLink = event.target.closest('a');
+            if (!row || inlineLink) {
+                return;
+            }
+            const href = row.getAttribute('data-href');
+            if (href) {
+                window.location.href = href;
+            }
+        });
+
+        content.addEventListener('keydown', function (event) {
+            const row = event.target.closest('.leaderboard-row-link');
+            if (!row) {
+                return;
+            }
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                const href = row.getAttribute('data-href');
+                if (href) {
+                    window.location.href = href;
+                }
+            }
+        });
 
         function closeNotice() {
-            if (!notice) {
-                return;
+            if (notice) {
+                notice.hidden = true;
             }
-            notice.hidden = true;
             try {
                 window.localStorage.setItem(noticeStorageKey, '1');
-            } catch (error) {
-            }
-        }
-
-        if (notice) {
-            let alreadySeen = false;
-            try {
-                alreadySeen = window.localStorage.getItem(noticeStorageKey) === '1';
-            } catch (error) {
-                alreadySeen = false;
-            }
-
-            if (!alreadySeen) {
-                openNotice();
-            }
+            } catch (error) {}
         }
 
         if (noticeClose) {
             noticeClose.addEventListener('click', closeNotice);
         }
-
         if (noticeOk) {
             noticeOk.addEventListener('click', closeNotice);
         }
-
-        document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && notice && !notice.hidden) {
-                closeNotice();
-            }
-        });
-
-        function isActiveRankedEnabled() {
-            return Boolean(activeRankedInput && activeRankedInput.value === '1');
-        }
-
-        function applyActiveRankedState(enabled, options) {
-            const settings = options || {};
-            const shouldPersist = settings.persist !== false;
-            const shouldSubmit = settings.submit === true;
-            const normalizedEnabled = Boolean(enabled);
-
-            if (activeRankedInput) {
-                activeRankedInput.value = normalizedEnabled ? '1' : '0';
-            }
-
-            if (activeRankedToggle) {
-                activeRankedToggle.classList.toggle('is-active', normalizedEnabled);
-                activeRankedToggle.setAttribute('aria-pressed', normalizedEnabled ? 'true' : 'false');
-            }
-
-            if (shouldPersist) {
-                try {
-                    window.localStorage.setItem(activeRankedStorageKey, normalizedEnabled ? '1' : '0');
-                } catch (error) {
+        if (notice) {
+            notice.addEventListener('click', function (event) {
+                if (event.target === notice) {
+                    closeNotice();
                 }
-            }
-
-            if (shouldSubmit && filterForm) {
-                filterForm.submit();
-            }
-        }
-
-        if (!hasActiveRankedQuery) {
+            });
             try {
-                if (window.localStorage.getItem(activeRankedStorageKey) === '1' && !isActiveRankedEnabled()) {
-                    applyActiveRankedState(true, { persist: false, submit: true });
-                    return;
+                if (!window.localStorage.getItem(noticeStorageKey)) {
+                    window.setTimeout(function () { notice.hidden = false; }, 800);
                 }
             } catch (error) {
+                window.setTimeout(function () { notice.hidden = false; }, 800);
             }
-        } else {
-            applyActiveRankedState(isActiveRankedEnabled(), { persist: true, submit: false });
         }
 
-        if (activeRankedToggle) {
-            activeRankedToggle.addEventListener('click', function () {
-                applyActiveRankedState(!isActiveRankedEnabled(), { persist: true, submit: true });
-            });
-        }
-
-        rows.forEach(function (row) {
-            const href = row.dataset.href;
-            if (!href) {
-                return;
-            }
-
-            row.addEventListener('click', function (event) {
-                if (event.target.closest('a')) {
-                    return;
-                }
-                window.location.href = href;
-            });
-
-            row.addEventListener('keydown', function (event) {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    window.location.href = href;
-                }
-            });
-        });
-
-        statusInputs.forEach(function (input) {
-            input.addEventListener('change', function () {
-                const checked = Array.from(statusInputs).filter(function (item) {
-                    return item.checked;
-                });
-
-                if (checked.length === 0) {
-                    const activeInput = document.querySelector('.leaderboard-status-input[value="active"]');
-                    if (activeInput) {
-                        activeInput.checked = true;
-                    }
-                }
-
-                if (filterForm) {
-                    filterForm.submit();
-                }
-            });
-        });
-
-        window.addEventListener('beforeunload', function () {
-            document.body.classList.remove('page-leaderboard-scroll-lock');
-        });
+        syncStatusToggleClasses();
+        syncActiveRankedButton();
+        fetchLeaderboard(false);
     });
+})();
 </script>
 {% endblock %}

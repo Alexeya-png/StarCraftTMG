@@ -55,6 +55,12 @@
                         </div>
                         <div class="submit-alert-note">{{ success_data.mission_name }}</div>
                         <div class="submit-alert-note">Score {{ success_data.score_display }}</div>
+                        {% if success_data.player1_roster_id or success_data.player2_roster_id %}
+                        <div class="submit-alert-note">Seeds {{ success_data.player1_roster_id or '–' }} / {{ success_data.player2_roster_id or '–' }}</div>
+                        {% endif %}
+                        {% if success_data.is_ranked and success_data.game_type == '1к' %}
+                        <div class="submit-alert-note">1к ranked uses 35% of normal 2к ELO gain and loss.</div>
+                        {% endif %}
                     </div>
                 </div>
                 {% if success_data.is_ranked %}
@@ -191,7 +197,7 @@
                     <section class="form-section">
                         <div class="form-section-head">
                             <h2>Ranked</h2>
-                            <p>Ranked changes ELO. Unranked is saved only in match statistics.</p>
+                            <p>Ranked changes ELO. Unranked is saved only in match statistics. Ranked 1к uses 65% of normal 2к ELO gain and loss.</p>
                         </div>
                         <div class="choice-grid choice-grid-compact">
                             <div class="choice-card-wrapper">
@@ -214,7 +220,7 @@
                     <section class="form-section">
                         <div class="form-section-head">
                             <h2>Game type</h2>
-                            <p>Choose the match format.</p>
+                            <p>Choose the match format. Ranked 1к uses 65% ELO compared to ranked 2к.</p>
                         </div>
                         <div class="choice-grid choice-grid-compact">
                             {% for game_type in game_type_options %}
@@ -250,6 +256,40 @@
                             <div class="toolbar-field">
                                 <label for="player2_score">Player 2 score</label>
                                 <input id="player2_score" name="player2_score" type="number" min="0" max="100" step="1" value="{{ form_state.player2_score }}" placeholder="0" required>
+                            </div>
+                        </div>
+                        <div class="score-pair-grid">
+                            <div class="toolbar-field">
+                                <label for="player1_roster_id">Player 1 roster seed</label>
+                                <input
+                                    id="player1_roster_id"
+                                    name="player1_roster_id"
+                                    type="text"
+                                    maxlength="6"
+                                    pattern="^$|^[A-Z0-9]{6}$"
+                                    value="{{ form_state.player1_roster_id }}"
+                                    placeholder="Optional seed"
+                                    title="Leave empty or enter exactly 6 characters: A-Z and 0-9"
+                                    autocomplete="off"
+                                    spellcheck="false"
+                                    data-seed-input
+                                >
+                            </div>
+                            <div class="toolbar-field">
+                                <label for="player2_roster_id">Player 2 roster seed</label>
+                                <input
+                                    id="player2_roster_id"
+                                    name="player2_roster_id"
+                                    type="text"
+                                    maxlength="6"
+                                    pattern="^$|^[A-Z0-9]{6}$"
+                                    value="{{ form_state.player2_roster_id }}"
+                                    placeholder="Optional seed"
+                                    title="Leave empty or enter exactly 6 characters: A-Z and 0-9"
+                                    autocomplete="off"
+                                    spellcheck="false"
+                                    data-seed-input
+                                >
                             </div>
                         </div>
                     </section>
@@ -316,6 +356,43 @@
     });
 })();
 </script>
+
+<script>
+(function () {
+    const seedInputs = document.querySelectorAll('[data-seed-input]');
+
+    function normalizeSeedValue(value) {
+        return String(value || '')
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, '')
+            .slice(0, 6);
+    }
+
+    function validateSeedInput(input) {
+        const value = String(input.value || '');
+        const isValid = value === '' || /^[A-Z0-9]{6}$/.test(value);
+        input.setCustomValidity(isValid ? '' : 'Seed must be exactly 6 characters: A-Z and 0-9.');
+    }
+
+    seedInputs.forEach((input) => {
+        input.addEventListener('input', function () {
+            const normalized = normalizeSeedValue(input.value);
+            if (input.value !== normalized) {
+                input.value = normalized;
+            }
+            validateSeedInput(input);
+        });
+
+        input.addEventListener('blur', function () {
+            input.value = normalizeSeedValue(input.value);
+            validateSeedInput(input);
+        });
+
+        validateSeedInput(input);
+    });
+})();
+</script>
+
 <script>
 (function () {
     const form = document.querySelector('.submit-form');

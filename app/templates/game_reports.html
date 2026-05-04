@@ -1,0 +1,688 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section leaderboard-section leaderboard-compact-section game-reports-section">
+    <div class="container leaderboard-container game-reports-container">
+        <style>
+            .game-reports-summary-line {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .game-reports-summary-separator {
+                opacity: 0.7;
+            }
+        </style>
+
+        <div class="page-head leaderboard-page-head game-reports-page-head">
+            <div>
+                <p class="page-text leaderboard-page-subtitle game-reports-summary-line">
+                    <span data-reports-count>Loading data...</span>
+                    <span class="game-reports-summary-separator" data-reports-separator hidden>·</span>
+                    <span data-reports-league>
+                        {% if current_league %}
+                            {{ current_league.name }}
+                        {% else %}
+                            Current league is not configured
+                        {% endif %}
+                    </span>
+                </p>
+            </div>
+        </div>
+
+        <div class="leaderboard-shell leaderboard-shell-polished leaderboard-shell-scrollable game-reports-shell">
+            <div class="leaderboard-table-wrap leaderboard-table-wrap-vertical polished-table-wrap game-reports-table-wrap" data-reports-content>
+                <div class="table-loader-card" data-loading-state>
+                    <div class="table-loader-spinner" aria-hidden="true"></div>
+                    <div class="table-loader-text">Loading data...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getFirestore, collection, getDocs, doc, getDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+const firebaseConfig = {
+    apiKey: 'AIzaSyDHRhS4FIO_1s_2Tn2C77noJRgbs-y_mks',
+    authDomain: 'starcrafttmgbeta.firebaseapp.com',
+    projectId: 'starcrafttmgbeta',
+    storageBucket: 'starcrafttmgbeta.firebasestorage.app',
+    messagingSenderId: '70752777650',
+    appId: '1:70752777650:web:46b8849504c846f260a0ab',
+    measurementId: 'G-QDY06Q6F95'
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const firebaseDb = getFirestore(firebaseApp, 'starcrafttmgbeta');
+
+const rosterPdfCache = {
+    tacticalCards: null,
+    armyUnits: null,
+    gameCards: null,
+    activeSeed: null,
+};
+
+document.addEventListener('DOMContentLoaded', function () {
+    const content = document.querySelector('[data-reports-content]');
+    const countNode = document.querySelector('[data-reports-count]');
+    const leagueNode = document.querySelector('[data-reports-league]');
+    const leagueSeparatorNode = document.querySelector('[data-reports-separator]');
+    const isAdmin = {{ 'true' if is_admin else 'false' }};
+    const state = {
+        page: {{ current_page|int }},
+        perPage: {{ per_page|int }},
+        search: {{ search|tojson }},
+        rankedOnly: {{ 'true' if show_ranked_only else 'false' }}
+    };
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function buildQueryString() {
+        const params = new URLSearchParams();
+        params.set('page', String(state.page || 1));
+        params.set('per_page', String(state.perPage || 25));
+        if (state.search) {
+            params.set('search', state.search);
+        }
+        if (state.rankedOnly) {
+            params.set('ranked_only', '1');
+        }
+        return params.toString();
+    }
+
+    function renderLoading() {
+        content.innerHTML = '<div class="table-loader-card"><div class="table-loader-spinner" aria-hidden="true"></div><div class="table-loader-text">Loading data...</div></div>';
+        countNode.textContent = 'Loading data...';
+    }
+
+    function renderState(title, text, isError) {
+        content.innerHTML = '<div class="state-card leaderboard-state-card' + (isError ? ' state-card-error' : '') + '"><h2>' + escapeHtml(title) + '</h2><p>' + escapeHtml(text) + '</p></div>';
+    }
+
+    function renderPagination(items) {
+        if (!Array.isArray(items) || !items.length) {
+            return '';
+        }
+        return '<div class="table-footer-pagination">' + items.map(function (item) {
+            if (item === '...') {
+                return '<span class="pagination-ellipsis">...</span>';
+            }
+            const pageNumber = Number(item || 1);
+            if (pageNumber === Number(state.page || 1)) {
+                return '<span class="pagination-link is-active">' + pageNumber + '</span>';
+            }
+            return '<a class="pagination-link" href="#" data-page-link="' + pageNumber + '">' + pageNumber + '</a>';
+        }).join('') + '</div>';
+    }
+
+    function normalizeSeed(value) {
+        return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 80);
+    }
+
+    function parseResource(value) {
+        if (value === null || value === undefined) return 0;
+        const numeric = Number.parseFloat(String(value).trim().replace(',', '.'));
+        return Number.isFinite(numeric) ? numeric : 0;
+    }
+
+    function setDownloadingState(seed, isDownloading, buttonText) {
+        const cleanSeed = normalizeSeed(seed);
+        const nodes = content.querySelectorAll('[data-roster-download]');
+        nodes.forEach(function (node) {
+            if (normalizeSeed(node.getAttribute('data-roster-download')) !== cleanSeed) {
+                return;
+            }
+            if (isDownloading) {
+                node.dataset.downloadOriginalText = node.textContent;
+                node.textContent = buttonText || 'PDF...';
+                node.style.pointerEvents = 'none';
+                node.style.opacity = '0.7';
+            } else {
+                if (node.dataset.downloadOriginalText) {
+                    node.textContent = node.dataset.downloadOriginalText;
+                    delete node.dataset.downloadOriginalText;
+                }
+                node.style.pointerEvents = '';
+                node.style.opacity = '';
+            }
+        });
+    }
+
+    function renderRaceIcon(raceLabel) {
+        const raceSlug = String(raceLabel || '').trim().toLowerCase();
+        if (!['terran', 'protoss', 'zerg'].includes(raceSlug)) {
+            return '';
+        }
+        return '<img class="race-inline-icon" src="/static/Race/' + raceSlug + '.svg" alt="' + escapeHtml(raceLabel || '') + ' icon">';
+    }
+
+    function renderRosterSeedInline(rosterId) {
+        const cleanRosterId = normalizeSeed(rosterId);
+        if (!cleanRosterId) {
+            return '';
+        }
+        return '<a class="game-report-seed-link" href="#" data-roster-download="' + escapeHtml(cleanRosterId) + '" title="Download roster PDF">[' + escapeHtml(cleanRosterId) + ']</a>';
+    }
+
+    function renderPlayerCell(playerName, profileUrl, raceLabel, rosterId, tieBadgeHtml, withResult) {
+        const raceHtml = renderRaceIcon(raceLabel || '');
+        const seedHtml = renderRosterSeedInline(rosterId || '');
+        const badgeHtml = withResult ? (tieBadgeHtml || '') : '';
+
+        return '<div class="game-report-player-cell">'
+            + '<div class="game-report-player-meta">'
+            + '<div class="game-report-player-main">'
+            + raceHtml
+            + '<a class="player-profile-link" href="' + escapeHtml(profileUrl || '#') + '"><span class="player-name sc2-player-name">' + escapeHtml(playerName || '') + '</span></a>'
+            + '</div>'
+            + seedHtml
+            + '</div>'
+            + badgeHtml
+            + '</div>';
+    }
+
+    function renderReports(payload) {
+        const currentLeague = payload.current_league || null;
+        countNode.textContent = String(payload.total_matches || 0) + ' matches shown';
+
+        if (leagueNode) {
+            if (currentLeague && currentLeague.name) {
+                leagueNode.textContent = currentLeague.name;
+                if (leagueSeparatorNode) {
+                    leagueSeparatorNode.hidden = false;
+                }
+            } else {
+                leagueNode.textContent = 'Current league is not configured';
+                if (leagueSeparatorNode) {
+                    leagueSeparatorNode.hidden = true;
+                }
+            }
+        }
+
+        if (!payload.ok) {
+            renderState('Database connection error', payload.error || 'Could not load match reports.', true);
+            return;
+        }
+
+        const matches = Array.isArray(payload.matches) ? payload.matches : [];
+        if (!matches.length) {
+            if (!currentLeague) {
+                renderState('Current league is not configured', 'Add a league in Supabase and set system_settings.current_league_id.', false);
+            } else {
+                renderState('No matches found', 'There are no saved matches in the current league yet.', false);
+            }
+            return;
+        }
+
+        const rows = matches.map(function (match) {
+            const tieBadge = match.is_tie ? '<span class="inline-result-badge inline-result-badge-tie">TIE</span>' : '';
+            const adminHtml = isAdmin ? '<td class="value-admin-action"><a class="admin-action-link" href="/admin/matches/' + Number(match.id || 0) + '">Edit</a></td>' : '';
+            const rowClass = match.is_tie ? ' class="game-report-row-tie"' : '';
+
+            const winnerPlayerCell = renderPlayerCell(
+                match.winner_name || '',
+                match.winner_profile_url || '#',
+                match.winner_race || '',
+                match.winner_roster_id || '',
+                tieBadge,
+                true
+            );
+
+            const loserPlayerCell = renderPlayerCell(
+                match.loser_name || '',
+                match.loser_profile_url || '#',
+                match.loser_race || '',
+                match.loser_roster_id || '',
+                '',
+                false
+            );
+
+            return '<tr' + rowClass + '>'
+                + '<td class="value-match-id">' + escapeHtml(match.id || 0) + '</td>'
+                + '<td class="value-played-at">' + escapeHtml(match.played_at_label || '') + '</td>'
+                + '<td class="value-player value-player-with-result">' + winnerPlayerCell + '</td>'
+                + '<td class="value-player">' + loserPlayerCell + '</td>'
+                + '<td class="value-ranked">' + escapeHtml(match.ranked_label || '') + '</td>'
+                + '<td class="value-game-type">' + escapeHtml(match.game_type_display || '') + '</td>'
+                + '<td class="value-score">' + escapeHtml(match.score_display || '') + '</td>'
+                + '<td class="value-mission">' + escapeHtml(match.mission_name_display || '') + '</td>'
+                + '<td class="value-comment">' + escapeHtml(match.comment_display || '') + '</td>'
+                + adminHtml
+                + '</tr>';
+        }).join('');
+
+        content.innerHTML = ''
+            + '<table class="leaderboard-table leaderboard-table-sc2 leaderboard-table-polished leaderboard-table-tight game-reports-table">'
+            + '  <colgroup><col class="col-match-id"><col class="col-played-at"><col class="col-match-player"><col class="col-match-player"><col class="col-ranked"><col class="col-game-type"><col class="col-score"><col class="col-mission"><col class="col-comment">'
+            + (isAdmin ? '<col class="col-admin-actions">' : '')
+            + '  </colgroup>'
+            + '  <thead><tr><th class="col-match-id">ID</th><th class="col-played-at">Played at</th><th class="col-match-player">Winner</th><th class="col-match-player">Loser</th><th class="col-ranked"><a class="inline-link" href="#" data-ranked-toggle aria-label="' + (state.rankedOnly ? 'Show all matches' : 'Show only ranked matches') + '" title="' + (state.rankedOnly ? 'Now: only Ranked. Click to show all matches.' : 'Now: all matches. Click to show only Ranked.') + '">Ranked' + (state.rankedOnly ? ' ✓' : '') + '</a></th><th class="col-game-type">Game type</th><th class="col-score">Score</th><th class="col-mission">Mission</th><th class="col-comment">Comment</th>'
+            + (isAdmin ? '<th class="col-admin-actions">Admin</th>' : '')
+            + '  </tr></thead>'
+            + '  <tbody>' + rows + '</tbody>'
+            + '</table>'
+            + renderPagination(payload.pagination_numbers);
+    }
+
+    async function loadScript(src) {
+        return new Promise(function (resolve, reject) {
+            const existing = document.querySelector('script[src="' + src + '"]');
+            if (existing) {
+                if (window.html2pdf) {
+                    resolve();
+                    return;
+                }
+                existing.addEventListener('load', function () { resolve(); }, { once: true });
+                existing.addEventListener('error', function () { reject(new Error('Failed to load script.')); }, { once: true });
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = function () { resolve(); };
+            script.onerror = function () { reject(new Error('Failed to load script: ' + src)); };
+            document.head.appendChild(script);
+        });
+    }
+
+    async function ensureHtml2Pdf() {
+        if (window.html2pdf) {
+            return;
+        }
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+        if (!window.html2pdf) {
+            throw new Error('html2pdf did not initialize.');
+        }
+    }
+
+    async function loadTacticalCards() {
+        if (rosterPdfCache.tacticalCards) {
+            return rosterPdfCache.tacticalCards;
+        }
+        const snapshot = await getDocs(collection(firebaseDb, 'tactical_cards'));
+        rosterPdfCache.tacticalCards = snapshot.docs.map(function (item) {
+            return { id: item.id, ...item.data() };
+        });
+        return rosterPdfCache.tacticalCards;
+    }
+
+    async function loadArmyUnits() {
+        if (rosterPdfCache.armyUnits) {
+            return rosterPdfCache.armyUnits;
+        }
+        const snapshot = await getDocs(collection(firebaseDb, 'army_units'));
+        rosterPdfCache.armyUnits = snapshot.docs.map(function (item) {
+            return { id: item.id, ...item.data() };
+        });
+        return rosterPdfCache.armyUnits;
+    }
+
+    async function loadGameCards() {
+        if (rosterPdfCache.gameCards) {
+            return rosterPdfCache.gameCards;
+        }
+        const snapshot = await getDocs(query(collection(firebaseDb, 'faction_cards'), where('faction', '==', 'the_game')));
+        rosterPdfCache.gameCards = snapshot.docs.map(function (item) {
+            return { id: item.id, ...item.data() };
+        });
+        return rosterPdfCache.gameCards;
+    }
+
+    async function fetchSharedRoster(seed) {
+        const snapshot = await getDoc(doc(firebaseDb, 'shared_rosters', seed));
+        if (!snapshot.exists()) {
+            throw new Error('Roster ' + seed + ' not found in shared_rosters.');
+        }
+        const data = snapshot.data();
+        if (!data || !data.state) {
+            throw new Error('Roster ' + seed + ' does not contain state.');
+        }
+        return data.state;
+    }
+
+    function generatePrintLayout(state, dbUnits, dbCards, dbGameCards, currentSeed) {
+        const factionName = String(state.faction || 'Unknown').toUpperCase();
+        const totalMin = Number(state.mineralsUsed || 0);
+        const limitMin = Number(state.mineralsLimit || 0);
+        const totalGas = Number(state.gasUsed || 0);
+        const totalSupply = Number(state.supplyUsed || 0);
+        const safeSeed = currentSeed || 'UNSAVED';
+
+        let factionCardName = 'None Selected';
+        if (state.factionCardId) {
+            const factionCard = dbCards.find((card) => card.id === state.factionCardId);
+            if (factionCard) factionCardName = factionCard.name;
+        }
+
+        let tacticsHtml = '';
+        if (Array.isArray(state.tacticalCardIds) && state.tacticalCardIds.length > 0) {
+            tacticsHtml = '<ul style="margin:0; padding-left:20px;">';
+            const cardCounts = {};
+            state.tacticalCardIds.forEach((id) => {
+                cardCounts[id] = (cardCounts[id] || 0) + 1;
+            });
+            Object.keys(cardCounts).forEach((id) => {
+                const card = dbCards.find((item) => item.id === id);
+                if (!card) return;
+                const isUnique = card.isUnique ? ' (Unique)' : '';
+                tacticsHtml += `<li style="margin-bottom:4px;"><b>${cardCounts[id]}x ${card.name}</b>${isUnique} <span style="font-size:10px; color:#666;">(${card.cost} Gas)</span></li>`;
+            });
+            tacticsHtml += '</ul>';
+        } else {
+            tacticsHtml = '<span style="color:#999; font-style:italic;">No Tactical Cards selected.</span>';
+        }
+
+        const missionNames = Array.isArray(state.missionIds) && state.missionIds.length > 0
+            ? state.missionIds.map((id) => {
+                const card = dbGameCards.find((item) => item.id === id);
+                return card ? card.name : 'Unknown ID';
+            }).join(', ')
+            : 'None Selected';
+
+        const deployNames = Array.isArray(state.deploymentIds) && state.deploymentIds.length > 0
+            ? state.deploymentIds.map((id) => {
+                const card = dbGameCards.find((item) => item.id === id);
+                return card ? card.name : 'Unknown ID';
+            }).join(', ')
+            : 'None Selected';
+
+        let unitsHtml = '';
+        (state.roster || []).forEach((unit) => {
+            const displayUnitName =
+                String(unit.name || '').trim().toLowerCase() === 'marine' &&
+                String(unit.size || '').trim().toLowerCase() === 'large'
+                    ? 'Special Forces'
+                    : (unit.name || 'Unknown Unit');
+
+            let upgradeCost = 0;
+            const upgradesList = [];
+            (unit.activeUpgrades || []).forEach((index) => {
+                const upgrade = (unit.availableUpgrades || [])[index];
+                if (!upgrade) return;
+                const cost = unit.size === 'small' ? Number(upgrade.costS || 0) : Number(upgrade.costL || 0);
+                upgradeCost += cost;
+                upgradesList.push(`${upgrade.name} (+${cost})`);
+            });
+
+            const totalCost = Number(unit.baseCost || 0) + upgradeCost;
+            const dbUnit = dbUnits.find((item) => item.id === unit.id);
+            const tagsValue = String(dbUnit?.tags || '').toLowerCase();
+            const isUnique = tagsValue.includes('unique');
+            const uniqueBadge = isUnique ? '<span style="background:#000; color:#fff; padding:1px 4px; font-size:9px; border-radius:3px; margin-left:5px;">UNIQUE</span>' : '';
+
+            unitsHtml += `
+                <tr style="border-bottom:1px solid #ccc;">
+                    <td style="padding:5px 6px; width:24%; vertical-align:top;">
+                        <b>${displayUnitName}</b> ${uniqueBadge}<br>
+                        <span style="font-size:9px; color:#555; line-height:1.2;">${String(unit.size || '').toUpperCase()} | Models: ${unit.models ?? '-'} | Type: ${unit.unitType || '-'}</span>
+                    </td>
+                    <td style="padding:5px 4px; width:8%; text-align:center; vertical-align:top;">${unit.supply ?? '-'}</td>
+                    <td style="padding:5px 6px; width:23%; font-size:10px; line-height:1.25; vertical-align:top;">
+                        HP: <b>${unit.stats?.hp ?? '-'}</b> | Armor: <b>${unit.stats?.armor ?? '-'}</b> | Shield: <b>${unit.stats?.shield ?? '-'}</b><br>
+                        Evade: <b>${unit.stats?.evade ?? '-'}</b> | Speed: <b>${unit.stats?.speed ?? '-'}</b>
+                    </td>
+                    <td style="padding:5px 6px; width:33%; font-size:10px; line-height:1.25; vertical-align:top; word-break:break-word;">${upgradesList.length > 0 ? upgradesList.join(', ') : '-'}</td>
+                    <td style="padding:5px 6px; width:12%; text-align:right; font-weight:bold; vertical-align:top;">${totalCost}</td>
+                </tr>
+            `;
+        });
+
+        const container = document.createElement('div');
+        container.innerHTML = `
+            <div style="font-family: Arial, sans-serif; padding: 16px; color: #000; background: #fff; max-width: 760px; margin: 0 auto;">
+                <div style="border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:flex-end;">
+                    <div>
+                        <h1 style="margin:0; font-size:24px;">STARCRAFT TMG</h1>
+                        <div style="font-size:14px; color:#444;">UNOFFICIAL ROSTER SHEET</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="background:#000; color:#fff; padding:4px 8px; border-radius:4px; margin-bottom:5px; display:inline-block;">
+                            SEED: <span style="font-weight:bold; font-family:monospace; font-size:16px;">${safeSeed}</span>
+                        </div>
+                        <div style="font-size:20px; font-weight:bold;">${factionName}</div>
+                        <div style="font-size:12px;">${new Date().toLocaleDateString()}</div>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:20px; margin-bottom:20px; background:#f3f4f6; padding:15px; border-radius:8px;">
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size:10px; text-transform:uppercase; color:#666;">Minerals</div>
+                        <div style="font-size:18px; font-weight:bold;">${totalMin} / ${limitMin}</div>
+                    </div>
+                    <div style="flex:1; text-align:center; border-left:1px solid #ccc;">
+                        <div style="font-size:10px; text-transform:uppercase; color:#666;">Gas</div>
+                        <div style="font-size:18px; font-weight:bold;">${totalGas}</div>
+                    </div>
+                    <div style="flex:1; text-align:center; border-left:1px solid #ccc;">
+                        <div style="font-size:10px; text-transform:uppercase; color:#666;">Supply</div>
+                        <div style="font-size:18px; font-weight:bold;">${totalSupply}</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:20px; display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                    <div>
+                        <h3 style="border-bottom:1px solid #000; font-size:14px; margin-bottom:10px;">COMMAND CARDS</h3>
+                        <div style="margin-bottom:10px;">
+                            <div style="font-size:11px; font-weight:bold; margin-bottom:4px; color:#444;">FACTION CARD</div>
+                            <div style="background:#eee; padding:8px; border-radius:4px; font-weight:bold;">${factionCardName}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:11px; font-weight:bold; margin-bottom:4px; color:#444;">TACTICAL CARDS</div>
+                            ${tacticsHtml}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 style="border-bottom:1px solid #000; font-size:14px; margin-bottom:10px;">THE GAME</h3>
+                        <div style="margin-bottom:10px;">
+                            <div style="font-size:11px; font-weight:bold; margin-bottom:4px; color:#444;">SELECTED MISSIONS</div>
+                            <div style="background:#eee; padding:8px; border-radius:4px; min-height:30px;">${missionNames}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:11px; font-weight:bold; margin-bottom:4px; color:#444;">SELECTED DEPLOYMENTS</div>
+                            <div style="background:#eee; padding:8px; border-radius:4px; min-height:30px;">${deployNames}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 style="border-bottom:1px solid #000; font-size:14px; margin-bottom:10px;">UNIT ROSTER</h3>
+                <table style="width:100%; border-collapse: collapse; table-layout:fixed; font-size:11px;">
+                    <thead>
+                        <tr style="background:#000; color:#fff;">
+                            <th style="padding:6px; width:24%; text-align:left;">UNIT</th>
+                            <th style="padding:6px; width:8%; text-align:center;">SUPPLY</th>
+                            <th style="padding:6px; width:23%; text-align:left;">STATS</th>
+                            <th style="padding:6px; width:33%; text-align:left;">UPGRADES</th>
+                            <th style="padding:6px; width:12%; text-align:right;">COST</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${unitsHtml || '<tr><td colspan="5" style="padding:14px; text-align:center;">No units mustered.</td></tr>'}
+                    </tbody>
+                </table>
+
+                <div style="margin-top:30px; text-align:center; font-size:10px; color:#888; border-top:1px solid #eee; padding-top:10px;">
+                    Generated by tmg-stats | Share SEED: <b>${safeSeed}</b>
+                </div>
+            </div>
+        `;
+        return container;
+    }
+
+    function recalculateState(stateValue, dbCards) {
+        const nextState = structuredClone(stateValue);
+        nextState.missionIds = Array.isArray(nextState.missionIds) ? nextState.missionIds : [];
+        nextState.deploymentIds = Array.isArray(nextState.deploymentIds) ? nextState.deploymentIds : [];
+        nextState.roster = Array.isArray(nextState.roster) ? nextState.roster : [];
+        nextState.tacticalCardIds = Array.isArray(nextState.tacticalCardIds) ? nextState.tacticalCardIds : [];
+
+        nextState.gasLimit = Math.floor(Number(nextState.mineralsLimit || 0) * 0.10);
+
+        let gasUsed = 0;
+        nextState.tacticalCardIds.forEach(function (id) {
+            const card = dbCards.find(function (item) {
+                return item.id === id;
+            });
+            if (card) {
+                gasUsed += Number(card.cost || 0);
+            }
+        });
+        nextState.gasUsed = gasUsed;
+
+        let resourceTotal = 0;
+        const addResource = function (cardId) {
+            const card = dbCards.find(function (item) {
+                return item.id === cardId;
+            });
+            if (!card) {
+                return;
+            }
+            if (card.resource !== undefined && card.resource !== null && String(card.resource).trim() !== '') {
+                resourceTotal += parseResource(card.resource);
+            }
+        };
+
+        if (nextState.factionCardId) {
+            addResource(nextState.factionCardId);
+        }
+        nextState.tacticalCardIds.forEach(function (id) {
+            addResource(id);
+        });
+        nextState.resourceTotal = resourceTotal;
+
+        let mineralsUsed = 0;
+        let supplyUsed = 0;
+        nextState.roster.forEach(function (unit) {
+            let upgradeCost = 0;
+            (unit.activeUpgrades || []).forEach(function (index) {
+                const upgrade = (unit.availableUpgrades || [])[index];
+                if (!upgrade) {
+                    return;
+                }
+                upgradeCost += unit.size === 'small' ? Number(upgrade.costS || 0) : Number(upgrade.costL || 0);
+            });
+            mineralsUsed += Number(unit.baseCost || 0) + upgradeCost;
+            supplyUsed += Number(unit.supply || 0);
+        });
+
+        nextState.mineralsUsed = mineralsUsed;
+        nextState.supplyUsed = supplyUsed;
+        return nextState;
+    }
+
+    async function downloadRosterPdfBySeed(seed) {
+        const cleanSeed = normalizeSeed(seed);
+        if (!cleanSeed) {
+            throw new Error('Invalid roster seed.');
+        }
+
+        rosterPdfCache.activeSeed = cleanSeed;
+        setDownloadingState(cleanSeed, true, 'PDF...');
+
+        try {
+            const rawState = await fetchSharedRoster(cleanSeed);
+            const results = await Promise.all([
+                loadTacticalCards(),
+                loadArmyUnits(),
+                loadGameCards(),
+            ]);
+
+            const dbCards = results[0];
+            const dbUnits = results[1];
+            const dbGameCards = results[2];
+
+            const preparedState = recalculateState(rawState, dbCards);
+            await ensureHtml2Pdf();
+
+            const printContent = generatePrintLayout(preparedState, dbUnits, dbCards, dbGameCards, cleanSeed);
+            const options = {
+                margin: 10,
+                filename: 'SC_TMG_' + (preparedState.faction || 'Unknown') + '_Roster_' + cleanSeed + '.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            };
+
+            await window.html2pdf().set(options).from(printContent).save();
+        } finally {
+            setDownloadingState(cleanSeed, false);
+            rosterPdfCache.activeSeed = null;
+        }
+    }
+
+    function fetchReports(pushHistory) {
+        renderLoading();
+        const queryString = buildQueryString();
+        const apiUrl = '/api/reports?' + queryString;
+        const pageUrl = '/reports?' + queryString;
+
+        fetch(apiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (response) {
+                return response.json().catch(function () {
+                    return { ok: false, error: 'Could not parse reports response.' };
+                });
+            })
+            .then(function (payload) {
+                if (payload && payload.ok) {
+                    state.page = Number(payload.current_page || state.page || 1);
+                    state.perPage = Number(payload.per_page || state.perPage || 25);
+                }
+                renderReports(payload);
+                if (pushHistory) {
+                    window.history.replaceState({}, '', pageUrl);
+                }
+            })
+            .catch(function () {
+                countNode.textContent = '0 matches shown';
+                renderState('Database connection error', 'Could not load match reports.', true);
+            });
+    }
+
+    content.addEventListener('click', function (event) {
+        const paginationLink = event.target.closest('[data-page-link]');
+        if (paginationLink) {
+            event.preventDefault();
+            state.page = Number(paginationLink.getAttribute('data-page-link') || '1');
+            fetchReports(true);
+            return;
+        }
+
+        const rankedToggle = event.target.closest('[data-ranked-toggle]');
+        if (rankedToggle) {
+            event.preventDefault();
+            state.rankedOnly = !state.rankedOnly;
+            state.page = 1;
+            fetchReports(true);
+            return;
+        }
+
+        const rosterDownloadLink = event.target.closest('[data-roster-download]');
+        if (rosterDownloadLink) {
+            event.preventDefault();
+            const rosterId = rosterDownloadLink.getAttribute('data-roster-download') || '';
+            if (!rosterId || rosterPdfCache.activeSeed) {
+                return;
+            }
+            downloadRosterPdfBySeed(rosterId).catch(function (error) {
+                console.error(error);
+                alert(error.message || 'Failed to generate PDF.');
+            });
+        }
+    });
+
+    fetchReports(false);
+});
+</script>
+{% endblock %}

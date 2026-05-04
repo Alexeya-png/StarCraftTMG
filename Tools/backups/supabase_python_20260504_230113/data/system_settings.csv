@@ -1,0 +1,5 @@
+id,setting_key,setting_value,updated_at,updated_by_admin
+1,default_elo,1000,2026-03-27 05:26:06.754813,1
+2,elo_k_factor,32,2026-03-27 05:26:06.754813,1
+3,site_name,StarCraft ELO,2026-03-27 05:26:06.754813,1
+8,current_league_id,1,2026-04-25 23:21:16.082656,

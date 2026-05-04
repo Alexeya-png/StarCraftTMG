@@ -1,0 +1,674 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section">
+    <div class="container league-results-page">
+        <div class="league-page-head">
+            <div>
+                <h1>League Results</h1>
+            </div>
+        </div>
+
+        <div class="league-results-content" data-leagues-content>
+            <div class="table-loader-card" data-loading-state>
+                <div class="table-loader-spinner" aria-hidden="true"></div>
+                <div class="table-loader-text">Loading data...</div>
+            </div>
+        </div>
+
+        <section class="league-rules-card" aria-labelledby="league-rules-title">
+            <div class="league-rules-head">
+                <div>
+                    <p class="league-rules-kicker">League rules</p>
+                    <h2 id="league-rules-title">How the league works</h2>
+                </div>
+                <div class="league-rules-badges">
+                </div>
+            </div>
+
+            <div class="league-rules-grid">
+                <article class="league-rules-panel league-rules-panel-wide">
+                    <h3>Main idea</h3>
+                    <p>A new league starts when a new wave of miniatures is released. The site will show the current league and the previous league, so players can compare the active season with the last completed season.</p>
+                    <p>League standings use only rated matches from the selected league. Unrated matches do not affect league points, race leaders, activity leaders, badges or league colours.</p>
+                </article>
+
+                <article class="league-rules-panel league-rules-panel-toggle" data-points-toggle-card>
+                    <button type="button" class="league-rules-toggle-head" data-points-toggle-button aria-pressed="false" aria-label="Toggle between base points and favorite points">
+                        <h3 data-points-toggle-title>Base points</h3>
+                        <span class="league-rules-toggle-hint" data-points-toggle-hint>Tap to view favorite points</span>
+                    </button>
+                    <div class="league-formula-list" data-points-toggle-list>
+                        <div><strong>Win</strong><span>3 points</span></div>
+                        <div><strong>Draw</strong><span>1 point</span></div>
+                        <div><strong>Loss</strong><span>-1 point</span></div>
+                    </div>
+                    <p class="league-rules-note" data-points-toggle-note>These are the normal values. Head-to-head rules can change the points when one player already leads the same opponent by 2 or more wins.</p>
+                </article>
+
+                <article class="league-rules-panel">
+                    <h3>Opponent activity requirement</h3>
+                    <p>Points are counted only when the opponent has played more than 3 rated matches in the same league.</p>
+                    <p class="league-rules-note">If the opponent has 1–3 rated matches, the match still counts for games, record and winrate, but gives 0 league points. Once the opponent reaches 4 rated matches, points can be counted normally.</p>
+                </article>
+
+                <article class="league-rules-panel">
+                    <h3>Head-to-head favorite rule</h3>
+                    <p>If one player leads the same opponent by <strong>2 or more wins</strong>, that player becomes the head-to-head favorite in that matchup.</p>
+                    <p class="league-rules-note">The favorite gets <strong>+1</strong> point for a win and <strong>-2</strong> points for a loss. The trailing player keeps the normal <strong>+3</strong> points for a win and <strong>-1</strong> point for a loss.</p>
+                </article>
+
+                <article class="league-rules-panel">
+                    <h3>Draws against a favorite</h3>
+                    <p>If a player leads the same opponent by <strong>2 or more wins</strong>, a draw gives <strong>0</strong> points to the favorite and <strong>+1</strong> point to the trailing player.</p>
+                    <p class="league-rules-note">Example: Player A leads Player B 2:0. If their next game is a draw, A gets 0 points and B gets +1 point.</p>
+                </article>
+
+                <article class="league-rules-panel league-rules-panel-wide">
+                    <h3>Badges</h3>
+                    <p>The top player of each race in a league can receive a race season badge. During the current season, race leaders receive a Contender badge for their faction. After the season ends, the final race leaders receive Champion badges for their faction. Badges are visible on the player profile.</p>
+
+                    <details class="league-champion-preview">
+                        <summary>Show Champion badges</summary>
+                        <div class="league-champion-preview-grid" aria-label="Champion badge preview">
+                            <figure class="league-champion-preview-item">
+                                <img src="/static/badges/champion-terran.webp" alt="Champion Terran badge" loading="lazy">
+                                <figcaption>Terran Champion</figcaption>
+                            </figure>
+                            <figure class="league-champion-preview-item">
+                                <img src="/static/badges/champion-protoss.webp" alt="Champion Protoss badge" loading="lazy">
+                                <figcaption>Protoss Champion</figcaption>
+                            </figure>
+                            <figure class="league-champion-preview-item">
+                                <img src="/static/badges/champion-zerg.webp" alt="Champion Zerg badge" loading="lazy">
+                                <figcaption>Zerg Champion</figcaption>
+                            </figure>
+                        </div>
+                    </details>
+                </article>
+            </div>
+
+            <div class="league-faq-card">
+                <h3>Mini FAQ</h3>
+                <details>
+                    <summary>Do league points change ELO?</summary>
+                    <p>No. ELO and league points are separate. ELO is the rating system. Points are used only for league standings.</p>
+                </details>
+                <details>
+                    <summary>Do unrated games count?</summary>
+                    <p>No. League results use rated matches only.</p>
+                </details>
+                <details>
+                    <summary>Why can a win give 0 points?</summary>
+                    <p>A win can give 0 points when the opponent has not played enough rated matches in the league. Head-to-head favorites now get +1 point for a win instead of 0.</p>
+                </details>
+                <details>
+                    <summary>Why can a win give only 1 point?</summary>
+                    <p>If a player already leads the same opponent by 2 or more wins, that player is the head-to-head favorite and gets only +1 point for another win.</p>
+                </details>
+                <details>
+                    <summary>When are badges final?</summary>
+                    <p>Current league badges and colours reflect current results. Final season badges are awarded when the league is completed.</p>
+                </details>
+            </div>
+        </section>
+    </div>
+</section>
+
+<style>
+.league-rules-card {
+    margin-top: 28px;
+    padding: 24px;
+    border-radius: 24px;
+    background:
+        radial-gradient(circle at top right, rgba(92, 140, 255, 0.12), transparent 30%),
+        linear-gradient(180deg, rgba(17, 25, 53, 0.98) 0%, rgba(7, 13, 31, 0.99) 100%);
+    border: 1px solid rgba(139, 174, 255, 0.18);
+    box-shadow: var(--shadow);
+}
+
+.league-rules-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 20px;
+}
+
+.league-rules-kicker {
+    margin: 0 0 8px;
+    color: var(--accent-soft);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.league-rules-head h2,
+.league-rules-panel h3,
+.league-faq-card h3 {
+    margin: 0;
+}
+
+.league-rules-badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.league-rules-badges span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgba(92, 140, 255, 0.14);
+    border: 1px solid rgba(139, 174, 255, 0.24);
+    color: #dce7ff;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.league-rules-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.league-rules-panel,
+.league-faq-card {
+    padding: 18px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.league-rules-panel-wide {
+    grid-column: 1 / -1;
+}
+
+.league-rules-panel p,
+.league-faq-card p {
+    margin: 10px 0 0;
+    color: var(--muted);
+    line-height: 1.55;
+}
+
+.league-rules-note {
+    font-size: 14px;
+    color: rgba(220, 231, 255, 0.78) !important;
+}
+
+.league-rules-panel-toggle {
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.league-rules-panel-toggle.is-favorite {
+    background: rgba(92, 140, 255, 0.06);
+    border-color: rgba(139, 174, 255, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(92, 140, 255, 0.06);
+}
+
+.league-rules-toggle-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.league-rules-toggle-head h3 {
+    transition: color 0.18s ease;
+}
+
+.league-rules-toggle-head:hover h3,
+.league-rules-toggle-head:focus-visible h3 {
+    color: var(--accent-soft);
+}
+
+.league-rules-toggle-head:focus-visible {
+    outline: 2px solid rgba(139, 174, 255, 0.38);
+    outline-offset: 4px;
+    border-radius: 10px;
+}
+
+.league-rules-toggle-hint {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(92, 140, 255, 0.1);
+    border: 1px solid rgba(139, 174, 255, 0.18);
+    color: #dce7ff;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.league-formula-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.league-formula-list div {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(6, 12, 29, 0.72);
+    border: 1px solid rgba(139, 174, 255, 0.12);
+}
+
+.league-formula-list strong {
+    color: #f3f5ff;
+}
+
+.league-formula-list span {
+    color: var(--accent-soft);
+    font-weight: 800;
+}
+
+.league-champion-preview {
+    margin-top: 16px;
+}
+
+.league-champion-preview summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: rgba(245, 186, 73, 0.12);
+    border: 1px solid rgba(245, 186, 73, 0.28);
+    color: #ffe28a;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    user-select: none;
+}
+
+.league-champion-preview summary:hover {
+    background: rgba(245, 186, 73, 0.18);
+    border-color: rgba(245, 186, 73, 0.42);
+}
+
+.league-champion-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.league-champion-preview-item {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 20px 14px;
+    border-radius: 16px;
+    background: rgba(6, 12, 29, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.league-champion-preview-item img {
+    display: block;
+    width: 170px;
+    height: 170px;
+    object-fit: contain;
+    filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.36));
+}
+
+.league-champion-preview-item figcaption {
+    color: #f3f5ff;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.league-faq-card {
+    margin-top: 14px;
+}
+
+.league-faq-card details {
+    margin-top: 10px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(6, 12, 29, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.league-faq-card summary {
+    cursor: pointer;
+    color: #f3f5ff;
+    font-weight: 800;
+}
+
+
+@media (max-width: 640px) {
+    .league-champion-preview-item img {
+        width: 130px;
+        height: 130px;
+    }
+
+    .league-champion-preview-item {
+        padding: 16px 12px;
+    }
+}
+
+@media (max-width: 900px) {
+    .league-rules-head {
+        flex-direction: column;
+    }
+
+    .league-rules-badges {
+        justify-content: flex-start;
+    }
+
+    .league-rules-grid,
+    .league-champion-preview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .league-champion-preview-item img {
+        width: 96px;
+        height: 96px;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const content = document.querySelector('[data-leagues-content]');
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function renderState(title, text, isError) {
+        content.innerHTML = '<div class="state-card' + (isError ? ' state-card-error' : '') + '"><h2>' + escapeHtml(title) + '</h2><p>' + escapeHtml(text) + '</p></div>';
+    }
+
+    function raceSlugFromPlayer(player) {
+        return String((player && player.priority_race_slug) || (player && player.priority_race) || '').trim().toLowerCase();
+    }
+
+    function raceClassName(value) {
+        const raceSlug = String(value || '').trim().toLowerCase();
+        if (['terran', 'protoss', 'zerg'].includes(raceSlug)) {
+            return ' race-accent-' + raceSlug;
+        }
+        return '';
+    }
+
+    function renderPlayerIdentity(player, extraClass) {
+        if (!player) {
+            return '';
+        }
+
+        const flagHtml = player.flag_url ? '<img class="country-flag-image player-flag" src="' + escapeHtml(player.flag_url) + '" alt="">' : '';
+        const raceSlug = raceSlugFromPlayer(player);
+        const raceLabel = player.priority_race || '';
+        const raceHtml = ['terran', 'protoss', 'zerg'].includes(raceSlug)
+            ? '<span class="league-player-race' + raceClassName(raceSlug) + '"><img class="race-inline-icon" src="/static/Race/' + escapeHtml(raceSlug) + '.svg" alt="' + escapeHtml(raceLabel) + ' icon"><span>' + escapeHtml(raceLabel) + '</span></span>'
+            : '';
+
+        return '<span class="league-player-identity ' + escapeHtml(extraClass || '') + '">'
+            + flagHtml
+            + raceHtml
+            + '<span class="league-player-name">' + escapeHtml(player.name || '') + '</span>'
+            + '</span>';
+    }
+
+    function renderPlayerLink(player) {
+        if (!player) {
+            return '';
+        }
+        return '<a class="league-player-link" href="' + escapeHtml(player.profile_url || '#') + '">' + renderPlayerIdentity(player, 'league-player-identity-featured') + '</a>';
+    }
+
+    function renderPlayerInline(player) {
+        return '<a class="player-profile-link" href="' + escapeHtml(player.profile_url || '#') + '">'
+            + '<div class="sc2-player-inline polished-player-inline">'
+            + renderPlayerIdentity(player, 'league-player-identity-table')
+            + '</div>'
+            + '</a>';
+    }
+
+    function pointsDisplay(player) {
+        return escapeHtml((player && player.points_display) || (player && player.points) || 0);
+    }
+
+    function renderPointsValue(player, pointsRules) {
+        return '<span class="league-points-help" title="' + escapeHtml(pointsRules || '') + '">' + pointsDisplay(player) + '</span>';
+    }
+
+    function renderLeagueBadge(badge, raceSlug, badgeKind) {
+        const cleanRace = String(raceSlug || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        const cleanKind = 'contender';
+
+        if (!['terran', 'protoss', 'zerg'].includes(cleanRace)) {
+            return '';
+        }
+
+        const title = badge && (badge.description || badge.label)
+            ? badge.description || badge.label
+            : cleanKind + ' ' + cleanRace;
+
+        return '<span class="league-race-image-badge league-race-image-badge-' + escapeHtml(cleanKind) + '-' + escapeHtml(cleanRace) + '" title="' + escapeHtml(title) + '" aria-label="' + escapeHtml(title) + '"></span>';
+    }
+
+    function renderTopPlayerRows(players, pointsRules) {
+        return players.map(function (player) {
+            return '<tr class="leaderboard-row-link" data-href="' + escapeHtml(player.profile_url || '#') + '" tabindex="0" aria-label="Open ' + escapeHtml(player.name || '') + ' profile">'
+                + '<td class="value-rank">' + escapeHtml(player.place || '') + '</td>'
+                + '<td class="value-player">' + renderPlayerInline(player) + '</td>'
+                + '<td class="value-wins">' + renderPointsValue(player, pointsRules) + '</td>'
+                + '<td class="value-games-all">' + escapeHtml(player.matches_count || 0) + '</td>'
+                + '<td class="value-losses">' + escapeHtml(player.record_display || '') + '</td>'
+                + '<td class="value-winrate">' + escapeHtml(player.win_rate_display || '') + '</td>'
+                + '<td class="value-elo">' + escapeHtml(player.current_elo_display || '') + '</td>'
+                + '</tr>';
+        }).join('');
+    }
+
+    function renderLeagueSection(section, index) {
+        const league = section.league || {};
+        const bestPlayer = section.best_player || null;
+        const activePlayer = section.most_active_player || null;
+        const standings = Array.isArray(section.standings) ? section.standings : [];
+        const raceLeaders = Array.isArray(section.race_leaders) ? section.race_leaders : [];
+        const pointsRules = section.points_rules || 'Win = 3 points. Draw = 1 point. Loss = -1 point. Points count only if the opponent has played more than 3 ranked matches in this league. If a player leads the same opponent by 2 or more wins, that player is the head-to-head favorite. A favorite gets +1 point for a win, 0 points for a draw, and -2 points for a loss. The trailing player keeps the normal +3 points for a win, +1 point for a draw, and -1 point for a loss.';
+
+        const bestPlayerHtml = bestPlayer
+            ? renderPlayerLink(bestPlayer) + '<div class="league-hero-meta">' + renderPointsValue(bestPlayer, pointsRules) + ' pts · ' + escapeHtml(bestPlayer.record_display || '') + ' · ' + escapeHtml(bestPlayer.win_rate_display || '') + '</div>'
+            : '<div class="league-empty">No ranked matches yet</div>';
+
+        const activePlayerHtml = activePlayer
+            ? renderPlayerLink(activePlayer) + '<div class="league-hero-meta">' + escapeHtml(activePlayer.matches_count || 0) + ' matches · ' + escapeHtml(activePlayer.record_display || '') + '</div>'
+            : '<div class="league-empty">No ranked matches yet</div>';
+
+        const raceLeaderHtml = raceLeaders.map(function (entry) {
+            const player = entry.player || null;
+            const badge = entry.badge || null;
+            const raceSlug = String(entry.race || '').trim().toLowerCase();
+            const badgeKind = 'contender';
+            const badgeHtml = player ? renderLeagueBadge(badge, raceSlug, badgeKind) : '';
+            const playerHtml = player
+                ? renderPlayerLink(player) + '<div class="league-race-meta">' + renderPointsValue(player, pointsRules) + ' pts · ' + escapeHtml(player.record_display || '') + ' · ' + escapeHtml(player.win_rate_display || '') + '</div>'
+                : '<div class="league-empty">No ' + escapeHtml(entry.race || '') + ' leader yet</div>';
+
+            return '<article class="league-race-card league-race-card-' + escapeHtml(raceSlug) + '">'
+                + '<div class="league-race-head">'
+                + '<span class="league-race-label' + raceClassName(raceSlug) + '">' + escapeHtml(entry.race || '') + '</span>'
+                + badgeHtml
+                + '</div>'
+                + playerHtml
+                + '</article>';
+        }).join('');
+
+        const standingsHtml = standings.length
+            ? '<div class="leaderboard-table-wrap polished-table-wrap league-table-wrap">'
+                + '<table class="leaderboard-table leaderboard-table-sc2 leaderboard-table-polished leaderboard-table-tight league-standings-table">'
+                + '<colgroup><col class="col-rank"><col class="col-player"><col class="col-games-all"><col class="col-wins"><col class="col-losses"><col class="col-winrate"><col class="col-elo"></colgroup>'
+                + '<thead><tr><th class="col-rank">Rank</th><th class="col-player">Player</th><th class="col-games-all">Points</th><th class="col-wins league-points-help" title="' + escapeHtml(pointsRules) + '">Matches</th><th class="col-losses">Record</th><th class="col-winrate">Winrate</th><th class="col-elo">ELO</th></tr></thead>'
+                + '<tbody>' + renderTopPlayerRows(standings, pointsRules) + '</tbody>'
+                + '</table>'
+                + '</div>'
+            : '<div class="league-empty-block">No ranked matches in this league yet.</div>';
+
+        return '<article class="league-section-card">'
+            + '<div class="league-section-head">'
+            + '<div>'
+            + '<div class="league-kicker">' + (index === 0 ? 'Current league' : 'Previous league') + '</div>'
+            + '<h2>' + escapeHtml(league.name || '') + '</h2>'
+            + (league.date_range_label ? '<p class="league-date-range">' + escapeHtml(league.date_range_label) + '</p>' : '')
+            + '</div>'
+            + '<div class="league-summary-meta">'
+            + '<span class="league-meta-pill">' + escapeHtml(section.matches_count || 0) + ' ranked matches</span>'
+            + '<span class="league-meta-pill">' + escapeHtml(section.players_count || 0) + ' players</span>'
+            + '</div>'
+            + '</div>'
+            + '<div class="league-hero-grid">'
+            + '<article class="league-hero-card league-hero-card-best"><span class="league-hero-label">Best overall</span>' + bestPlayerHtml + '</article>'
+            + '<article class="league-hero-card league-hero-card-active"><span class="league-hero-label">Most active</span>' + activePlayerHtml + '</article>'
+            + '</div>'
+            + '<div class="league-race-grid">' + raceLeaderHtml + '</div>'
+            + '<div class="league-standings-card league-standings-card-leaderboard">'
+            + '<div class="league-standings-head"><h3>Top players</h3></div>'
+            + standingsHtml
+            + '</div>'
+            + '</article>';
+    }
+
+    function renderPayload(payload) {
+        if (!payload || !payload.ok) {
+            renderState('League results are unavailable', (payload && payload.error) || 'Could not load league results.', true);
+            return;
+        }
+
+        const sections = Array.isArray(payload.league_sections) ? payload.league_sections : [];
+        if (!sections.length) {
+            renderState('No leagues found', 'Add leagues in Supabase and set the current league in system_settings to show results here.', false);
+            return;
+        }
+
+        content.innerHTML = sections.map(renderLeagueSection).join('');
+    }
+
+    content.addEventListener('click', function (event) {
+        const row = event.target.closest('[data-href]');
+        if (!row || event.target.closest('a')) {
+            return;
+        }
+        const href = row.getAttribute('data-href');
+        if (href) {
+            window.location.href = href;
+        }
+    });
+
+    content.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+        const row = event.target.closest('[data-href]');
+        if (!row) {
+            return;
+        }
+        event.preventDefault();
+        const href = row.getAttribute('data-href');
+        if (href) {
+            window.location.href = href;
+        }
+    });
+
+    (function setupPointsToggle() {
+        const card = document.querySelector('[data-points-toggle-card]');
+        const button = document.querySelector('[data-points-toggle-button]');
+        const title = document.querySelector('[data-points-toggle-title]');
+        const hint = document.querySelector('[data-points-toggle-hint]');
+        const list = document.querySelector('[data-points-toggle-list]');
+        const note = document.querySelector('[data-points-toggle-note]');
+
+        if (!card || !button || !title || !hint || !list || !note) {
+            return;
+        }
+
+        const states = {
+            base: {
+                title: 'Base points',
+                hint: 'Tap to view favorite points',
+                rows: [
+                    { label: 'Win', value: '3 points' },
+                    { label: 'Draw', value: '1 point' },
+                    { label: 'Loss', value: '-1 point' },
+                ],
+                note: 'These are the normal values. Head-to-head rules can change the points when one player already leads the same opponent by 2 or more wins.',
+            },
+            favorite: {
+                title: 'Favorite points',
+                hint: 'Tap to view base points',
+                rows: [
+                    { label: 'Win', value: '1 point' },
+                    { label: 'Draw', value: '0 points' },
+                    { label: 'Loss', value: '-2 points' },
+                ],
+                note: 'These values apply only to the head-to-head favorite, meaning the player who already leads the same opponent by 2 or more wins.',
+            },
+        };
+
+        let currentState = 'base';
+
+        function renderRows(rows) {
+            list.innerHTML = rows.map(function (row) {
+                return '<div><strong>' + escapeHtml(row.label) + '</strong><span>' + escapeHtml(row.value) + '</span></div>';
+            }).join('');
+        }
+
+        function applyState(name) {
+            const state = states[name] || states.base;
+            currentState = name;
+            title.textContent = state.title;
+            hint.textContent = state.hint;
+            note.textContent = state.note;
+            renderRows(state.rows);
+            button.setAttribute('aria-pressed', name === 'favorite' ? 'true' : 'false');
+            card.classList.toggle('is-favorite', name === 'favorite');
+        }
+
+        button.addEventListener('click', function () {
+            applyState(currentState === 'base' ? 'favorite' : 'base');
+        });
+
+        applyState('base');
+    })();
+
+    fetch('/api/leagues', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (response) {
+            return response.json().catch(function () {
+                return { ok: false, error: 'Could not parse league results response.' };
+            });
+        })
+        .then(renderPayload)
+        .catch(function () {
+            renderState('League results are unavailable', 'Could not load league results.', true);
+        });
+});
+</script>
+{% endblock %}

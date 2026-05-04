@@ -1,0 +1,2 @@
+id,username,password_hash,role,is_active,created_at,last_login_at
+1,admin,pbkdf2_sha256$260000$f7925a4585e144ca1ac040c22a0d4654$086c0ca9b5b353d03dc1d911b72d50fa8c702f0a6d8c5f6ebe119786f4f29448,admin,t,2026-03-26 01:45:28.719768,

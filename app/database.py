@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import os
@@ -142,17 +143,73 @@ COUNTRY_NAME_BY_CODE = {
 RACE_OPTIONS = ('Терран', 'Протосс', 'Зерг')
 GAME_TYPE_OPTIONS = ('1к', '2к', 'Grand Offensive')
 DEFAULT_K_FACTOR = 32
-TOP_PLAYER_K_FACTOR = 10
-HIGH_RATING_K_FACTOR = 16
 BASE_RATING_K_FACTOR = 32
-NEW_PLAYER_K_FACTOR = 40
-NEW_PLAYER_MATCHES_LIMIT = 5
+ESTABLISHED_PLAYER_K_FACTOR = 24
+STABLE_PLAYER_K_FACTOR = 16
+ESTABLISHED_PLAYER_RANKED_MATCHES_THRESHOLD = 15
+STABLE_PLAYER_RANKED_MATCHES_THRESHOLD = 40
+RANKED_1K_ELO_MULTIPLIER = 0.35
+WINNER_SEED_ELO_BONUS_MULTIPLIER = 1.0
 ACTIVE_PLAYER_DAYS_WINDOW = 365
 DATA_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_DATA_CACHE_TTL_SECONDS', '300') or '300'))
+LEAGUE_SUMMARY_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_LEAGUE_SUMMARY_CACHE_TTL_SECONDS', '300') or '300'))
+PAGE_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_PAGE_CACHE_TTL_SECONDS', '900') or '900'))
 TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS = max(0, int(os.getenv('TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS', '3600') or '3600'))
 FEEDBACK_MESSAGE_MAX_LENGTH = 300
 FEEDBACK_PLAYER_NAME_MAX_LENGTH = 80
 FEEDBACK_TABLE_NAME = 'admin_feedback_messages'
+LEAGUE_TABLE_NAME = 'leagues'
+LEAGUE_BADGES_TABLE_NAME = 'player_league_badges'
+CURRENT_LEAGUE_SETTING_KEY = 'current_league_id'
+CURRENT_LEAGUE_SETTING_FALLBACK_KEYS = ('current_league_id', 'current_league')
+
+LEAGUE_BADGE_KIND_CHAMPION = 'champion'
+LEAGUE_BADGE_KIND_CONTENDER = 'contender'
+LEAGUE_BADGE_KINDS = (LEAGUE_BADGE_KIND_CHAMPION, LEAGUE_BADGE_KIND_CONTENDER)
+LEAGUE_BADGE_RACES = ('Terran', 'Protoss', 'Zerg')
+LEAGUE_BADGE_RACE_SLUGS = {
+    'Terran': 'terran',
+    'Protoss': 'protoss',
+    'Zerg': 'zerg',
+}
+LEAGUE_BADGE_KIND_TITLES = {
+    LEAGUE_BADGE_KIND_CHAMPION: 'Champion',
+    LEAGUE_BADGE_KIND_CONTENDER: 'Contender',
+}
+LEAGUE_BADGE_KIND_ICONS = {
+    LEAGUE_BADGE_KIND_CHAMPION: '🏆',
+    LEAGUE_BADGE_KIND_CONTENDER: '⚔',
+}
+LEAGUE_BADGE_RACE_ICONS = {
+    'Terran': '⚙',
+    'Protoss': 'ψ',
+    'Zerg': '☣',
+}
+LEAGUE_BADGE_DEFINITIONS = {
+    f'{kind}_{race_slug}': {
+        'title': LEAGUE_BADGE_KIND_TITLES[kind],
+        'icon': LEAGUE_BADGE_KIND_ICONS[kind],
+        'race_icon': LEAGUE_BADGE_RACE_ICONS[race],
+        'variant': f'{kind}-{race_slug}',
+        'kind': kind,
+        'race': race,
+        'race_slug': race_slug,
+        'image_url': f'/static/badges/{kind}-{race_slug}.png',
+        'description_template': f'{LEAGUE_BADGE_KIND_TITLES[kind]} of {{league_name}} for {race}.',
+    }
+    for kind in LEAGUE_BADGE_KINDS
+    for race, race_slug in LEAGUE_BADGE_RACE_SLUGS.items()
+}
+LEAGUE_HERO_RACES = LEAGUE_BADGE_RACES
+LEAGUE_HEAD_TO_HEAD_POINT_LEAD_LIMIT = 2
+LEAGUE_HEAD_TO_HEAD_HALF_POINTS_AFTER_GAMES = 3
+LEAGUE_POINTS_MIN_OPPONENT_MATCHES = 4
+LEAGUE_POINTS_RULES_TEXT = (
+    'Win = 3 points. Draw = 1 point. Loss = 0 points. '
+    'Points count only if the opponent has played more than 3 ranked matches in this league. '
+    'If a player already leads the same opponent by 2 wins, the next win against that opponent gives 0 points. '
+    'From the 4th head-to-head match between the same players, earned points are reduced by 50%.'
+)
 
 _DATA_CACHE_LOCK = threading.RLock()
 _SUBMIT_MATCH_LOCK = threading.RLock()
@@ -164,9 +221,73 @@ _DATA_CACHE: dict[str, Any] = {
     'version': 0,
 }
 
+_LEAGUE_SUMMARY_CACHE_LOCK = threading.RLock()
+_LEAGUE_SUMMARY_CACHE: dict[int, dict[str, Any]] = {}
+
+_LEAGUE_CONFIG_CACHE_LOCK = threading.RLock()
+_LEAGUE_CONFIG_CACHE: dict[str, Any] = {
+    'all_leagues': None,
+    'current_league': None,
+    'loaded_at': 0.0,
+}
+
+_PAGE_CACHE_LOCK = threading.RLock()
+_PAGE_CACHE: dict[str, dict[str, Any]] = {}
+
 
 MATCH_META_PREFIX = '[[match_meta:'
 MATCH_META_PATTERN = re.compile(r'^\[\[match_meta:(\{.*?\})\]\]\s*', re.DOTALL)
+
+
+
+def _make_page_cache_key(prefix: str, *parts: Any, **kwargs: Any) -> str:
+    payload = {
+        'parts': parts,
+        'kwargs': kwargs,
+    }
+    try:
+        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str, separators=(',', ':'))
+    except TypeError:
+        encoded = repr(payload)
+    return f'{prefix}:{encoded}'
+
+
+def _get_page_cache(key: str):
+    if PAGE_CACHE_TTL_SECONDS <= 0:
+        return None
+
+    now = time.time()
+    with _PAGE_CACHE_LOCK:
+        cached = _PAGE_CACHE.get(key)
+        if not cached:
+            return None
+        loaded_at = float(cached.get('loaded_at') or 0.0)
+        if loaded_at <= 0 or (now - loaded_at) >= PAGE_CACHE_TTL_SECONDS:
+            _PAGE_CACHE.pop(key, None)
+            return None
+        return copy.deepcopy(cached.get('value'))
+
+
+def _set_page_cache(key: str, value):
+    if PAGE_CACHE_TTL_SECONDS <= 0:
+        return value
+    with _PAGE_CACHE_LOCK:
+        _PAGE_CACHE[key] = {
+            'loaded_at': time.time(),
+            'value': copy.deepcopy(value),
+        }
+    return value
+
+
+def invalidate_page_cache(prefix: str | None = None) -> None:
+    with _PAGE_CACHE_LOCK:
+        if not prefix:
+            _PAGE_CACHE.clear()
+            return
+        clean_prefix = str(prefix)
+        for key in list(_PAGE_CACHE.keys()):
+            if key.startswith(clean_prefix):
+                _PAGE_CACHE.pop(key, None)
 
 
 
@@ -223,31 +344,48 @@ def _extract_match_score_details(row: dict | None) -> dict[str, Any]:
 
     player1_score_source = source.get('player1_score', metadata.get('player1_score'))
     player2_score_source = source.get('player2_score', metadata.get('player2_score'))
+    player1_roster_source = source.get('player1_roster_id', metadata.get('player1_roster_id'))
+    player2_roster_source = source.get('player2_roster_id', metadata.get('player2_roster_id'))
 
     player1_score = _coerce_match_score_value(player1_score_source, allow_blank=True, field_label='Player 1 score')
     player2_score = _coerce_match_score_value(player2_score_source, allow_blank=True, field_label='Player 2 score')
+    player1_roster_id = _normalize_roster_id(player1_roster_source, field_label='Player 1 roster ID') if _normalize_text(player1_roster_source) else ''
+    player2_roster_id = _normalize_roster_id(player2_roster_source, field_label='Player 2 roster ID') if _normalize_text(player2_roster_source) else ''
 
     return {
         'visible_comment': visible_comment,
         'player1_score': player1_score,
         'player2_score': player2_score,
+        'player1_roster_id': player1_roster_id,
+        'player2_roster_id': player2_roster_id,
         'has_score': player1_score is not None and player2_score is not None,
     }
 
 
 
-def _build_match_comment_payload(comment: str | None, player1_score, player2_score) -> str | None:
+def _build_match_comment_payload(
+    comment: str | None,
+    player1_score,
+    player2_score,
+    player1_roster_id: str | None = None,
+    player2_roster_id: str | None = None,
+) -> str | None:
     clean_comment = _normalize_text(comment)
     metadata = {
         'player1_score': _coerce_match_score_value(player1_score, field_label='Player 1 score'),
         'player2_score': _coerce_match_score_value(player2_score, field_label='Player 2 score'),
     }
+
+    if _normalize_text(player1_roster_id):
+        metadata['player1_roster_id'] = _normalize_roster_id(player1_roster_id, field_label='Player 1 roster ID')
+    if _normalize_text(player2_roster_id):
+        metadata['player2_roster_id'] = _normalize_roster_id(player2_roster_id, field_label='Player 2 roster ID')
+
     metadata_blob = json.dumps(metadata, ensure_ascii=False, separators=(',', ':'))
     payload = f'{MATCH_META_PREFIX}{metadata_blob}]]'
     if clean_comment:
         payload = f'{payload} {clean_comment}'
     return payload
-
 
 
 def _format_match_score(player1_score, player2_score) -> str:
@@ -256,6 +394,19 @@ def _format_match_score(player1_score, player2_score) -> str:
     if left_score is None or right_score is None:
         return ''
     return f'{left_score}:{right_score}'
+
+def _normalize_roster_id(value: str | None, *, field_label: str = 'Roster ID') -> str:
+    clean_value = _normalize_text(value).upper()
+    if not clean_value:
+        return ''
+
+    normalized = ''.join(char for char in clean_value if char.isalnum() or char in {'-', '_'})
+    if not normalized:
+        raise ValueError(f'{field_label} is invalid.')
+    if len(normalized) > 80:
+        raise ValueError(f'{field_label} must be at most 80 characters.')
+    return normalized
+
 
 
 def _slugify(value: str | None) -> str:
@@ -505,15 +656,60 @@ def _calculate_expected_score(player_elo: int, opponent_elo: int) -> float:
     return 1 / (1 + 10 ** ((opponent_elo - player_elo) / 400))
 
 
-def _determine_k_factor(current_elo: int, matches_played_before_match: int) -> int:
-    if int(matches_played_before_match or 0) < NEW_PLAYER_MATCHES_LIMIT:
-        return NEW_PLAYER_K_FACTOR
-    if int(current_elo or 0) >= 2400:
-        return TOP_PLAYER_K_FACTOR
-    if int(current_elo or 0) >= 2000:
-        return HIGH_RATING_K_FACTOR
+def _determine_k_factor(current_elo: int, ranked_matches_played_before_match: int) -> int:
+    ranked_matches_count = int(ranked_matches_played_before_match or 0)
+    if ranked_matches_count >= STABLE_PLAYER_RANKED_MATCHES_THRESHOLD:
+        return STABLE_PLAYER_K_FACTOR
+    if ranked_matches_count >= ESTABLISHED_PLAYER_RANKED_MATCHES_THRESHOLD:
+        return ESTABLISHED_PLAYER_K_FACTOR
     return BASE_RATING_K_FACTOR
 
+
+def _count_player_ranked_matches_before_submit(player_id: int) -> int:
+    _, total = _rest_select(
+        'rating_history',
+        select='id',
+        filters=[('player_id', 'eq', int(player_id))],
+        limit=1,
+        count=True,
+    )
+    return int(total or 0)
+
+
+def _resolve_ranked_elo_multiplier(game_type: str | None) -> float:
+    clean_game_type = _normalize_text(game_type)
+    if clean_game_type == '1к':
+        return RANKED_1K_ELO_MULTIPLIER
+    return 1.0
+
+
+def _has_player1_seed_bonus(match: dict | None = None, *, player1_roster_id: str | None = None) -> bool:
+    if player1_roster_id is not None:
+        return bool(_normalize_text(player1_roster_id))
+
+    score_details = _extract_match_score_details(match)
+    return bool(score_details.get('player1_roster_id'))
+
+
+def _apply_positive_winner_seed_bonus(delta: int | None) -> int:
+    return int(delta or 0)
+
+
+def _apply_winner_seed_bonus_to_win_elo_result(
+    elo_result: dict,
+    *,
+    winner_old_elo: int,
+    loser_old_elo: int,
+    apply_bonus: bool,
+) -> dict:
+    adjusted_result = dict(elo_result)
+    adjusted_result['winner_seed_bonus_applied'] = False
+    adjusted_result['winner_seed_bonus_multiplier'] = 1.0
+    return adjusted_result
+
+
+def _calculate_elo_delta_with_multiplier(base_k_factor: int, actual_score: float, expected_score: float, multiplier: float) -> int:
+    return int(round(base_k_factor * (actual_score - expected_score) * multiplier))
 
 
 def _calculate_elo_result_for_actual_scores(
@@ -523,15 +719,26 @@ def _calculate_elo_result_for_actual_scores(
     player2_actual_score: float,
     player1_matches_played_before_match: int = 0,
     player2_matches_played_before_match: int = 0,
+    elo_multiplier: float = 1.0,
 ) -> dict:
     expected_player1 = _calculate_expected_score(player1_elo, player2_elo)
     expected_player2 = _calculate_expected_score(player2_elo, player1_elo)
 
-    player1_k_factor = _determine_k_factor(player1_elo, player1_matches_played_before_match)
-    player2_k_factor = _determine_k_factor(player2_elo, player2_matches_played_before_match)
+    player1_base_k_factor = _determine_k_factor(player1_elo, player1_matches_played_before_match)
+    player2_base_k_factor = _determine_k_factor(player2_elo, player2_matches_played_before_match)
 
-    player1_delta = int(round(player1_k_factor * (player1_actual_score - expected_player1)))
-    player2_delta = int(round(player2_k_factor * (player2_actual_score - expected_player2)))
+    player1_delta = _calculate_elo_delta_with_multiplier(
+        player1_base_k_factor,
+        player1_actual_score,
+        expected_player1,
+        elo_multiplier,
+    )
+    player2_delta = _calculate_elo_delta_with_multiplier(
+        player2_base_k_factor,
+        player2_actual_score,
+        expected_player2,
+        elo_multiplier,
+    )
 
     player1_new = max(0, player1_elo + player1_delta)
     player2_new = max(0, player2_elo + player2_delta)
@@ -542,14 +749,17 @@ def _calculate_elo_result_for_actual_scores(
         'player1_delta': player1_delta,
         'player1_expected_score': expected_player1,
         'player1_actual_score': player1_actual_score,
-        'player1_k_factor': player1_k_factor,
+        'player1_k_factor': player1_base_k_factor,
+        'player1_k_factor_effective': player1_base_k_factor * elo_multiplier,
         'player2_old_elo': player2_elo,
         'player2_new_elo': player2_new,
         'player2_delta': player2_delta,
         'player2_expected_score': expected_player2,
         'player2_actual_score': player2_actual_score,
-        'player2_k_factor': player2_k_factor,
-        'k_factor': max(player1_k_factor, player2_k_factor),
+        'player2_k_factor': player2_base_k_factor,
+        'player2_k_factor_effective': player2_base_k_factor * elo_multiplier,
+        'k_factor': max(player1_base_k_factor, player2_base_k_factor),
+        'elo_multiplier': elo_multiplier,
     }
 
 
@@ -558,6 +768,7 @@ def _calculate_elo_result(
     loser_elo: int,
     winner_matches_played_before_match: int = 0,
     loser_matches_played_before_match: int = 0,
+    elo_multiplier: float = 1.0,
 ) -> dict:
     base_result = _calculate_elo_result_for_actual_scores(
         winner_elo,
@@ -566,6 +777,7 @@ def _calculate_elo_result(
         0.0,
         winner_matches_played_before_match,
         loser_matches_played_before_match,
+        elo_multiplier,
     )
 
     return {
@@ -590,6 +802,7 @@ def _calculate_draw_elo_result(
     player2_elo: int,
     player1_matches_played_before_match: int = 0,
     player2_matches_played_before_match: int = 0,
+    elo_multiplier: float = 1.0,
 ) -> dict:
     base_result = _calculate_elo_result_for_actual_scores(
         player1_elo,
@@ -598,6 +811,7 @@ def _calculate_draw_elo_result(
         0.5,
         player1_matches_played_before_match,
         player2_matches_played_before_match,
+        elo_multiplier,
     )
 
     return {
@@ -893,6 +1107,913 @@ def _rest_delete(table: str, *, filters: list[tuple[str, str, Any]] | None = Non
     )
 
 
+
+def _coerce_positive_int(value) -> int | None:
+    clean_value = _normalize_text(value)
+    if not clean_value:
+        return None
+    try:
+        numeric_value = int(clean_value)
+    except (TypeError, ValueError):
+        return None
+    return numeric_value if numeric_value > 0 else None
+
+
+def _prepare_league_row(row: dict | None) -> dict | None:
+    if not row:
+        return None
+
+    league = dict(row)
+    league_id = _coerce_positive_int(league.get('id'))
+    if not league_id:
+        return None
+
+    league['id'] = league_id
+    league['name'] = _normalize_text(league.get('name')) or f'League {league_id}'
+    league['slug'] = _normalize_text(league.get('slug'))
+    league['starts_at'] = _normalize_text(league.get('starts_at') or league.get('start_date'))
+    league['ends_at'] = _normalize_text(league.get('ends_at') or league.get('end_date'))
+
+    date_parts = []
+    if league['starts_at']:
+        date_parts.append(league['starts_at'])
+    if league['ends_at']:
+        date_parts.append(league['ends_at'])
+    league['date_range_label'] = ' – '.join(date_parts)
+    return league
+
+
+def _fetch_league_by_setting_value(setting_value: str | None) -> dict | None:
+    clean_value = _normalize_text(setting_value)
+    if not clean_value:
+        return None
+
+    league_id = _coerce_positive_int(clean_value)
+    if league_id:
+        row = _rest_select(LEAGUE_TABLE_NAME, filters=[('id', 'eq', league_id)], single=True)
+        return _prepare_league_row(row)
+
+    row = _rest_select(LEAGUE_TABLE_NAME, filters=[('slug', 'eq', clean_value)], single=True)
+    prepared = _prepare_league_row(row)
+    if prepared:
+        return prepared
+
+    row = _rest_select(LEAGUE_TABLE_NAME, filters=[('name', 'eq', clean_value)], single=True)
+    return _prepare_league_row(row)
+
+
+def _fetch_current_league_uncached(*, required: bool = False) -> dict | None:
+    setting_rows = _rest_select(
+        'system_settings',
+        select='setting_key,setting_value',
+        filters=[('setting_key', 'in', list(CURRENT_LEAGUE_SETTING_FALLBACK_KEYS))],
+    )
+    settings_by_key = {
+        _normalize_text(row.get('setting_key')): _normalize_text(row.get('setting_value'))
+        for row in setting_rows
+    }
+
+    for key in CURRENT_LEAGUE_SETTING_FALLBACK_KEYS:
+        league = _fetch_league_by_setting_value(settings_by_key.get(key))
+        if league:
+            return league
+
+    if required:
+        raise ValueError(
+            'Current league is not configured. Add a league to Supabase and set '
+            'system_settings.current_league_id to that league id.'
+        )
+    return None
+
+
+def _fetch_all_leagues_uncached() -> list[dict]:
+    rows = _rest_fetch_all(LEAGUE_TABLE_NAME, select='id,name,slug,starts_at,ends_at')
+    leagues: list[dict] = []
+    for row in rows:
+        prepared = _prepare_league_row(row)
+        if prepared:
+            leagues.append(prepared)
+
+    def sort_key(league: dict) -> tuple:
+        parsed_start = _parse_datetime(league.get('starts_at'))
+        parsed_end = _parse_datetime(league.get('ends_at'))
+        return (
+            parsed_start or datetime.min,
+            parsed_end or datetime.min,
+            int(league.get('id') or 0),
+        )
+
+    leagues.sort(key=sort_key, reverse=True)
+    return leagues
+
+
+
+def _league_config_cache_is_fresh() -> bool:
+    loaded_at = float(_LEAGUE_CONFIG_CACHE.get('loaded_at') or 0.0)
+    if loaded_at <= 0:
+        return False
+    if LEAGUE_SUMMARY_CACHE_TTL_SECONDS <= 0:
+        return False
+    return (time.time() - loaded_at) < LEAGUE_SUMMARY_CACHE_TTL_SECONDS
+
+
+def _load_league_config_cache(*, force_refresh: bool = False) -> dict[str, Any]:
+    with _LEAGUE_CONFIG_CACHE_LOCK:
+        if (
+            not force_refresh
+            and _league_config_cache_is_fresh()
+            and _LEAGUE_CONFIG_CACHE.get('all_leagues') is not None
+        ):
+            return {
+                'all_leagues': copy.deepcopy(_LEAGUE_CONFIG_CACHE.get('all_leagues') or []),
+                'current_league': copy.deepcopy(_LEAGUE_CONFIG_CACHE.get('current_league')),
+            }
+
+    all_leagues = _fetch_all_leagues_uncached()
+    current_league = _fetch_current_league_uncached(required=False)
+
+    with _LEAGUE_CONFIG_CACHE_LOCK:
+        _LEAGUE_CONFIG_CACHE['all_leagues'] = copy.deepcopy(all_leagues)
+        _LEAGUE_CONFIG_CACHE['current_league'] = copy.deepcopy(current_league)
+        _LEAGUE_CONFIG_CACHE['loaded_at'] = time.time()
+        return {
+            'all_leagues': copy.deepcopy(all_leagues),
+            'current_league': copy.deepcopy(current_league),
+        }
+
+
+def fetch_current_league(*, required: bool = False, force_refresh: bool = False) -> dict | None:
+    config = _load_league_config_cache(force_refresh=force_refresh)
+    current_league = config.get('current_league')
+    if current_league:
+        return current_league
+    if required:
+        raise ValueError(
+            'Current league is not configured. Add a league to Supabase and set '
+            'system_settings.current_league_id to that league id.'
+        )
+    return None
+
+
+def fetch_all_leagues(*, force_refresh: bool = False) -> list[dict]:
+    config = _load_league_config_cache(force_refresh=force_refresh)
+    return list(config.get('all_leagues') or [])
+
+
+def _fetch_leagues_by_ids(league_ids: list[int]) -> dict[int, dict]:
+    clean_ids = sorted({int(league_id) for league_id in league_ids if _coerce_positive_int(league_id)})
+    if not clean_ids:
+        return {}
+
+    rows = _rest_select(
+        LEAGUE_TABLE_NAME,
+        select='id,name,slug,starts_at,ends_at',
+        filters=[('id', 'in', clean_ids)],
+    )
+    leagues_by_id: dict[int, dict] = {}
+    for row in rows:
+        prepared = _prepare_league_row(row)
+        if prepared:
+            leagues_by_id[int(prepared['id'])] = prepared
+    return leagues_by_id
+
+
+def _select_featured_leagues() -> list[dict]:
+    leagues = fetch_all_leagues()
+    if not leagues:
+        return []
+
+    current_league = fetch_current_league(required=False)
+    if not current_league:
+        return leagues[:2]
+
+    ordered: list[dict] = []
+    current_id = int(current_league['id'])
+    for league in leagues:
+        if int(league['id']) == current_id:
+            ordered.append(league)
+            break
+    for league in leagues:
+        if int(league['id']) != current_id:
+            ordered.append(league)
+        if len(ordered) >= 2:
+            break
+    return ordered[:2]
+
+
+def _player_league_sort_key(row: dict) -> tuple:
+    return (
+        -float(row.get('points') or 0),
+        -float(row.get('win_rate_numeric') or 0.0),
+        -int(row.get('wins') or 0),
+        -int(row.get('matches_count') or 0),
+        -int(row.get('current_elo') or 0),
+        _normalize_player_name(row.get('name')).casefold(),
+    )
+
+
+def _player_activity_sort_key(row: dict) -> tuple:
+    return (
+        -int(row.get('matches_count') or 0),
+        -int(row.get('wins') or 0),
+        -float(row.get('points') or 0),
+        -float(row.get('win_rate_numeric') or 0.0),
+        -int(row.get('current_elo') or 0),
+        _normalize_player_name(row.get('name')).casefold(),
+    )
+
+
+def _format_league_points(value) -> str:
+    try:
+        numeric_value = float(value or 0)
+    except (TypeError, ValueError):
+        return '0'
+
+    if numeric_value.is_integer():
+        return str(int(numeric_value))
+    return f'{numeric_value:.2f}'.rstrip('0').rstrip('.')
+
+
+def _normalize_league_badge_kind(value) -> str:
+    kind = _normalize_text(value).strip().lower()
+    return kind if kind in LEAGUE_BADGE_KINDS else ''
+
+
+def _normalize_league_badge_race(value) -> str:
+    race = _normalize_race_label(value)
+    return race if race in LEAGUE_BADGE_RACE_SLUGS else ''
+
+
+def _build_league_badge_code(*, kind: str, race: str) -> str:
+    clean_kind = _normalize_league_badge_kind(kind)
+    clean_race = _normalize_league_badge_race(race)
+    if not clean_kind or not clean_race:
+        return ''
+    return f'{clean_kind}_{LEAGUE_BADGE_RACE_SLUGS[clean_race]}'
+
+
+def _league_badge_codes_for_kind(kind: str) -> list[str]:
+    clean_kind = _normalize_league_badge_kind(kind)
+    if not clean_kind:
+        return []
+    return [
+        _build_league_badge_code(kind=clean_kind, race=race)
+        for race in LEAGUE_BADGE_RACES
+    ]
+
+
+def _resolve_league_badge_kind_for_league(league_id: int | None) -> str:
+    clean_league_id = _coerce_positive_int(league_id)
+    if not clean_league_id:
+        return LEAGUE_BADGE_KIND_CHAMPION
+
+    try:
+        current_league = fetch_current_league(required=False)
+    except Exception:
+        current_league = None
+
+    current_league_id = _coerce_positive_int((current_league or {}).get('id'))
+    if current_league_id and current_league_id == clean_league_id:
+        return LEAGUE_BADGE_KIND_CONTENDER
+    return LEAGUE_BADGE_KIND_CHAMPION
+
+
+def _build_league_race_badge(*, league: dict | None, race: str, kind: str | None = None) -> dict | None:
+    prepared_league = _prepare_league_row(league) if league else None
+    league_id = _coerce_positive_int((prepared_league or {}).get('id'))
+    badge_kind = _normalize_league_badge_kind(kind) or _resolve_league_badge_kind_for_league(league_id)
+    badge_code = _build_league_badge_code(kind=badge_kind, race=race)
+    if not badge_code:
+        return None
+    return _build_league_badge_display(badge_code=badge_code, league=prepared_league, row={'league_id': league_id})
+
+
+def _apply_head_to_head_volume_modifier(base_points: float, games_before_pair: int) -> float:
+    points = float(base_points or 0)
+    if games_before_pair >= LEAGUE_HEAD_TO_HEAD_HALF_POINTS_AFTER_GAMES:
+        points = points / 2
+    return points
+
+
+def _opponent_has_enough_league_matches(player_match_counts: dict[int, int], opponent_id: int) -> bool:
+    return int(player_match_counts.get(int(opponent_id), 0) or 0) >= LEAGUE_POINTS_MIN_OPPONENT_MATCHES
+
+
+def _prepare_league_player_card(row: dict | None) -> dict | None:
+    if not row:
+        return None
+
+    prepared = dict(row)
+    prepared['profile_url'] = f"/players/{prepared['id']}"
+    prepared['flag_url'] = _resolve_flag_url(prepared.get('country_code'), prepared.get('country_name'))
+    prepared['country_code'] = _resolve_country_code(prepared.get('country_code'), prepared.get('country_name'))
+    prepared['priority_race'] = _normalize_race_label(prepared.get('priority_race'))
+    prepared['priority_race_slug'] = prepared['priority_race'].strip().lower()
+    prepared['current_elo_display'] = _normalize_elo_value(prepared.get('current_elo'))
+    prepared['points_display'] = _format_league_points(prepared.get('points'))
+    prepared['win_rate_display'] = _format_percent(prepared.get('win_rate_numeric'))
+    prepared['record_display'] = f"{int(prepared.get('wins') or 0)}-{int(prepared.get('losses') or 0)}"
+    if int(prepared.get('draws') or 0) > 0:
+        prepared['record_display'] += f"-{int(prepared.get('draws') or 0)}"
+    prepared['matches_label'] = f"{int(prepared.get('matches_count') or 0)} match"
+    if int(prepared.get('matches_count') or 0) != 1:
+        prepared['matches_label'] += 'es'
+    return prepared
+
+
+def _build_league_results_summary(league: dict) -> dict:
+    league_id = int(league['id'])
+    match_rows = _rest_fetch_all(
+        'matches',
+        select='id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,is_ranked,result_type,league_id',
+        filters=[('league_id', 'eq', league_id), ('is_ranked', 'eq', True)],
+        order='played_at.asc,id.asc',
+    )
+
+    player_ids: set[int] = set()
+    player_rows: dict[int, dict] = {}
+    stats_by_player: dict[int, dict] = {}
+
+    league_match_counts_by_player: dict[int, int] = defaultdict(int)
+
+    for match in match_rows:
+        player1_id = int(match.get('player1_id') or 0)
+        player2_id = int(match.get('player2_id') or 0)
+        if player1_id > 0:
+            player_ids.add(player1_id)
+            league_match_counts_by_player[player1_id] += 1
+        if player2_id > 0:
+            player_ids.add(player2_id)
+            league_match_counts_by_player[player2_id] += 1
+
+    if player_ids:
+        for row in _rest_select(
+            'players',
+            select='id,name,current_elo,priority_race,country_code',
+            filters=[('id', 'in', sorted(player_ids))],
+        ):
+            player_rows[int(row['id'])] = dict(row)
+
+    def ensure_player(player_id: int) -> dict:
+        if player_id not in stats_by_player:
+            base_player = dict(player_rows.get(player_id) or {'id': player_id, 'name': f'Player {player_id}'})
+            stats_by_player[player_id] = {
+                'id': player_id,
+                'name': _normalize_player_name(base_player.get('name')) or f'Player {player_id}',
+                'current_elo': int(base_player.get('current_elo') or 0),
+                'priority_race': _normalize_race_label(base_player.get('priority_race')),
+                'country_code': _resolve_country_code(base_player.get('country_code'), base_player.get('country_name')),
+                'country_name': _resolve_country_name(base_player.get('country_code'), base_player.get('country_name')),
+                'matches_count': 0,
+                'wins': 0,
+                'losses': 0,
+                'draws': 0,
+                'points': 0.0,
+            }
+        return stats_by_player[player_id]
+
+    head_to_head: dict[tuple[int, int], dict[str, Any]] = {}
+
+    for match in match_rows:
+        player1_id = int(match.get('player1_id') or 0)
+        player2_id = int(match.get('player2_id') or 0)
+        if player1_id <= 0 or player2_id <= 0:
+            continue
+
+        pair_key = tuple(sorted((player1_id, player2_id)))
+        pair_stats = head_to_head.setdefault(
+            pair_key,
+            {'games': 0, 'wins': defaultdict(int)},
+        )
+        games_before_pair = int(pair_stats.get('games') or 0)
+        pair_wins = pair_stats['wins']
+
+        player1 = ensure_player(player1_id)
+        player2 = ensure_player(player2_id)
+        player1['matches_count'] += 1
+        player2['matches_count'] += 1
+
+        if _is_match_draw(match):
+            player1['draws'] += 1
+            player2['draws'] += 1
+            draw_points = _apply_head_to_head_volume_modifier(1, games_before_pair)
+            if _opponent_has_enough_league_matches(league_match_counts_by_player, player2_id):
+                player1['points'] += draw_points
+            if _opponent_has_enough_league_matches(league_match_counts_by_player, player1_id):
+                player2['points'] += draw_points
+            pair_stats['games'] = games_before_pair + 1
+            continue
+
+        winner_id = int(match.get('winner_player_id') or 0)
+        loser_id = player2_id if winner_id == player1_id else player1_id if winner_id == player2_id else 0
+
+        if winner_id == player1_id:
+            player1['wins'] += 1
+            player2['losses'] += 1
+        elif winner_id == player2_id:
+            player2['wins'] += 1
+            player1['losses'] += 1
+
+        if winner_id in {player1_id, player2_id} and loser_id in {player1_id, player2_id}:
+            winner_lead_before = int(pair_wins[winner_id] or 0) - int(pair_wins[loser_id] or 0)
+            awarded_points = 0.0
+            if (
+                winner_lead_before < LEAGUE_HEAD_TO_HEAD_POINT_LEAD_LIMIT
+                and _opponent_has_enough_league_matches(league_match_counts_by_player, loser_id)
+            ):
+                awarded_points = _apply_head_to_head_volume_modifier(3, games_before_pair)
+
+            if winner_id == player1_id:
+                player1['points'] += awarded_points
+            elif winner_id == player2_id:
+                player2['points'] += awarded_points
+
+            pair_wins[winner_id] += 1
+
+        pair_stats['games'] = games_before_pair + 1
+
+    prepared_players: list[dict] = []
+    for stats in stats_by_player.values():
+        stats['priority_race'] = _normalize_race_label(stats.get('priority_race'))
+        matches_count = int(stats.get('matches_count') or 0)
+        wins = int(stats.get('wins') or 0)
+        draws = int(stats.get('draws') or 0)
+        stats['win_rate_numeric'] = round((((wins + (draws * 0.5)) / matches_count) * 100), 1) if matches_count > 0 else 0.0
+        prepared_players.append(_prepare_league_player_card(stats))
+
+    standings = sorted(prepared_players, key=_player_league_sort_key)
+    for position, player in enumerate(standings, start=1):
+        player['place'] = position
+
+    most_active_player = sorted(prepared_players, key=_player_activity_sort_key)[0] if prepared_players else None
+    best_player = standings[0] if standings else None
+
+    badge_kind = _resolve_league_badge_kind_for_league(league_id)
+    is_current_league = badge_kind == LEAGUE_BADGE_KIND_CONTENDER
+
+    race_leaders: list[dict] = []
+    for race_name in LEAGUE_HERO_RACES:
+        candidates = [row for row in prepared_players if _normalize_race_label(row.get('priority_race')) == race_name]
+        leader = sorted(candidates, key=_player_league_sort_key)[0] if candidates else None
+        race_leaders.append({
+            'race': race_name,
+            'player': leader,
+            'badge': _build_league_race_badge(league=league, race=race_name, kind=badge_kind) if leader else None,
+        })
+
+    return {
+        'league': league,
+        'matches_count': len(match_rows),
+        'players_count': len(prepared_players),
+        'best_player': best_player,
+        'most_active_player': most_active_player,
+        'race_leaders': race_leaders,
+        'standings': standings[:10],
+        'points_rules': LEAGUE_POINTS_RULES_TEXT,
+        'badge_kind': badge_kind,
+        'badge_kind_title': LEAGUE_BADGE_KIND_TITLES.get(badge_kind, ''),
+        'is_current_league': is_current_league,
+    }
+
+
+
+def _get_league_results_summary_cached(league: dict, *, force_refresh: bool = False) -> dict:
+    league_id = int(league['id'])
+    now = time.time()
+
+    if not force_refresh and LEAGUE_SUMMARY_CACHE_TTL_SECONDS > 0:
+        with _LEAGUE_SUMMARY_CACHE_LOCK:
+            cached = _LEAGUE_SUMMARY_CACHE.get(league_id)
+            if cached and (now - float(cached.get('loaded_at') or 0.0)) < LEAGUE_SUMMARY_CACHE_TTL_SECONDS:
+                return copy.deepcopy(cached['summary'])
+
+    summary = _build_league_results_summary(league)
+
+    if LEAGUE_SUMMARY_CACHE_TTL_SECONDS > 0:
+        with _LEAGUE_SUMMARY_CACHE_LOCK:
+            _LEAGUE_SUMMARY_CACHE[league_id] = {
+                'loaded_at': now,
+                'summary': copy.deepcopy(summary),
+            }
+
+    return summary
+
+
+def _fetch_league_results_overview_uncached() -> list[dict]:
+    return [_get_league_results_summary_cached(league) for league in _select_featured_leagues()]
+
+
+def fetch_league_results_overview() -> list[dict]:
+    key = _make_page_cache_key('leagues_overview')
+    cached = _get_page_cache(key)
+    if cached is not None:
+        return cached
+    result = _fetch_league_results_overview_uncached()
+    return _set_page_cache(key, result)
+
+
+def _build_award_name_class(*, is_best_overall: bool = False, is_most_active: bool = False) -> str:
+    if is_best_overall and is_most_active:
+        return 'player-name-award-combo'
+    if is_best_overall:
+        return 'player-name-award-overall'
+    if is_most_active:
+        return 'player-name-award-active'
+    return ''
+
+
+def fetch_current_league_awards() -> dict[str, Any]:
+    current_league = fetch_current_league(required=False)
+    if not current_league:
+        return {
+            'league': None,
+            'best_overall_player_id': None,
+            'most_active_player_id': None,
+            'award_player_ids': set(),
+        }
+
+    summary = _get_league_results_summary_cached(current_league)
+    best_player = summary.get('best_player') or {}
+    most_active_player = summary.get('most_active_player') or {}
+    best_player_id = _coerce_positive_int(best_player.get('id'))
+    active_player_id = _coerce_positive_int(most_active_player.get('id'))
+    award_player_ids = {player_id for player_id in (best_player_id, active_player_id) if player_id}
+
+    return {
+        'league': current_league,
+        'best_overall_player_id': best_player_id,
+        'most_active_player_id': active_player_id,
+        'award_player_ids': award_player_ids,
+    }
+
+
+def decorate_players_with_current_league_awards(players: list[dict]) -> list[dict]:
+    try:
+        awards = fetch_current_league_awards()
+    except Exception:
+        awards = {
+            'best_overall_player_id': None,
+            'most_active_player_id': None,
+        }
+
+    best_player_id = _coerce_positive_int(awards.get('best_overall_player_id'))
+    active_player_id = _coerce_positive_int(awards.get('most_active_player_id'))
+
+    decorated: list[dict] = []
+    for player in players:
+        prepared = dict(player)
+        player_id = _coerce_positive_int(prepared.get('id'))
+        is_best_overall = bool(player_id and best_player_id and player_id == best_player_id)
+        is_most_active = bool(player_id and active_player_id and player_id == active_player_id)
+        prepared['is_current_league_best_overall'] = is_best_overall
+        prepared['is_current_league_most_active'] = is_most_active
+        prepared['award_name_class'] = _build_award_name_class(
+            is_best_overall=is_best_overall,
+            is_most_active=is_most_active,
+        )
+        decorated.append(prepared)
+    return decorated
+
+
+def decorate_player_with_current_league_awards(player: dict) -> dict:
+    decorated = decorate_players_with_current_league_awards([player])
+    return decorated[0] if decorated else dict(player)
+
+
+def _is_missing_league_badges_table_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return LEAGUE_BADGES_TABLE_NAME in message and (
+        'does not exist' in message
+        or 'schema cache' in message
+        or 'could not find the table' in message
+    )
+
+
+def _is_unique_league_badge_conflict_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        LEAGUE_BADGES_TABLE_NAME in message
+        and ('duplicate key' in message or 'unique constraint' in message)
+    )
+
+
+def _normalize_league_badge_code(value) -> str:
+    code = _normalize_text(value).strip().lower().replace('-', '_')
+    return code if code in LEAGUE_BADGE_DEFINITIONS else ''
+
+
+def _build_league_badge_display(*, badge_code: str, league: dict | None, row: dict | None = None) -> dict | None:
+    clean_badge_code = _normalize_league_badge_code(badge_code)
+    if not clean_badge_code:
+        return None
+
+    prepared_league = _prepare_league_row(league) if league else None
+    league_id = _coerce_positive_int((prepared_league or {}).get('id') or (row or {}).get('league_id'))
+    if not league_id:
+        return None
+
+    league_name = _normalize_text((prepared_league or {}).get('name')) or f'Season {league_id}'
+    definition = LEAGUE_BADGE_DEFINITIONS[clean_badge_code]
+    title = definition['title']
+    race = definition['race']
+    race_slug = definition['race_slug']
+    kind = definition['kind']
+    icon = definition['icon']
+    race_icon = definition['race_icon']
+
+    return {
+        'code': clean_badge_code,
+        'label': f'{title} {league_name} · {race}',
+        'short_label': f'{icon} {title} {league_name}',
+        'description': definition['description_template'].format(league_name=league_name),
+        'league_id': league_id,
+        'league_name': league_name,
+        'variant': definition['variant'],
+        'kind': kind,
+        'kind_title': title,
+        'race': race,
+        'race_slug': race_slug,
+        'race_icon': race_icon,
+        'image_url': definition['image_url'],
+        'awarded_at': _normalize_text((row or {}).get('awarded_at')),
+        'awarded_match_id': _coerce_positive_int((row or {}).get('awarded_match_id')),
+    }
+
+
+def _delete_league_badge_rows(rows: list[dict]) -> None:
+    for row in rows or []:
+        row_id = _coerce_positive_int(row.get('id'))
+        if not row_id:
+            continue
+        _rest_delete(LEAGUE_BADGES_TABLE_NAME, filters=[('id', 'eq', row_id)])
+
+
+
+def _ensure_player_league_badge(
+    *,
+    player_id: int,
+    league: dict,
+    badge_code: str,
+    awarded_match_id: int | None = None,
+) -> dict | None:
+    clean_player_id = _coerce_positive_int(player_id)
+    clean_badge_code = _normalize_league_badge_code(badge_code)
+    prepared_league = _prepare_league_row(league)
+    league_id = _coerce_positive_int((prepared_league or {}).get('id'))
+    if not clean_player_id or not clean_badge_code or not prepared_league or not league_id:
+        return None
+
+    existing_for_code = _rest_select(
+        LEAGUE_BADGES_TABLE_NAME,
+        select='id,player_id,league_id,badge_code,awarded_at,awarded_match_id',
+        filters=[
+            ('league_id', 'eq', league_id),
+            ('badge_code', 'eq', clean_badge_code),
+        ],
+        order='awarded_at.desc,id.desc',
+    )
+
+    matching_existing = None
+    rows_to_delete: list[dict] = []
+    for row in existing_for_code or []:
+        if _coerce_positive_int(row.get('player_id')) == clean_player_id and matching_existing is None:
+            matching_existing = row
+        else:
+            rows_to_delete.append(row)
+
+    if rows_to_delete:
+        _delete_league_badge_rows(rows_to_delete)
+
+    existing_for_player = _rest_select(
+        LEAGUE_BADGES_TABLE_NAME,
+        select='id,player_id,league_id,badge_code,awarded_at,awarded_match_id',
+        filters=[('player_id', 'eq', clean_player_id)],
+    )
+    player_rows_to_delete = [
+        row for row in existing_for_player or []
+        if not (
+            _coerce_positive_int(row.get('league_id')) == league_id
+            and _normalize_league_badge_code(row.get('badge_code')) == clean_badge_code
+        )
+    ]
+    if player_rows_to_delete:
+        _delete_league_badge_rows(player_rows_to_delete)
+
+    if matching_existing:
+        badge = _build_league_badge_display(badge_code=clean_badge_code, league=prepared_league, row=matching_existing)
+        if badge:
+            badge['created'] = False
+        return badge
+
+    payload = {
+        'player_id': clean_player_id,
+        'league_id': league_id,
+        'badge_code': clean_badge_code,
+    }
+    clean_match_id = _coerce_positive_int(awarded_match_id)
+    if clean_match_id:
+        payload['awarded_match_id'] = clean_match_id
+
+    try:
+        inserted_rows = _rest_insert(LEAGUE_BADGES_TABLE_NAME, payload)
+        inserted = inserted_rows[0] if isinstance(inserted_rows, list) and inserted_rows else inserted_rows
+    except Exception as exc:
+        if not _is_unique_league_badge_conflict_error(exc):
+            raise
+        _rest_update(
+            LEAGUE_BADGES_TABLE_NAME,
+            {'player_id': clean_player_id, 'awarded_match_id': clean_match_id},
+            filters=[
+                ('league_id', 'eq', league_id),
+                ('badge_code', 'eq', clean_badge_code),
+            ],
+        )
+        inserted = _rest_select(
+            LEAGUE_BADGES_TABLE_NAME,
+            select='id,player_id,league_id,badge_code,awarded_at,awarded_match_id',
+            filters=[
+                ('league_id', 'eq', league_id),
+                ('badge_code', 'eq', clean_badge_code),
+            ],
+            single=True,
+        )
+        badge = _build_league_badge_display(badge_code=clean_badge_code, league=prepared_league, row=inserted)
+        if badge:
+            badge['created'] = False
+        return badge
+
+    badge = _build_league_badge_display(badge_code=clean_badge_code, league=prepared_league, row=inserted or payload)
+    if badge:
+        badge['created'] = True
+    return badge
+
+
+def _sync_league_badge_targets(*, league: dict, badge_kind: str, targets_by_badge_code: dict[str, int], awarded_match_id: int | None = None) -> list[dict]:
+    prepared_league = _prepare_league_row(league)
+    league_id = _coerce_positive_int((prepared_league or {}).get('id'))
+    clean_badge_kind = _normalize_league_badge_kind(badge_kind)
+    if not prepared_league or not league_id or not clean_badge_kind:
+        return []
+
+    badge_codes = list(LEAGUE_BADGE_DEFINITIONS.keys())
+    existing_rows = _rest_select(
+        LEAGUE_BADGES_TABLE_NAME,
+        select='id,player_id,league_id,badge_code,awarded_at,awarded_match_id',
+        filters=[
+            ('league_id', 'eq', league_id),
+            ('badge_code', 'in', badge_codes),
+        ],
+    )
+
+    rows_to_delete: list[dict] = []
+    for row in existing_rows or []:
+        code = _normalize_league_badge_code(row.get('badge_code'))
+        desired_player_id = _coerce_positive_int(targets_by_badge_code.get(code))
+        if not desired_player_id or _coerce_positive_int(row.get('player_id')) != desired_player_id:
+            rows_to_delete.append(row)
+
+    if rows_to_delete:
+        _delete_league_badge_rows(rows_to_delete)
+
+    awarded_badges: list[dict] = []
+    used_player_ids: set[int] = set()
+    for race_name in LEAGUE_BADGE_RACES:
+        badge_code = _build_league_badge_code(kind=clean_badge_kind, race=race_name)
+        player_id = _coerce_positive_int(targets_by_badge_code.get(badge_code))
+        if not badge_code or not player_id or player_id in used_player_ids:
+            continue
+        used_player_ids.add(player_id)
+        badge = _ensure_player_league_badge(
+            player_id=player_id,
+            league=prepared_league,
+            badge_code=badge_code,
+            awarded_match_id=awarded_match_id,
+        )
+        if badge:
+            awarded_badges.append(badge)
+
+    return awarded_badges
+
+
+
+def _sync_league_badges_for_league(league: dict | int, *, awarded_match_id: int | None = None) -> list[dict]:
+    if isinstance(league, dict):
+        prepared_league = _prepare_league_row(league)
+    else:
+        prepared_league = _prepare_league_row(
+            _rest_select(LEAGUE_TABLE_NAME, filters=[('id', 'eq', int(league))], single=True)
+        )
+    if not prepared_league:
+        return []
+
+    summary = _get_league_results_summary_cached(prepared_league, force_refresh=True)
+    badge_kind = _normalize_league_badge_kind(summary.get('badge_kind')) or _resolve_league_badge_kind_for_league(prepared_league.get('id'))
+    targets_by_badge_code: dict[str, int] = {}
+
+    for entry in summary.get('race_leaders') or []:
+        race_name = _normalize_league_badge_race((entry or {}).get('race'))
+        player_id = _coerce_positive_int(((entry or {}).get('player') or {}).get('id'))
+        badge_code = _build_league_badge_code(kind=badge_kind, race=race_name)
+        if badge_code and player_id and player_id not in targets_by_badge_code.values():
+            targets_by_badge_code[badge_code] = player_id
+
+    return _sync_league_badge_targets(
+        league=prepared_league,
+        badge_kind=badge_kind,
+        targets_by_badge_code=targets_by_badge_code,
+        awarded_match_id=awarded_match_id,
+    )
+
+def _sync_league_badges_after_ranked_match(*, league_id: int | None, match_id: int | None = None) -> list[dict]:
+    clean_league_id = _coerce_positive_int(league_id)
+    if not clean_league_id:
+        return []
+    try:
+        return _sync_league_badges_for_league(clean_league_id, awarded_match_id=match_id)
+    except Exception as exc:
+        if _is_missing_league_badges_table_error(exc):
+            return []
+        raise
+
+
+def _sync_all_current_league_badges() -> list[dict]:
+    awarded_badges: list[dict] = []
+    try:
+        leagues = fetch_all_leagues(force_refresh=True)
+        current_league = fetch_current_league(required=False, force_refresh=True)
+        current_league_id = _coerce_positive_int((current_league or {}).get('id'))
+        ordered_leagues = [league for league in leagues if _coerce_positive_int(league.get('id')) != current_league_id]
+        ordered_leagues.extend([league for league in leagues if _coerce_positive_int(league.get('id')) == current_league_id])
+        for league in ordered_leagues:
+            awarded_badges.extend(_sync_league_badges_for_league(league))
+    except Exception as exc:
+        if _is_missing_league_badges_table_error(exc):
+            return awarded_badges
+        raise
+    return awarded_badges
+
+
+def fetch_player_badges(player_id: int) -> list[dict]:
+    target_player_id = _coerce_positive_int(player_id)
+    if not target_player_id:
+        return []
+
+    try:
+        rows = _rest_select(
+            LEAGUE_BADGES_TABLE_NAME,
+            select='id,player_id,league_id,badge_code,awarded_at,awarded_match_id',
+            filters=[('player_id', 'eq', target_player_id)],
+            order='league_id.desc,badge_code.asc',
+        )
+    except Exception as exc:
+        if _is_missing_league_badges_table_error(exc):
+            return []
+        raise
+
+    rows = [row for row in rows if _normalize_league_badge_code(row.get('badge_code'))]
+    league_ids = [_coerce_positive_int(row.get('league_id')) for row in rows]
+    leagues_by_id = _fetch_leagues_by_ids([league_id for league_id in league_ids if league_id])
+
+    badges: list[dict] = []
+    for row in rows:
+        league_id = _coerce_positive_int(row.get('league_id'))
+        badge = _build_league_badge_display(
+            badge_code=row.get('badge_code'),
+            league=leagues_by_id.get(int(league_id)) if league_id else None,
+            row=row,
+        )
+        if badge:
+            badges.append(badge)
+
+    current_league_id = None
+    try:
+        current_league_id = _coerce_positive_int((fetch_current_league(required=False) or {}).get('id'))
+    except Exception:
+        current_league_id = None
+
+    badges.sort(
+        key=lambda badge: (
+            0 if current_league_id and int(badge.get('league_id') or 0) == current_league_id else 1,
+            0 if badge.get('kind') == LEAGUE_BADGE_KIND_CONTENDER else 1,
+            -int(badge.get('league_id') or 0),
+            str(badge.get('code') or ''),
+            str(badge.get('awarded_at') or ''),
+        )
+    )
+    return badges[:1]
+
+def _resolve_match_league_id(*, ranked_match: bool, existing_league_id=None) -> int | None:
+    if not ranked_match:
+        return None
+
+    existing_id = _coerce_positive_int(existing_league_id)
+    if existing_id:
+        return existing_id
+
+    current_league = fetch_current_league(required=True)
+    return int(current_league['id']) if current_league else None
+
+
 def _cache_is_fresh() -> bool:
     loaded_at = float(_DATA_CACHE.get('loaded_at') or 0.0)
     if loaded_at <= 0:
@@ -909,6 +2030,16 @@ def invalidate_application_cache() -> None:
         _DATA_CACHE['rating_history'] = None
         _DATA_CACHE['loaded_at'] = 0.0
         _DATA_CACHE['version'] = int(_DATA_CACHE.get('version') or 0) + 1
+
+    with _LEAGUE_SUMMARY_CACHE_LOCK:
+        _LEAGUE_SUMMARY_CACHE.clear()
+
+    with _LEAGUE_CONFIG_CACHE_LOCK:
+        _LEAGUE_CONFIG_CACHE['all_leagues'] = None
+        _LEAGUE_CONFIG_CACHE['current_league'] = None
+        _LEAGUE_CONFIG_CACHE['loaded_at'] = 0.0
+
+    invalidate_page_cache()
 
 
 def warmup_application_cache(*, force_refresh: bool = False) -> dict[str, Any]:
@@ -944,6 +2075,35 @@ def _cache_snapshot(*, force_refresh: bool = False) -> dict[str, Any]:
     return warmup_application_cache(force_refresh=force_refresh)
 
 
+
+def refresh_application_cache(*, force_refresh: bool = True) -> dict[str, Any]:
+    if force_refresh:
+        invalidate_application_cache()
+
+    snapshot = warmup_application_cache(force_refresh=force_refresh)
+    leagues = fetch_all_leagues(force_refresh=force_refresh)
+    current_league = fetch_current_league(required=False, force_refresh=force_refresh)
+
+    league_sections = fetch_league_results_overview()
+    leaderboard_active = fetch_leaderboard(include_active=True, include_inactive=False, active_ranked_only=False)
+    reports_page_1 = fetch_game_reports_page(page=1, per_page=25, ranked_only=False)
+
+    with _PAGE_CACHE_LOCK:
+        page_cache_entries = len(_PAGE_CACHE)
+
+    return {
+        'players_count': len(snapshot.get('players') or []),
+        'matches_count': len(snapshot.get('matches') or []),
+        'rating_history_count': len(snapshot.get('rating_history') or []),
+        'leagues_count': len(leagues),
+        'current_league_id': int(current_league['id']) if current_league else None,
+        'league_sections_count': len(league_sections),
+        'leaderboard_active_count': len(leaderboard_active),
+        'reports_page_1_count': int(reports_page_1.get('total_count') or 0),
+        'page_cache_entries': page_cache_entries,
+        'cache_version': int(snapshot.get('version') or 0),
+    }
+
 def ping_database() -> tuple[bool, str | None]:
     try:
         _rest_select('players', select='id', limit=1)
@@ -973,6 +2133,10 @@ def _prepare_game_report_row(row: dict) -> dict:
     match['played_at_label'] = _format_match_date(match.get('played_at'))
     match['winner_race'] = _normalize_race_label(match.get('winner_race'))
     match['loser_race'] = _normalize_race_label(match.get('loser_race'))
+    match['player1_roster_id'] = _normalize_roster_id(match.get('player1_roster_id'), field_label='Player 1 roster ID') if _normalize_text(match.get('player1_roster_id')) else ''
+    match['player2_roster_id'] = _normalize_roster_id(match.get('player2_roster_id'), field_label='Player 2 roster ID') if _normalize_text(match.get('player2_roster_id')) else ''
+    match['winner_roster_id'] = _normalize_roster_id(match.get('winner_roster_id'), field_label='Winner roster ID') if _normalize_text(match.get('winner_roster_id')) else ''
+    match['loser_roster_id'] = _normalize_roster_id(match.get('loser_roster_id'), field_label='Loser roster ID') if _normalize_text(match.get('loser_roster_id')) else ''
     match['winner_profile_url'] = f"/players/{match['winner_id']}"
     match['loser_profile_url'] = f"/players/{match['loser_id']}"
     match['winner_elo_delta_display'] = _format_delta(match.get('winner_elo_delta'))
@@ -1276,7 +2440,7 @@ def fetch_mission_suggestions(limit: int = 50) -> list[str]:
     return missions[:safe_limit]
 
 
-def fetch_leaderboard(
+def _fetch_leaderboard_uncached(
     search: str = '',
     *,
     include_active: bool = True,
@@ -1327,6 +2491,32 @@ def fetch_leaderboard(
         prepared['rank_position'] = rank_position
         prepared_rows.append(_prepare_player_row(prepared))
     return prepared_rows
+
+
+def fetch_leaderboard(
+    search: str = '',
+    *,
+    include_active: bool = True,
+    include_inactive: bool = False,
+    active_ranked_only: bool = False,
+) -> list[dict]:
+    key = _make_page_cache_key(
+        'leaderboard',
+        search,
+        include_active=include_active,
+        include_inactive=include_inactive,
+        active_ranked_only=active_ranked_only,
+    )
+    cached = _get_page_cache(key)
+    if cached is not None:
+        return cached
+    result = _fetch_leaderboard_uncached(
+        search=search,
+        include_active=include_active,
+        include_inactive=include_inactive,
+        active_ranked_only=active_ranked_only,
+    )
+    return _set_page_cache(key, result)
 
 
 def _fetch_player_match_rows(player_id: int, *, limit: int | None = None, order_desc: bool = True) -> list[dict]:
@@ -1389,69 +2579,89 @@ def _build_match_search_or_clause(search: str) -> str:
     return '(' + ','.join(or_parts) + ')'
 
 
-def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25, *, ranked_only: bool = False) -> dict:
+def _fetch_game_reports_page_uncached(search: str = '', page: int = 1, per_page: int = 25, *, ranked_only: bool = False) -> dict:
     safe_per_page = max(1, min(int(per_page or 25), 100))
-    safe_page = max(1, int(page or 1))
-    offset = (safe_page - 1) * safe_per_page
-    match_select = 'id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,is_ranked,game_type,mission_name,comment,result_type'
+    requested_page = max(1, int(page or 1))
 
-    normalized_search = _normalize_search_term(search)
-    if normalized_search:
-        or_clause = _build_match_search_or_clause(normalized_search)
-        count_query = {'select': 'id', 'or': or_clause}
-        page_query = {
-            'select': match_select,
-            'or': or_clause,
-            'order': 'id.desc',
-            'limit': safe_per_page,
-            'offset': offset,
-        }
+    current_league = fetch_current_league(required=False)
+    current_league_id = _coerce_positive_int((current_league or {}).get('id'))
+
+    all_matches = _fetch_all_matches_raw()
+    all_player_ids: set[int] = set()
+
+    for match in all_matches:
+        try:
+            all_player_ids.add(int(match.get('player1_id') or 0))
+            all_player_ids.add(int(match.get('player2_id') or 0))
+        except (TypeError, ValueError):
+            continue
+
+    players_by_id = _fetch_players_by_ids_cached(list(all_player_ids))
+
+    normalized_search = _normalize_search_term(search).casefold()
+
+    def match_is_in_reports_scope(match: dict) -> bool:
+        match_league_id = _coerce_positive_int(match.get('league_id'))
+        match_is_ranked = bool(match.get('is_ranked'))
+
         if ranked_only:
-            count_query['is_ranked'] = 'eq.true'
-            page_query['is_ranked'] = 'eq.true'
-        _, total_count = _rest_select_raw('matches', query=count_query, count=True)
-        match_rows = _rest_select_raw('matches', query=page_query)
-    else:
-        base_filters = [('is_ranked', 'eq', True)] if ranked_only else None
-        _, total_count = _rest_select('matches', select='id', filters=base_filters, count=True)
-        match_rows = _rest_select(
-            'matches',
-            select=match_select,
-            filters=base_filters,
-            order='id.desc',
-            limit=safe_per_page,
-            offset=offset,
+            return bool(
+                current_league_id
+                and match_is_ranked
+                and match_league_id == current_league_id
+            )
+
+        is_current_league_match = bool(
+            current_league_id
+            and match_league_id == current_league_id
         )
 
-    total_pages = max(1, math.ceil(total_count / safe_per_page)) if total_count else 1
-    safe_page = min(safe_page, total_pages)
+        is_friendly_null_match = bool(
+            match_league_id is None
+            and match_is_ranked is False
+        )
 
-    if not match_rows and safe_page != page and total_count:
-        offset = (safe_page - 1) * safe_per_page
-        if normalized_search:
-            fallback_page_query = {
-                'select': match_select,
-                'or': or_clause,
-                'order': 'id.desc',
-                'limit': safe_per_page,
-                'offset': offset,
-            }
-            if ranked_only:
-                fallback_page_query['is_ranked'] = 'eq.true'
-            match_rows = _rest_select_raw(
-                'matches',
-                query=fallback_page_query,
-            )
-        else:
-            fallback_filters = [('is_ranked', 'eq', True)] if ranked_only else None
-            match_rows = _rest_select(
-                'matches',
-                select=match_select,
-                filters=fallback_filters,
-                order='id.desc',
-                limit=safe_per_page,
-                offset=offset,
-            )
+        return is_current_league_match or is_friendly_null_match
+
+    def match_passes_search(match: dict) -> bool:
+        if not normalized_search:
+            return True
+
+        player1_id = _coerce_positive_int(match.get('player1_id'))
+        player2_id = _coerce_positive_int(match.get('player2_id'))
+
+        player1_name = _normalize_player_name((players_by_id.get(player1_id) or {}).get('name')).casefold()
+        player2_name = _normalize_player_name((players_by_id.get(player2_id) or {}).get('name')).casefold()
+
+        searchable_parts = [
+            _normalize_text(match.get('comment')).casefold(),
+            _normalize_text(match.get('game_type')).casefold(),
+            _normalize_text(match.get('mission_name')).casefold(),
+            player1_name,
+            player2_name,
+        ]
+
+        return any(normalized_search in part for part in searchable_parts if part)
+
+    filtered_matches = [
+        dict(match)
+        for match in all_matches
+        if match_is_in_reports_scope(match) and match_passes_search(match)
+    ]
+
+    filtered_matches.sort(
+        key=lambda row: (
+            int(row.get('id') or 0),
+            _parse_datetime(row.get('played_at')) or datetime.min,
+        ),
+        reverse=True,
+    )
+
+    total_count = len(filtered_matches)
+    total_pages = max(1, math.ceil(total_count / safe_per_page)) if total_count else 1
+    safe_page = min(requested_page, total_pages)
+    offset = (safe_page - 1) * safe_per_page
+    match_rows = filtered_matches[offset:offset + safe_per_page]
 
     page_match_ids = [int(row['id']) for row in match_rows]
     page_player_ids = []
@@ -1459,7 +2669,7 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25,
         page_player_ids.append(int(row['player1_id']))
         page_player_ids.append(int(row['player2_id']))
 
-    players_by_id = _fetch_players_by_ids(page_player_ids)
+    page_players_by_id = _fetch_players_by_ids(page_player_ids)
     history_by_pair = _fetch_history_for_matches(page_match_ids, page_player_ids)
 
     items = []
@@ -1470,8 +2680,8 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25,
         result_type = _normalize_match_result_type(match.get('result_type'))
         is_tie = result_type == 'draw'
 
-        player1 = players_by_id.get(player1_id)
-        player2 = players_by_id.get(player2_id)
+        player1 = page_players_by_id.get(player1_id) or players_by_id.get(player1_id)
+        player2 = page_players_by_id.get(player2_id) or players_by_id.get(player2_id)
         if not player1 or not player2:
             continue
 
@@ -1486,7 +2696,10 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25,
             winner_race = match.get('player1_race')
             loser_race = match.get('player2_race')
         else:
-            winner_id = int(match['winner_player_id'])
+            winner_id = _coerce_positive_int(match.get('winner_player_id'))
+            if winner_id not in {player1_id, player2_id}:
+                continue
+
             loser_id = player2_id if winner_id == player1_id else player1_id
             winner_name = player1_name if winner_id == player1_id else player2_name
             loser_name = player2_name if winner_id == player1_id else player1_name
@@ -1503,9 +2716,16 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25,
         if is_tie or winner_id == player1_id:
             winner_score = player1_score
             loser_score = player2_score
+            winner_roster_id = score_details['player1_roster_id']
+            loser_roster_id = score_details['player2_roster_id']
         else:
             winner_score = player2_score
             loser_score = player1_score
+            winner_roster_id = score_details['player2_roster_id']
+            loser_roster_id = score_details['player1_roster_id']
+
+        match_league_id = _coerce_positive_int(match.get('league_id'))
+        is_friendly_null_match = match_league_id is None and bool(match.get('is_ranked')) is False
 
         item = {
             'id': int(match['id']),
@@ -1522,6 +2742,10 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25,
             'game_type': match.get('game_type'),
             'mission_name': match.get('mission_name'),
             'comment': score_details['visible_comment'],
+            'player1_roster_id': score_details['player1_roster_id'],
+            'player2_roster_id': score_details['player2_roster_id'],
+            'winner_roster_id': winner_roster_id,
+            'loser_roster_id': loser_roster_id,
             'winner_old_elo': winner_history.get('old_elo'),
             'winner_new_elo': winner_history.get('new_elo'),
             'winner_elo_delta': winner_history.get('elo_delta'),
@@ -1530,7 +2754,10 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25,
             'loser_elo_delta': loser_history.get('elo_delta'),
             'result_type': result_type,
             'is_tie': is_tie,
+            'league_id': match_league_id,
+            'league_name': 'Friendly' if is_friendly_null_match else ((current_league or {}).get('name') or ''),
         }
+
         items.append(_prepare_game_report_row(item))
 
     return {
@@ -1539,7 +2766,27 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25,
         'page': safe_page,
         'per_page': safe_per_page,
         'total_pages': total_pages,
+        'current_league': current_league,
     }
+
+def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25, *, ranked_only: bool = False) -> dict:
+    key = _make_page_cache_key(
+        'game_reports_page',
+        search,
+        page=int(page or 1),
+        per_page=int(per_page or 25),
+        ranked_only=bool(ranked_only),
+    )
+    cached = _get_page_cache(key)
+    if cached is not None:
+        return cached
+    result = _fetch_game_reports_page_uncached(
+        search=search,
+        page=page,
+        per_page=per_page,
+        ranked_only=ranked_only,
+    )
+    return _set_page_cache(key, result)
 
 
 def fetch_game_reports(search: str = '', limit: int = 100, *, ranked_only: bool = False) -> list[dict]:
@@ -1630,9 +2877,54 @@ def _race_matchup_report_from_matches(player_id: int, priority_race: str | None,
     }
 
 
-def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict | None:
+
+def _get_cached_player_by_id(player_id: int) -> dict | None:
+    target_id = int(player_id)
+    for row in _fetch_all_players_raw():
+        if int(row.get('id') or 0) == target_id:
+            return dict(row)
+    return None
+
+
+def _fetch_player_match_rows_cached(player_id: int, *, order_desc: bool = True) -> list[dict]:
+    target_id = int(player_id)
+    rows = []
+    for row in _fetch_all_matches_raw():
+        try:
+            player1_id = int(row.get('player1_id') or 0)
+            player2_id = int(row.get('player2_id') or 0)
+        except (TypeError, ValueError):
+            continue
+        if target_id in {player1_id, player2_id}:
+            rows.append(dict(row))
+
+    rows.sort(
+        key=lambda row: (_parse_datetime(row.get('played_at')) or datetime.min, int(row.get('id') or 0)),
+        reverse=order_desc,
+    )
+    return rows
+
+
+def _fetch_players_by_ids_cached(player_ids: list[int]) -> dict[int, dict]:
+    target_ids = {int(player_id) for player_id in player_ids if player_id is not None}
+    if not target_ids:
+        return {}
+    return {
+        int(row['id']): dict(row)
+        for row in _fetch_all_players_raw()
+        if int(row.get('id') or 0) in target_ids
+    }
+
+
+def _fetch_rating_history_for_player_cached(player_id: int) -> list[dict]:
+    target_id = int(player_id)
+    rows = [dict(row) for row in _fetch_all_rating_history_raw() if int(row.get('player_id') or 0) == target_id]
+    rows.sort(key=lambda row: int(row.get('id') or 0))
+    return rows
+
+def _fetch_player_profile_uncached(player_id: int, recent_matches_limit: int = 20) -> dict | None:
     safe_recent_matches_limit = max(1, min(recent_matches_limit, 50))
-    player_row = _rest_get_player_by_id(int(player_id))
+    player_row = _get_cached_player_by_id(int(player_id))
     if not player_row:
         return None
 
@@ -1643,20 +2935,18 @@ def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict
     player_base['win_rate'] = round((player_base['wins'] / player_base['matches_count']) * 100, 1) if player_base['matches_count'] > 0 else 0
     player = _prepare_player_row(player_base)
     player['rank_position'] = _compute_player_rank_position(int(player_id))
+    player = decorate_player_with_current_league_awards(player)
+    player['badges'] = fetch_player_badges(int(player_id))
 
-    matches = _fetch_player_match_rows(int(player_id), order_desc=True)
+    matches = _fetch_player_match_rows_cached(int(player_id), order_desc=True)
     match_ids = [int(match['id']) for match in matches]
     opponent_ids = [
         int(match['player2_id']) if int(match['player1_id']) == int(player_id) else int(match['player1_id'])
         for match in matches
     ]
-    opponents_by_id = _fetch_players_by_ids(opponent_ids)
+    opponents_by_id = _fetch_players_by_ids_cached(opponent_ids)
 
-    history_rows = _rest_select(
-        'rating_history',
-        select='match_id,player_id,old_elo,new_elo,elo_delta',
-        filters=[('player_id', 'eq', int(player_id))],
-    )
+    history_rows = _fetch_rating_history_for_player_cached(int(player_id))
     history_by_match_id = {int(row['match_id']): dict(row) for row in history_rows}
 
     recent_matches = []
@@ -1737,6 +3027,20 @@ def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict
         'priority_matchup_report': priority_matchup_report,
     }
 
+
+def fetch_player_profile(player_id: int, recent_matches_limit: int = 20) -> dict | None:
+    key = _make_page_cache_key(
+        'player_profile',
+        int(player_id),
+        recent_matches_limit=int(recent_matches_limit or 20),
+    )
+    cached = _get_page_cache(key)
+    if cached is not None:
+        return cached
+    result = _fetch_player_profile_uncached(player_id, recent_matches_limit=recent_matches_limit)
+    return _set_page_cache(key, result)
+
+
 def _rest_get_player_by_name_key(name_key: str) -> dict | None:
     return _rest_select('players', filters=[('name_normalized', 'eq', name_key)], single=True)
 
@@ -1746,14 +3050,20 @@ def _rest_get_player_by_id(player_id: int) -> dict | None:
 
 
 def _compute_player_rank_position(player_id: int) -> int | str:
-    rows = _rest_fetch_all(
-        'players',
-        select='id,name,current_elo,wins,matches_count',
-        order='current_elo.desc,wins.desc,matches_count.desc,name.asc',
+    rows = _fetch_all_players_raw()
+    rows.sort(
+        key=lambda row: (
+            -int(row.get('current_elo') or 0),
+            -int(row.get('wins') or 0),
+            -int(row.get('matches_count') or 0),
+            _normalize_player_name(row.get('name')).casefold(),
+        )
     )
+
     for index, row in enumerate(rows, start=1):
         if int(row['id']) == int(player_id):
             return index
+
     return ''
 
 
@@ -1797,33 +3107,6 @@ def _get_or_create_player(player_name: str) -> dict:
         raise
 
 
-def _refresh_priority_race(player_id: int, *, force_refresh: bool = False) -> None:
-    match_rows = _fetch_player_match_rows(int(player_id), order_desc=False)
-    counts: dict[str, int] = defaultdict(int)
-
-    for row in match_rows:
-        player1_race = _normalize_race_db_label(row.get('player1_race'))
-        player2_race = _normalize_race_db_label(row.get('player2_race'))
-
-        if int(row['player1_id']) == int(player_id) and player1_race in RACE_OPTIONS:
-            counts[player1_race] += 1
-        if int(row['player2_id']) == int(player_id) and player2_race in RACE_OPTIONS:
-            counts[player2_race] += 1
-
-    selected = ''
-    if counts:
-        selected = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
-
-    _rest_update(
-        'players',
-        {
-            'priority_race': selected or None,
-            'updated_at': datetime.utcnow().isoformat(),
-        },
-        filters=[('id', 'eq', player_id)],
-    )
-
-
 def _find_recent_duplicate_match(
     *,
     player1_id: int,
@@ -1835,12 +3118,13 @@ def _find_recent_duplicate_match(
     mission_name: str,
     comment: str,
     result_type: str,
+    league_id: int | None,
     submitted_at: datetime,
     window_seconds: int = 5,
 ) -> dict | None:
     rows = _rest_select(
         'matches',
-        select='id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,is_ranked,game_type,mission_name,comment,result_type',
+        select='id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,is_ranked,game_type,mission_name,comment,result_type,league_id',
         filters=[('player1_id', 'eq', int(player1_id)), ('player2_id', 'eq', int(player2_id))],
         order='played_at.desc,id.desc',
         limit=20,
@@ -1872,6 +3156,8 @@ def _find_recent_duplicate_match(
         if _normalize_text(row.get('comment')) != _normalize_text(comment):
             continue
         if _normalize_match_result_type(row.get('result_type')) != _normalize_match_result_type(result_type):
+            continue
+        if _coerce_positive_int(row.get('league_id')) != _coerce_positive_int(league_id):
             continue
         return dict(row)
 
@@ -1916,12 +3202,15 @@ def _build_submit_result_from_existing_match(
         'player1_score': score_details['player1_score'],
         'player2_score': score_details['player2_score'],
         'score_display': _format_match_score(score_details['player1_score'], score_details['player2_score']),
+        'player1_roster_id': score_details['player1_roster_id'],
+        'player2_roster_id': score_details['player2_roster_id'],
         'winner_old_elo_display': _normalize_elo_value(player1_history.get('old_elo')),
         'winner_new_elo_display': _normalize_elo_value(player1_history.get('new_elo')),
         'winner_delta_display': _format_delta(player1_history.get('elo_delta')),
         'opponent_old_elo_display': _normalize_elo_value(player2_history.get('old_elo')),
         'opponent_new_elo_display': _normalize_elo_value(player2_history.get('new_elo')),
         'opponent_delta_display': _format_delta(player2_history.get('elo_delta')),
+        'league_id': _coerce_positive_int(match_row.get('league_id')),
     }
 
 
@@ -2046,6 +3335,8 @@ def submit_tts_match_result(
     mission_name: str,
     player1_score,
     player2_score,
+    player1_roster_id: str = '',
+    player2_roster_id: str = '',
     comment: str = '',
 ) -> dict:
     with _SUBMIT_MATCH_LOCK:
@@ -2079,6 +3370,8 @@ def submit_tts_match_result(
             mission_name=mission_name,
             player1_score=player1_score,
             player2_score=player2_score,
+            player1_roster_id=player1_roster_id,
+            player2_roster_id=player2_roster_id,
             comment=comment,
         )
 
@@ -2095,6 +3388,8 @@ def submit_match_result(
     mission_name: str,
     player1_score,
     player2_score,
+    player1_roster_id: str = '',
+    player2_roster_id: str = '',
     comment: str,
 ) -> dict:
     with _SUBMIT_MATCH_LOCK:
@@ -2107,7 +3402,15 @@ def submit_match_result(
         clean_comment = _normalize_text(comment)
         clean_player1_score = _coerce_match_score_value(player1_score, field_label='Player 1 score')
         clean_player2_score = _coerce_match_score_value(player2_score, field_label='Player 2 score')
-        comment_payload = _build_match_comment_payload(clean_comment, clean_player1_score, clean_player2_score)
+        clean_player1_roster_id = _normalize_roster_id(player1_roster_id, field_label='Player 1 roster ID')
+        clean_player2_roster_id = _normalize_roster_id(player2_roster_id, field_label='Player 2 roster ID')
+        comment_payload = _build_match_comment_payload(
+            clean_comment,
+            clean_player1_score,
+            clean_player2_score,
+            clean_player1_roster_id,
+            clean_player2_roster_id,
+        )
         clean_result_type = _normalize_match_result_type(result_type)
         ranked_match = _coerce_ranked_value(is_ranked)
 
@@ -2128,6 +3431,8 @@ def submit_match_result(
         if len(comment_payload or '') > 4000:
             raise ValueError('Comment is too long.')
 
+        match_league_id = _resolve_match_league_id(ranked_match=ranked_match)
+
         submitted_at = datetime.now()
         played_at = submitted_at.isoformat()
 
@@ -2144,50 +3449,70 @@ def submit_match_result(
             mission_name=clean_mission_name,
             comment=comment_payload,
             result_type=clean_result_type,
+            league_id=match_league_id,
             submitted_at=submitted_at,
         )
         if duplicate_match:
-            return _build_submit_result_from_existing_match(
+            duplicate_result = _build_submit_result_from_existing_match(
                 duplicate_match,
                 player1=player1,
                 player2=player2,
             )
+            if ranked_match and match_league_id:
+                duplicate_result['awarded_badges'] = _sync_league_badges_after_ranked_match(
+                    league_id=match_league_id,
+                    match_id=duplicate_match.get('id'),
+                )
+            return duplicate_result
 
         player1_old_elo = int(player1.get('current_elo') or 1000)
         player2_old_elo = int(player2.get('current_elo') or 1000)
 
         player1_matches_before_match = int(player1.get('matches_count') or 0)
         player2_matches_before_match = int(player2.get('matches_count') or 0)
+        player1_ranked_matches_before_match = _count_player_ranked_matches_before_submit(int(player1['id']))
+        player2_ranked_matches_before_match = _count_player_ranked_matches_before_submit(int(player2['id']))
+        elo_multiplier = _resolve_ranked_elo_multiplier(clean_game_type)
 
         if ranked_match:
             if clean_result_type == 'draw':
                 elo_result = _calculate_draw_elo_result(
                     player1_old_elo,
                     player2_old_elo,
-                    player1_matches_before_match,
-                    player2_matches_before_match,
+                    player1_ranked_matches_before_match,
+                    player2_ranked_matches_before_match,
+                    elo_multiplier,
                 )
             else:
-                elo_result = _calculate_elo_result(
+                win_elo_result = _calculate_elo_result(
                     player1_old_elo,
                     player2_old_elo,
-                    player1_matches_before_match,
-                    player2_matches_before_match,
+                    player1_ranked_matches_before_match,
+                    player2_ranked_matches_before_match,
+                    elo_multiplier,
+                )
+                win_elo_result = _apply_winner_seed_bonus_to_win_elo_result(
+                    win_elo_result,
+                    winner_old_elo=player1_old_elo,
+                    loser_old_elo=player2_old_elo,
+                    apply_bonus=False,
                 )
                 elo_result = {
-                    'player1_old_elo': elo_result['winner_old_elo'],
-                    'player1_new_elo': elo_result['winner_new_elo'],
-                    'player1_delta': elo_result['winner_delta'],
-                    'player1_expected_score': elo_result['winner_expected_score'],
+                    'player1_old_elo': win_elo_result['winner_old_elo'],
+                    'player1_new_elo': win_elo_result['winner_new_elo'],
+                    'player1_delta': win_elo_result['winner_delta'],
+                    'player1_expected_score': win_elo_result['winner_expected_score'],
                     'player1_actual_score': 1.0,
-                    'player1_k_factor': elo_result['winner_k_factor'],
-                    'player2_old_elo': elo_result['loser_old_elo'],
-                    'player2_new_elo': elo_result['loser_new_elo'],
-                    'player2_delta': elo_result['loser_delta'],
-                    'player2_expected_score': elo_result['loser_expected_score'],
+                    'player1_k_factor': win_elo_result['winner_k_factor'],
+                    'player2_old_elo': win_elo_result['loser_old_elo'],
+                    'player2_new_elo': win_elo_result['loser_new_elo'],
+                    'player2_delta': win_elo_result['loser_delta'],
+                    'player2_expected_score': win_elo_result['loser_expected_score'],
                     'player2_actual_score': 0.0,
-                    'player2_k_factor': elo_result['loser_k_factor'],
-                    'k_factor': elo_result['k_factor'],
+                    'player2_k_factor': win_elo_result['loser_k_factor'],
+                    'k_factor': win_elo_result['k_factor'],
+                    'winner_seed_bonus_applied': win_elo_result['winner_seed_bonus_applied'],
+                    'winner_seed_bonus_multiplier': win_elo_result['winner_seed_bonus_multiplier'],
                 }
             player1_new_elo = elo_result['player1_new_elo']
             player2_new_elo = elo_result['player2_new_elo']
@@ -2206,6 +3531,8 @@ def submit_match_result(
                 'player2_actual_score': 0.5 if clean_result_type == 'draw' else 0.0,
                 'player2_k_factor': 0,
                 'k_factor': 0,
+                'winner_seed_bonus_applied': False,
+                'winner_seed_bonus_multiplier': 1.0,
             }
             player1_new_elo = player1_old_elo
             player2_new_elo = player2_old_elo
@@ -2220,8 +3547,11 @@ def submit_match_result(
             'is_ranked': ranked_match,
             'game_type': clean_game_type,
             'mission_name': clean_mission_name,
+            'player1_roster_id': clean_player1_roster_id or None,
+            'player2_roster_id': clean_player2_roster_id or None,
             'result_type': clean_result_type,
             'winner_player_id': None if clean_result_type == 'draw' else player1['id'],
+            'league_id': match_league_id,
         }
 
         match_rows = _rest_insert('matches', match_payload)
@@ -2282,9 +3612,13 @@ def submit_match_result(
                 ],
             )
 
-        _refresh_priority_race(player1['id'], force_refresh=True)
-        _refresh_priority_race(player2['id'])
         invalidate_application_cache()
+        awarded_badges = []
+        if ranked_match and match_league_id:
+            awarded_badges = _sync_league_badges_after_ranked_match(
+                league_id=match_league_id,
+                match_id=match_row.get('id'),
+            )
 
         return {
             'match_id': match_row['id'],
@@ -2308,12 +3642,16 @@ def submit_match_result(
             'player1_score': clean_player1_score,
             'player2_score': clean_player2_score,
             'score_display': _format_match_score(clean_player1_score, clean_player2_score),
+            'player1_roster_id': clean_player1_roster_id,
+            'player2_roster_id': clean_player2_roster_id,
             'winner_old_elo_display': _normalize_elo_value(elo_result['player1_old_elo']),
             'winner_new_elo_display': _normalize_elo_value(elo_result['player1_new_elo']),
             'winner_delta_display': _format_delta(elo_result['player1_delta']),
             'opponent_old_elo_display': _normalize_elo_value(elo_result['player2_old_elo']),
             'opponent_new_elo_display': _normalize_elo_value(elo_result['player2_new_elo']),
             'opponent_delta_display': _format_delta(elo_result['player2_delta']),
+            'league_id': match_league_id,
+            'awarded_badges': awarded_badges,
         }
 
 
@@ -2352,6 +3690,31 @@ def fetch_admin_feedback_messages(limit: int = 200) -> list[dict]:
         raise _feedback_storage_error(exc) from None
     return [_prepare_feedback_message_row(row) for row in rows]
 
+
+
+
+def delete_admin_feedback_message(message_id: int) -> None:
+    try:
+        clean_message_id = int(message_id)
+    except (TypeError, ValueError):
+        raise ValueError('Invalid message id.')
+
+    existing = _rest_select(
+        FEEDBACK_TABLE_NAME,
+        select='id',
+        filters=[('id', 'eq', clean_message_id)],
+        single=True,
+    )
+    if not existing:
+        raise ValueError('Message not found.')
+
+    try:
+        _rest_delete(
+            FEEDBACK_TABLE_NAME,
+            filters=[('id', 'eq', clean_message_id)],
+        )
+    except Exception as exc:
+        raise _feedback_storage_error(exc) from None
 
 def submit_admin_feedback_message(
     *,
@@ -2418,12 +3781,9 @@ def update_player_admin(
     clean_country_name = _normalize_text(country_name)
     clean_country_code = _resolve_country_code(country_code, clean_country_name)
     clean_discord_url = _normalize_text(discord_url)
-    clean_priority_race = _normalize_text(priority_race)
 
     if not clean_name:
         raise ValueError('Enter the player name.')
-    if clean_priority_race and clean_priority_race not in RACE_OPTIONS:
-        raise ValueError('Choose a valid priority race.')
 
     try:
         clean_current_elo = max(0, int(current_elo))
@@ -2446,7 +3806,6 @@ def update_player_admin(
             'current_elo': clean_current_elo,
             'country_code': clean_country_code or None,
             'discord_url': clean_discord_url or None,
-            'priority_race': clean_priority_race or None,
             'is_active': _is_player_active_by_last_match(current_player.get('last_match_at')),
             'updated_at': datetime.utcnow().isoformat(),
         },
@@ -2490,10 +3849,17 @@ def fetch_match_admin(match_id: int) -> dict | None:
     match['player1_score'] = score_details['player1_score']
     match['player2_score'] = score_details['player2_score']
     match['score_display'] = _format_match_score(score_details['player1_score'], score_details['player2_score'])
+    match['player1_roster_id'] = score_details['player1_roster_id']
+    match['player2_roster_id'] = score_details['player2_roster_id']
     match['comment'] = score_details['visible_comment']
     match['played_at_label'] = _format_match_datetime(match.get('played_at'))
     parsed = _parse_datetime(match.get('played_at'))
     match['played_at_input'] = parsed.strftime('%Y-%m-%dT%H:%M') if parsed else ''
+    match['league_id'] = _coerce_positive_int(match.get('league_id'))
+    match['league_name'] = ''
+    if match['league_id']:
+        league = _prepare_league_row(_rest_select(LEAGUE_TABLE_NAME, filters=[('id', 'eq', match['league_id'])], single=True))
+        match['league_name'] = league.get('name') if league else ''
     return match
 
 
@@ -2507,6 +3873,7 @@ def _rebuild_ratings_and_player_stats() -> None:
         int(player['id']): {
             'elo': 1000,
             'matches_count': 0,
+            'ranked_matches_count': 0,
             'wins': 0,
             'losses': 0,
             'draws': 0,
@@ -2528,22 +3895,25 @@ def _rebuild_ratings_and_player_stats() -> None:
         ranked_match = bool(match.get('is_ranked'))
         result_type = _normalize_match_result_type(match.get('result_type'))
 
-        player1_state = player_state.setdefault(player1_id, {'elo': 1000, 'matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
-        player2_state = player_state.setdefault(player2_id, {'elo': 1000, 'matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
+        player1_state = player_state.setdefault(player1_id, {'elo': 1000, 'matches_count': 0, 'ranked_matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
+        player2_state = player_state.setdefault(player2_id, {'elo': 1000, 'matches_count': 0, 'ranked_matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
 
         player1_old_elo = int(player1_state['elo'])
         player2_old_elo = int(player2_state['elo'])
 
-        player1_matches_before_match = int(player1_state['matches_count'])
-        player2_matches_before_match = int(player2_state['matches_count'])
+        player1_ranked_matches_before_match = int(player1_state.get('ranked_matches_count') or 0)
+        player2_ranked_matches_before_match = int(player2_state.get('ranked_matches_count') or 0)
+
+        elo_multiplier = _resolve_ranked_elo_multiplier(match.get('game_type'))
 
         if result_type == 'draw':
             if ranked_match:
                 elo_result = _calculate_draw_elo_result(
                     player1_old_elo,
                     player2_old_elo,
-                    player1_matches_before_match,
-                    player2_matches_before_match,
+                    player1_ranked_matches_before_match,
+                    player2_ranked_matches_before_match,
+                    elo_multiplier,
                 )
                 player1_new_elo = elo_result['player1_new_elo']
                 player2_new_elo = elo_result['player2_new_elo']
@@ -2577,11 +3947,15 @@ def _rebuild_ratings_and_player_stats() -> None:
 
             player1_state['elo'] = player1_new_elo
             player1_state['matches_count'] += 1
+            if ranked_match:
+                player1_state['ranked_matches_count'] = int(player1_state.get('ranked_matches_count') or 0) + 1
             player1_state['draws'] += 1
             player1_state['last_match_at'] = played_at
 
             player2_state['elo'] = player2_new_elo
             player2_state['matches_count'] += 1
+            if ranked_match:
+                player2_state['ranked_matches_count'] = int(player2_state.get('ranked_matches_count') or 0) + 1
             player2_state['draws'] += 1
             player2_state['last_match_at'] = played_at
 
@@ -2600,15 +3974,22 @@ def _rebuild_ratings_and_player_stats() -> None:
         winner_old_elo = int(winner_state['elo'])
         loser_old_elo = int(loser_state['elo'])
 
-        winner_matches_before_match = int(winner_state['matches_count'])
-        loser_matches_before_match = int(loser_state['matches_count'])
+        winner_ranked_matches_before_match = int(winner_state.get('ranked_matches_count') or 0)
+        loser_ranked_matches_before_match = int(loser_state.get('ranked_matches_count') or 0)
 
         if ranked_match:
             elo_result = _calculate_elo_result(
                 winner_old_elo,
                 loser_old_elo,
-                winner_matches_before_match,
-                loser_matches_before_match,
+                winner_ranked_matches_before_match,
+                loser_ranked_matches_before_match,
+                elo_multiplier,
+            )
+            elo_result = _apply_winner_seed_bonus_to_win_elo_result(
+                elo_result,
+                winner_old_elo=winner_old_elo,
+                loser_old_elo=loser_old_elo,
+                apply_bonus=False,
             )
             winner_new_elo = elo_result['winner_new_elo']
             loser_new_elo = elo_result['loser_new_elo']
@@ -2642,11 +4023,15 @@ def _rebuild_ratings_and_player_stats() -> None:
 
         winner_state['elo'] = winner_new_elo
         winner_state['matches_count'] += 1
+        if ranked_match:
+            winner_state['ranked_matches_count'] = int(winner_state.get('ranked_matches_count') or 0) + 1
         winner_state['wins'] += 1
         winner_state['last_match_at'] = played_at
 
         loser_state['elo'] = loser_new_elo
         loser_state['matches_count'] += 1
+        if ranked_match:
+            loser_state['ranked_matches_count'] = int(loser_state.get('ranked_matches_count') or 0) + 1
         loser_state['losses'] += 1
         loser_state['last_match_at'] = played_at
 
@@ -2658,7 +4043,7 @@ def _rebuild_ratings_and_player_stats() -> None:
 
     for player in players:
         player_id = int(player['id'])
-        state = player_state.get(player_id, {'elo': 1000, 'matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
+        state = player_state.get(player_id, {'elo': 1000, 'matches_count': 0, 'ranked_matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
         _rest_update(
             'players',
             {
@@ -2669,16 +4054,14 @@ def _rebuild_ratings_and_player_stats() -> None:
                 'draws': int(state['draws']),
                 'last_match_at': state['last_match_at'],
                 'is_active': _is_player_active_by_last_match(state['last_match_at']),
-                'priority_race': None,
                 'updated_at': datetime.utcnow().isoformat(),
             },
             filters=[('id', 'eq', player_id)],
         )
 
-    for index, player_id in enumerate(sorted(touched_players)):
-        _refresh_priority_race(player_id, force_refresh=(index == 0))
-
     invalidate_application_cache()
+    _sync_all_current_league_badges()
+    invalidate_page_cache()
 
 
 def update_match_admin(
@@ -2694,6 +4077,8 @@ def update_match_admin(
     mission_name: str,
     player1_score,
     player2_score,
+    player1_roster_id: str = '',
+    player2_roster_id: str = '',
     comment: str,
     played_at: datetime,
 ) -> dict:
@@ -2707,7 +4092,15 @@ def update_match_admin(
     clean_comment = _normalize_text(comment)
     clean_player1_score = _coerce_match_score_value(player1_score, field_label='Player 1 score')
     clean_player2_score = _coerce_match_score_value(player2_score, field_label='Player 2 score')
-    comment_payload = _build_match_comment_payload(clean_comment, clean_player1_score, clean_player2_score)
+    clean_player1_roster_id = _normalize_roster_id(player1_roster_id, field_label='Player 1 roster ID')
+    clean_player2_roster_id = _normalize_roster_id(player2_roster_id, field_label='Player 2 roster ID')
+    comment_payload = _build_match_comment_payload(
+        clean_comment,
+        clean_player1_score,
+        clean_player2_score,
+        clean_player1_roster_id,
+        clean_player2_roster_id,
+    )
     clean_winner_side = _normalize_text(winner_side)
     clean_result_type = 'draw' if clean_winner_side == 'tie' else 'win'
 
@@ -2736,6 +4129,11 @@ def update_match_admin(
     if not existing:
         raise ValueError('Match not found.')
 
+    match_league_id = _resolve_match_league_id(
+        ranked_match=ranked_match,
+        existing_league_id=existing.get('league_id'),
+    )
+
     player1 = _get_or_create_player(clean_player1_name)
     player2 = _get_or_create_player(clean_player2_name)
     winner_player_id = None if clean_result_type == 'draw' else (player1['id'] if clean_winner_side == 'player1' else player2['id'])
@@ -2754,6 +4152,9 @@ def update_match_admin(
             'is_ranked': ranked_match,
             'game_type': clean_game_type,
             'mission_name': clean_mission_name,
+            'player1_roster_id': clean_player1_roster_id or None,
+            'player2_roster_id': clean_player2_roster_id or None,
+            'league_id': match_league_id,
         },
         filters=[('id', 'eq', match_id)],
     )

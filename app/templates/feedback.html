@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section feedback-section">
+    <div class="container feedback-container">
+        <div class="feedback-shell">
+            <div class="submit-hero feedback-hero">
+                <span class="eyebrow">Contact Admin</span>
+                <h1 class="submit-title feedback-title">Leave a short message</h1>
+                <p class="submit-lead feedback-lead">
+                    Use this tab if you want to leave a short comment for the admin.
+                    {% if is_admin %}
+                    In admin mode you can also read the latest user messages below.
+                    {% endif %}
+                </p>
+            </div>
+
+            {% if error_message %}
+            <div class="submit-alert submit-alert-error">
+                <strong>Could not send the message.</strong>
+                <span>{{ error_message }}</span>
+            </div>
+            {% endif %}
+
+            {% if success_message %}
+            <div class="submit-alert submit-alert-success">
+                <strong>{{ success_message }}</strong>
+            </div>
+            {% endif %}
+
+            <form class="submit-form feedback-form" method="post" action="/feedback">
+                <div class="submit-form-grid feedback-form-grid">
+                    <section class="form-section">
+                        <div class="form-section-head">
+                            <h2>Player name</h2>
+                            <p>Use your player name so the admin knows who sent the message.</p>
+                        </div>
+                        <div class="toolbar-field">
+                            <label for="player_name">Player name</label>
+                            <input
+                                id="player_name"
+                                name="player_name"
+                                type="text"
+                                list="player-name-suggestions"
+                                value="{{ form_state.player_name }}"
+                                placeholder="Enter your player name"
+                                autocomplete="off"
+                                maxlength="80"
+                                required
+                            >
+                        </div>
+                    </section>
+
+                    <section class="form-section">
+                        <div class="form-section-head">
+                            <h2>Message</h2>
+                            <p>Short comments only. Maximum {{ feedback_message_max_length }} characters.</p>
+                        </div>
+                        <div class="toolbar-field">
+                            <label for="message_text">Comment</label>
+                            <textarea
+                                id="message_text"
+                                name="message_text"
+                                maxlength="{{ feedback_message_max_length }}"
+                                placeholder="Write a short message for the admin"
+                                required
+                                data-feedback-message-input
+                            >{{ form_state.message_text }}</textarea>
+                            <div class="feedback-message-meta">
+                                <span class="field-help">Short questions, bug reports or small suggestions are okay here.</span>
+                                <span class="feedback-char-counter" data-feedback-char-counter>0 / {{ feedback_message_max_length }}</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="submit-actions feedback-actions">
+                    <button class="button button-primary" type="submit">Send message</button>
+                </div>
+            </form>
+
+            {% if is_admin %}
+            <section class="feedback-admin-section">
+                <div class="form-section feedback-admin-shell">
+                    <div class="feedback-admin-head">
+                        <div>
+                            <span class="eyebrow">Admin</span>
+                            <h2>Latest user messages</h2>
+                            <p class="page-text">Messages are shown only when admin mode is active.</p>
+                        </div>
+                        <div class="feedback-admin-count">{{ feedback_messages|length }} shown</div>
+                    </div>
+
+                    {% if feedback_load_error %}
+                    <div class="submit-alert submit-alert-error feedback-inline-alert">
+                        <strong>Could not load messages.</strong>
+                        <span>{{ feedback_load_error }}</span>
+                    </div>
+                    {% elif feedback_messages %}
+                    <div class="feedback-message-list">
+                        {% for item in feedback_messages %}
+                        <article class="feedback-message-card">
+                            <div class="feedback-message-head">
+                                <div>
+                                    <div class="feedback-message-author">{{ item.player_name }}</div>
+                                    <div class="feedback-message-date">{{ item.created_at_label }}</div>
+                                </div>
+                                <form method="post" action="/feedback" class="feedback-delete-form" onsubmit="return confirm('Delete this message?');">
+                                    <input type="hidden" name="action" value="delete_message">
+                                    <input type="hidden" name="message_id" value="{{ item.id }}">
+                                    <button class="button button-secondary button-small" type="submit">Delete</button>
+                                </form>
+                            </div>
+                            <p class="feedback-message-text">{{ item.message_text }}</p>
+                        </article>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="state-card feedback-empty-state">
+                        <h3>No messages yet</h3>
+                        <p>Users have not left any comments for the admin yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<datalist id="player-name-suggestions">
+    {% for name in name_suggestions %}
+    <option value="{{ name }}"></option>
+    {% endfor %}
+</datalist>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const messageInput = document.querySelector('[data-feedback-message-input]');
+        const counter = document.querySelector('[data-feedback-char-counter]');
+
+        if (!messageInput || !counter) {
+            return;
+        }
+
+        const maxLength = Number(messageInput.getAttribute('maxlength') || '0');
+
+        function updateCounter() {
+            const currentLength = messageInput.value.length;
+            counter.textContent = currentLength + ' / ' + maxLength;
+            counter.classList.toggle('is-limit-close', maxLength > 0 && currentLength >= Math.max(0, maxLength - 25));
+        }
+
+        messageInput.addEventListener('input', updateCounter);
+        updateCounter();
+    });
+</script>
+{% endblock %}

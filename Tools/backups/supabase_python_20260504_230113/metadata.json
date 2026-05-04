@@ -1,0 +1,1311 @@
+{
+  "schema": "public",
+  "created_at": "2026-05-04 23:01:15",
+  "tables": [
+    {
+      "schema": "public",
+      "table": "admin_feedback_messages",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": null,
+          "position": 1
+        },
+        {
+          "name": "player_name",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": null,
+          "position": 2
+        },
+        {
+          "name": "player_name_normalized",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": null,
+          "position": 3
+        },
+        {
+          "name": "message_text",
+          "data_type": "text",
+          "udt_name": "text",
+          "nullable": false,
+          "default": null,
+          "position": 4
+        },
+        {
+          "name": "created_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "position": 5
+        },
+        {
+          "name": "ip_address",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 6
+        },
+        {
+          "name": "is_hidden",
+          "data_type": "boolean",
+          "udt_name": "bool",
+          "nullable": false,
+          "default": "false",
+          "position": 7
+        }
+      ],
+      "row_count": 1,
+      "csv_file": "data/admin_feedback_messages.csv"
+    },
+    {
+      "schema": "public",
+      "table": "admin_users",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": "nextval('admin_users_id_seq'::regclass)",
+          "position": 1
+        },
+        {
+          "name": "username",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": null,
+          "position": 2
+        },
+        {
+          "name": "password_hash",
+          "data_type": "text",
+          "udt_name": "text",
+          "nullable": false,
+          "default": null,
+          "position": 3
+        },
+        {
+          "name": "role",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": "'admin'::character varying",
+          "position": 4
+        },
+        {
+          "name": "is_active",
+          "data_type": "boolean",
+          "udt_name": "bool",
+          "nullable": false,
+          "default": "true",
+          "position": 5
+        },
+        {
+          "name": "created_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "position": 6
+        },
+        {
+          "name": "last_login_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": true,
+          "default": null,
+          "position": 7
+        }
+      ],
+      "row_count": 1,
+      "csv_file": "data/admin_users.csv"
+    },
+    {
+      "schema": "public",
+      "table": "leagues",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": null,
+          "position": 1
+        },
+        {
+          "name": "name",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": null,
+          "position": 2
+        },
+        {
+          "name": "slug",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 3
+        },
+        {
+          "name": "starts_at",
+          "data_type": "date",
+          "udt_name": "date",
+          "nullable": false,
+          "default": null,
+          "position": 4
+        },
+        {
+          "name": "ends_at",
+          "data_type": "date",
+          "udt_name": "date",
+          "nullable": true,
+          "default": null,
+          "position": 5
+        },
+        {
+          "name": "created_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "position": 6
+        }
+      ],
+      "row_count": 1,
+      "csv_file": "data/leagues.csv"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": "nextval('players_id_seq'::regclass)",
+          "position": 1
+        },
+        {
+          "name": "name",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": null,
+          "position": 2
+        },
+        {
+          "name": "name_normalized",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": null,
+          "position": 3
+        },
+        {
+          "name": "current_elo",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "nullable": false,
+          "default": "1000",
+          "position": 4
+        },
+        {
+          "name": "matches_count",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "nullable": false,
+          "default": "0",
+          "position": 5
+        },
+        {
+          "name": "wins",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "nullable": false,
+          "default": "0",
+          "position": 6
+        },
+        {
+          "name": "losses",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "nullable": false,
+          "default": "0",
+          "position": 7
+        },
+        {
+          "name": "last_match_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": true,
+          "default": null,
+          "position": 8
+        },
+        {
+          "name": "created_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "position": 9
+        },
+        {
+          "name": "updated_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "position": 10
+        },
+        {
+          "name": "is_active",
+          "data_type": "boolean",
+          "udt_name": "bool",
+          "nullable": false,
+          "default": "true",
+          "position": 11
+        },
+        {
+          "name": "priority_race",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 12
+        },
+        {
+          "name": "country_code",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 13
+        },
+        {
+          "name": "discord_url",
+          "data_type": "text",
+          "udt_name": "text",
+          "nullable": true,
+          "default": null,
+          "position": 14
+        },
+        {
+          "name": "draws",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "nullable": false,
+          "default": "0",
+          "position": 15
+        }
+      ],
+      "row_count": 83,
+      "csv_file": "data/players.csv"
+    },
+    {
+      "schema": "public",
+      "table": "admin_action_log",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": "nextval('admin_action_log_id_seq'::regclass)",
+          "position": 1
+        },
+        {
+          "name": "admin_user_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": true,
+          "default": null,
+          "position": 2
+        },
+        {
+          "name": "action_type",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": null,
+          "position": 3
+        },
+        {
+          "name": "entity_type",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": null,
+          "position": 4
+        },
+        {
+          "name": "entity_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": true,
+          "default": null,
+          "position": 5
+        },
+        {
+          "name": "details_json",
+          "data_type": "jsonb",
+          "udt_name": "jsonb",
+          "nullable": true,
+          "default": null,
+          "position": 6
+        },
+        {
+          "name": "created_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "position": 7
+        },
+        {
+          "name": "ip_address",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 8
+        }
+      ],
+      "row_count": 6,
+      "csv_file": "data/admin_action_log.csv"
+    },
+    {
+      "schema": "public",
+      "table": "system_settings",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": "nextval('system_settings_id_seq'::regclass)",
+          "position": 1
+        },
+        {
+          "name": "setting_key",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": null,
+          "position": 2
+        },
+        {
+          "name": "setting_value",
+          "data_type": "text",
+          "udt_name": "text",
+          "nullable": false,
+          "default": null,
+          "position": 3
+        },
+        {
+          "name": "updated_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "position": 4
+        },
+        {
+          "name": "updated_by_admin",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": true,
+          "default": null,
+          "position": 5
+        }
+      ],
+      "row_count": 4,
+      "csv_file": "data/system_settings.csv"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": "nextval('matches_id_seq'::regclass)",
+          "position": 1
+        },
+        {
+          "name": "player1_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": null,
+          "position": 2
+        },
+        {
+          "name": "player2_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": null,
+          "position": 3
+        },
+        {
+          "name": "winner_player_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": true,
+          "default": null,
+          "position": 4
+        },
+        {
+          "name": "played_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": null,
+          "position": 5
+        },
+        {
+          "name": "created_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "position": 6
+        },
+        {
+          "name": "comment",
+          "data_type": "text",
+          "udt_name": "text",
+          "nullable": true,
+          "default": null,
+          "position": 7
+        },
+        {
+          "name": "player1_race",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 8
+        },
+        {
+          "name": "player2_race",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 9
+        },
+        {
+          "name": "is_ranked",
+          "data_type": "boolean",
+          "udt_name": "bool",
+          "nullable": false,
+          "default": "true",
+          "position": 10
+        },
+        {
+          "name": "game_type",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 11
+        },
+        {
+          "name": "mission_name",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 12
+        },
+        {
+          "name": "result_type",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": "'win'::character varying",
+          "position": 13
+        },
+        {
+          "name": "player1_roster_id",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 14
+        },
+        {
+          "name": "player2_roster_id",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": true,
+          "default": null,
+          "position": 15
+        },
+        {
+          "name": "league_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": true,
+          "default": null,
+          "position": 16
+        }
+      ],
+      "row_count": 175,
+      "csv_file": "data/matches.csv"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": null,
+          "position": 1
+        },
+        {
+          "name": "player_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": null,
+          "position": 2
+        },
+        {
+          "name": "league_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": null,
+          "position": 3
+        },
+        {
+          "name": "badge_code",
+          "data_type": "character varying",
+          "udt_name": "varchar",
+          "nullable": false,
+          "default": null,
+          "position": 4
+        },
+        {
+          "name": "awarded_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "position": 5
+        },
+        {
+          "name": "awarded_match_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": true,
+          "default": null,
+          "position": 6
+        }
+      ],
+      "row_count": 3,
+      "csv_file": "data/player_league_badges.csv"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": "nextval('rating_history_id_seq'::regclass)",
+          "position": 1
+        },
+        {
+          "name": "match_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": null,
+          "position": 2
+        },
+        {
+          "name": "player_id",
+          "data_type": "bigint",
+          "udt_name": "int8",
+          "nullable": false,
+          "default": null,
+          "position": 3
+        },
+        {
+          "name": "old_elo",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "nullable": false,
+          "default": null,
+          "position": 4
+        },
+        {
+          "name": "new_elo",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "nullable": false,
+          "default": null,
+          "position": 5
+        },
+        {
+          "name": "elo_delta",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "nullable": false,
+          "default": null,
+          "position": 6
+        },
+        {
+          "name": "expected_score",
+          "data_type": "numeric",
+          "udt_name": "numeric",
+          "nullable": false,
+          "default": null,
+          "position": 7
+        },
+        {
+          "name": "actual_score",
+          "data_type": "numeric",
+          "udt_name": "numeric",
+          "nullable": false,
+          "default": null,
+          "position": 8
+        },
+        {
+          "name": "k_factor",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "nullable": false,
+          "default": null,
+          "position": 9
+        },
+        {
+          "name": "created_at",
+          "data_type": "timestamp without time zone",
+          "udt_name": "timestamp",
+          "nullable": false,
+          "default": "now()",
+          "position": 10
+        }
+      ],
+      "row_count": 198,
+      "csv_file": "data/rating_history.csv"
+    }
+  ],
+  "constraints": [
+    {
+      "schema": "public",
+      "table": "admin_action_log",
+      "name": "admin_action_log_admin_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (admin_user_id) REFERENCES admin_users(id) ON DELETE SET NULL"
+    },
+    {
+      "schema": "public",
+      "table": "admin_action_log",
+      "name": "admin_action_log_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_feedback_messages",
+      "name": "admin_feedback_messages_message_text_length_check",
+      "type": "c",
+      "definition": "CHECK (char_length(message_text) >= 3 AND char_length(message_text) <= 300)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_feedback_messages",
+      "name": "admin_feedback_messages_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_users",
+      "name": "admin_users_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_users",
+      "name": "admin_users_username_key",
+      "type": "u",
+      "definition": "UNIQUE (username)"
+    },
+    {
+      "schema": "public",
+      "table": "leagues",
+      "name": "leagues_dates_check",
+      "type": "c",
+      "definition": "CHECK (ends_at IS NULL OR ends_at >= starts_at)"
+    },
+    {
+      "schema": "public",
+      "table": "leagues",
+      "name": "leagues_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "schema": "public",
+      "table": "leagues",
+      "name": "leagues_slug_key",
+      "type": "u",
+      "definition": "UNIQUE (slug)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "chk_matches_different_players",
+      "type": "c",
+      "definition": "CHECK (player1_id <> player2_id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "chk_matches_player1_race",
+      "type": "c",
+      "definition": "CHECK (player1_race::text = ANY (ARRAY['Терран'::character varying, 'Протосс'::character varying, 'Зерг'::character varying]::text[]))"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "chk_matches_player2_race",
+      "type": "c",
+      "definition": "CHECK (player2_race::text = ANY (ARRAY['Терран'::character varying, 'Протосс'::character varying, 'Зерг'::character varying]::text[]))"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "chk_matches_winner_is_participant",
+      "type": "c",
+      "definition": "CHECK (winner_player_id = player1_id OR winner_player_id = player2_id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "matches_league_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (league_id) REFERENCES leagues(id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "matches_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "matches_player1_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (player1_id) REFERENCES players(id) ON DELETE RESTRICT"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "matches_player2_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (player2_id) REFERENCES players(id) ON DELETE RESTRICT"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "matches_players_distinct_check",
+      "type": "c",
+      "definition": "CHECK (player1_id <> player2_id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "matches_result_type_check",
+      "type": "c",
+      "definition": "CHECK (result_type::text = ANY (ARRAY['win'::character varying, 'draw'::character varying]::text[]))"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "matches_winner_consistency_check",
+      "type": "c",
+      "definition": "CHECK (result_type::text = 'win'::text AND winner_player_id IS NOT NULL AND (winner_player_id = player1_id OR winner_player_id = player2_id) OR result_type::text = 'draw'::text AND winner_player_id IS NULL)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "matches_winner_player_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (winner_player_id) REFERENCES players(id) ON DELETE RESTRICT"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_awarded_match_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (awarded_match_id) REFERENCES matches(id) ON DELETE SET NULL"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_badge_code_check",
+      "type": "c",
+      "definition": "CHECK (badge_code::text = ANY (ARRAY['champion_terran'::character varying, 'champion_protoss'::character varying, 'champion_zerg'::character varying, 'contender_terran'::character varying, 'contender_protoss'::character varying, 'contender_zerg'::character varying]::text[]))"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_league_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_player_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_unique",
+      "type": "u",
+      "definition": "UNIQUE (player_id, league_id, badge_code)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "chk_players_priority_race",
+      "type": "c",
+      "definition": "CHECK ((priority_race::text = ANY (ARRAY['Терран'::character varying, 'Протосс'::character varying, 'Зерг'::character varying]::text[])) OR priority_race IS NULL)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "players_current_elo_check",
+      "type": "c",
+      "definition": "CHECK (current_elo >= 0)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "players_draws_check",
+      "type": "c",
+      "definition": "CHECK (draws >= 0)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "players_losses_check",
+      "type": "c",
+      "definition": "CHECK (losses >= 0)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "players_matches_count_check",
+      "type": "c",
+      "definition": "CHECK (matches_count >= 0)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "players_name_normalized_key",
+      "type": "u",
+      "definition": "UNIQUE (name_normalized)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "players_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "players_wins_check",
+      "type": "c",
+      "definition": "CHECK (wins >= 0)"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "rating_history_match_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "rating_history_new_elo_check",
+      "type": "c",
+      "definition": "CHECK (new_elo >= 0)"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "rating_history_old_elo_check",
+      "type": "c",
+      "definition": "CHECK (old_elo >= 0)"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "rating_history_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "rating_history_player_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "uq_rating_history_match_player",
+      "type": "u",
+      "definition": "UNIQUE (match_id, player_id)"
+    },
+    {
+      "schema": "public",
+      "table": "system_settings",
+      "name": "system_settings_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "schema": "public",
+      "table": "system_settings",
+      "name": "system_settings_setting_key_key",
+      "type": "u",
+      "definition": "UNIQUE (setting_key)"
+    },
+    {
+      "schema": "public",
+      "table": "system_settings",
+      "name": "system_settings_updated_by_admin_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (updated_by_admin) REFERENCES admin_users(id) ON DELETE SET NULL"
+    }
+  ],
+  "indexes": [
+    {
+      "schema": "public",
+      "table": "admin_action_log",
+      "name": "admin_action_log_pkey",
+      "definition": "CREATE UNIQUE INDEX admin_action_log_pkey ON public.admin_action_log USING btree (id)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_action_log",
+      "name": "ix_admin_action_log_admin_user_id",
+      "definition": "CREATE INDEX ix_admin_action_log_admin_user_id ON public.admin_action_log USING btree (admin_user_id)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_action_log",
+      "name": "ix_admin_action_log_created_at",
+      "definition": "CREATE INDEX ix_admin_action_log_created_at ON public.admin_action_log USING btree (created_at DESC)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_feedback_messages",
+      "name": "admin_feedback_messages_created_at_idx",
+      "definition": "CREATE INDEX admin_feedback_messages_created_at_idx ON public.admin_feedback_messages USING btree (created_at DESC, id DESC)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_feedback_messages",
+      "name": "admin_feedback_messages_pkey",
+      "definition": "CREATE UNIQUE INDEX admin_feedback_messages_pkey ON public.admin_feedback_messages USING btree (id)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_feedback_messages",
+      "name": "admin_feedback_messages_player_name_normalized_idx",
+      "definition": "CREATE INDEX admin_feedback_messages_player_name_normalized_idx ON public.admin_feedback_messages USING btree (player_name_normalized)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_users",
+      "name": "admin_users_pkey",
+      "definition": "CREATE UNIQUE INDEX admin_users_pkey ON public.admin_users USING btree (id)"
+    },
+    {
+      "schema": "public",
+      "table": "admin_users",
+      "name": "admin_users_username_key",
+      "definition": "CREATE UNIQUE INDEX admin_users_username_key ON public.admin_users USING btree (username)"
+    },
+    {
+      "schema": "public",
+      "table": "leagues",
+      "name": "leagues_pkey",
+      "definition": "CREATE UNIQUE INDEX leagues_pkey ON public.leagues USING btree (id)"
+    },
+    {
+      "schema": "public",
+      "table": "leagues",
+      "name": "leagues_slug_key",
+      "definition": "CREATE UNIQUE INDEX leagues_slug_key ON public.leagues USING btree (slug)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "idx_matches_is_ranked_id_desc",
+      "definition": "CREATE INDEX idx_matches_is_ranked_id_desc ON public.matches USING btree (is_ranked, id DESC)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "idx_matches_league_id",
+      "definition": "CREATE INDEX idx_matches_league_id ON public.matches USING btree (league_id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "idx_matches_league_id_played_at",
+      "definition": "CREATE INDEX idx_matches_league_id_played_at ON public.matches USING btree (league_id, played_at DESC, id DESC)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "idx_matches_played_at_id_desc",
+      "definition": "CREATE INDEX idx_matches_played_at_id_desc ON public.matches USING btree (played_at DESC, id DESC)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "idx_matches_player1_id",
+      "definition": "CREATE INDEX idx_matches_player1_id ON public.matches USING btree (player1_id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "idx_matches_player1_priority_race",
+      "definition": "CREATE INDEX idx_matches_player1_priority_race ON public.matches USING btree (player1_id, player1_race)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "idx_matches_player2_id",
+      "definition": "CREATE INDEX idx_matches_player2_id ON public.matches USING btree (player2_id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "idx_matches_player2_priority_race",
+      "definition": "CREATE INDEX idx_matches_player2_priority_race ON public.matches USING btree (player2_id, player2_race)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "ix_matches_played_at",
+      "definition": "CREATE INDEX ix_matches_played_at ON public.matches USING btree (played_at)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "ix_matches_player1_id",
+      "definition": "CREATE INDEX ix_matches_player1_id ON public.matches USING btree (player1_id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "ix_matches_player2_id",
+      "definition": "CREATE INDEX ix_matches_player2_id ON public.matches USING btree (player2_id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "ix_matches_winner_player_id",
+      "definition": "CREATE INDEX ix_matches_winner_player_id ON public.matches USING btree (winner_player_id)"
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "name": "matches_pkey",
+      "definition": "CREATE UNIQUE INDEX matches_pkey ON public.matches USING btree (id)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "idx_player_league_badges_awarded_match_id",
+      "definition": "CREATE INDEX idx_player_league_badges_awarded_match_id ON public.player_league_badges USING btree (awarded_match_id)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "idx_player_league_badges_league_id",
+      "definition": "CREATE INDEX idx_player_league_badges_league_id ON public.player_league_badges USING btree (league_id)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "idx_player_league_badges_player_id",
+      "definition": "CREATE INDEX idx_player_league_badges_player_id ON public.player_league_badges USING btree (player_id)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_awarded_match_id_idx",
+      "definition": "CREATE INDEX player_league_badges_awarded_match_id_idx ON public.player_league_badges USING btree (awarded_match_id)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_league_id_idx",
+      "definition": "CREATE INDEX player_league_badges_league_id_idx ON public.player_league_badges USING btree (league_id)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_one_badge_per_player_idx",
+      "definition": "CREATE UNIQUE INDEX player_league_badges_one_badge_per_player_idx ON public.player_league_badges USING btree (player_id)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_one_holder_per_badge_idx",
+      "definition": "CREATE UNIQUE INDEX player_league_badges_one_holder_per_badge_idx ON public.player_league_badges USING btree (league_id, badge_code)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_pkey",
+      "definition": "CREATE UNIQUE INDEX player_league_badges_pkey ON public.player_league_badges USING btree (id)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_player_id_idx",
+      "definition": "CREATE INDEX player_league_badges_player_id_idx ON public.player_league_badges USING btree (player_id)"
+    },
+    {
+      "schema": "public",
+      "table": "player_league_badges",
+      "name": "player_league_badges_unique",
+      "definition": "CREATE UNIQUE INDEX player_league_badges_unique ON public.player_league_badges USING btree (player_id, league_id, badge_code)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "idx_players_name_normalized",
+      "definition": "CREATE INDEX idx_players_name_normalized ON public.players USING btree (name_normalized)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "ix_players_current_elo",
+      "definition": "CREATE INDEX ix_players_current_elo ON public.players USING btree (current_elo DESC)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "ix_players_last_match_at",
+      "definition": "CREATE INDEX ix_players_last_match_at ON public.players USING btree (last_match_at DESC)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "players_name_normalized_key",
+      "definition": "CREATE UNIQUE INDEX players_name_normalized_key ON public.players USING btree (name_normalized)"
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "name": "players_pkey",
+      "definition": "CREATE UNIQUE INDEX players_pkey ON public.players USING btree (id)"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "idx_rating_history_match_player",
+      "definition": "CREATE INDEX idx_rating_history_match_player ON public.rating_history USING btree (match_id, player_id)"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "ix_rating_history_match_id",
+      "definition": "CREATE INDEX ix_rating_history_match_id ON public.rating_history USING btree (match_id)"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "ix_rating_history_player_id",
+      "definition": "CREATE INDEX ix_rating_history_player_id ON public.rating_history USING btree (player_id)"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "rating_history_pkey",
+      "definition": "CREATE UNIQUE INDEX rating_history_pkey ON public.rating_history USING btree (id)"
+    },
+    {
+      "schema": "public",
+      "table": "rating_history",
+      "name": "uq_rating_history_match_player",
+      "definition": "CREATE UNIQUE INDEX uq_rating_history_match_player ON public.rating_history USING btree (match_id, player_id)"
+    },
+    {
+      "schema": "public",
+      "table": "system_settings",
+      "name": "system_settings_pkey",
+      "definition": "CREATE UNIQUE INDEX system_settings_pkey ON public.system_settings USING btree (id)"
+    },
+    {
+      "schema": "public",
+      "table": "system_settings",
+      "name": "system_settings_setting_key_key",
+      "definition": "CREATE UNIQUE INDEX system_settings_setting_key_key ON public.system_settings USING btree (setting_key)"
+    }
+  ],
+  "restore_order": [
+    "admin_feedback_messages",
+    "admin_users",
+    "leagues",
+    "players",
+    "admin_action_log",
+    "system_settings",
+    "matches",
+    "player_league_badges",
+    "rating_history"
+  ]
+}
