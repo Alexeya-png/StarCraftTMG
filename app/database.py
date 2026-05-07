@@ -202,13 +202,19 @@ LEAGUE_BADGE_DEFINITIONS = {
 }
 LEAGUE_HERO_RACES = LEAGUE_BADGE_RACES
 LEAGUE_HEAD_TO_HEAD_POINT_LEAD_LIMIT = 2
-LEAGUE_HEAD_TO_HEAD_HALF_POINTS_AFTER_GAMES = 3
 LEAGUE_POINTS_MIN_OPPONENT_MATCHES = 4
+LEAGUE_POINTS_WIN = 3.0
+LEAGUE_POINTS_DRAW = 1.0
+LEAGUE_POINTS_LOSS = -1.0
+LEAGUE_POINTS_FAVORITE_WIN = 1.0
+LEAGUE_POINTS_FAVORITE_DRAW = 0.0
+LEAGUE_POINTS_FAVORITE_LOSS = -2.0
 LEAGUE_POINTS_RULES_TEXT = (
-    'Win = 3 points. Draw = 1 point. Loss = 0 points. '
+    'Win = 3 points. Draw = 1 point. Loss = -1 point. '
     'Points count only if the opponent has played more than 3 ranked matches in this league. '
-    'If a player already leads the same opponent by 2 wins, the next win against that opponent gives 0 points. '
-    'From the 4th head-to-head match between the same players, earned points are reduced by 50%.'
+    'If a player leads the same opponent by 2 or more wins, that player is the head-to-head favorite. '
+    'A favorite gets +1 point for a win, 0 points for a draw, and -2 points for a loss. '
+    'The trailing player keeps the normal +3 points for a win, +1 point for a draw, and -1 point for a loss.'
 )
 
 _DATA_CACHE_LOCK = threading.RLock()
@@ -1388,13 +1394,6 @@ def _build_league_race_badge(*, league: dict | None, race: str, kind: str | None
     return _build_league_badge_display(badge_code=badge_code, league=prepared_league, row={'league_id': league_id})
 
 
-def _apply_head_to_head_volume_modifier(base_points: float, games_before_pair: int) -> float:
-    points = float(base_points or 0)
-    if games_before_pair >= LEAGUE_HEAD_TO_HEAD_HALF_POINTS_AFTER_GAMES:
-        points = points / 2
-    return points
-
-
 def _opponent_has_enough_league_matches(player_match_counts: dict[int, int], opponent_id: int) -> bool:
     return int(player_match_counts.get(int(opponent_id), 0) or 0) >= LEAGUE_POINTS_MIN_OPPONENT_MATCHES
 
@@ -1472,7 +1471,7 @@ def _build_league_results_summary(league: dict) -> dict:
             }
         return stats_by_player[player_id]
 
-    head_to_head: dict[tuple[int, int], dict[str, Any]] = {}
+    head_to_head: dict[tuple[int, int], dict[int, int]] = {}
 
     for match in match_rows:
         player1_id = int(match.get('player1_id') or 0)
@@ -1481,27 +1480,27 @@ def _build_league_results_summary(league: dict) -> dict:
             continue
 
         pair_key = tuple(sorted((player1_id, player2_id)))
-        pair_stats = head_to_head.setdefault(
-            pair_key,
-            {'games': 0, 'wins': defaultdict(int)},
-        )
-        games_before_pair = int(pair_stats.get('games') or 0)
-        pair_wins = pair_stats['wins']
+        pair_wins = head_to_head.setdefault(pair_key, defaultdict(int))
 
         player1 = ensure_player(player1_id)
         player2 = ensure_player(player2_id)
         player1['matches_count'] += 1
         player2['matches_count'] += 1
 
+        player1_lead_before = int(pair_wins[player1_id] or 0) - int(pair_wins[player2_id] or 0)
+        player2_lead_before = int(pair_wins[player2_id] or 0) - int(pair_wins[player1_id] or 0)
+        player1_is_favorite = player1_lead_before >= LEAGUE_HEAD_TO_HEAD_POINT_LEAD_LIMIT
+        player2_is_favorite = player2_lead_before >= LEAGUE_HEAD_TO_HEAD_POINT_LEAD_LIMIT
+
         if _is_match_draw(match):
             player1['draws'] += 1
             player2['draws'] += 1
-            draw_points = _apply_head_to_head_volume_modifier(1, games_before_pair)
+            player1_points = LEAGUE_POINTS_FAVORITE_DRAW if player1_is_favorite else LEAGUE_POINTS_DRAW
+            player2_points = LEAGUE_POINTS_FAVORITE_DRAW if player2_is_favorite else LEAGUE_POINTS_DRAW
             if _opponent_has_enough_league_matches(league_match_counts_by_player, player2_id):
-                player1['points'] += draw_points
+                player1['points'] += player1_points
             if _opponent_has_enough_league_matches(league_match_counts_by_player, player1_id):
-                player2['points'] += draw_points
-            pair_stats['games'] = games_before_pair + 1
+                player2['points'] += player2_points
             continue
 
         winner_id = int(match.get('winner_player_id') or 0)
@@ -1516,21 +1515,22 @@ def _build_league_results_summary(league: dict) -> dict:
 
         if winner_id in {player1_id, player2_id} and loser_id in {player1_id, player2_id}:
             winner_lead_before = int(pair_wins[winner_id] or 0) - int(pair_wins[loser_id] or 0)
-            awarded_points = 0.0
-            if (
-                winner_lead_before < LEAGUE_HEAD_TO_HEAD_POINT_LEAD_LIMIT
-                and _opponent_has_enough_league_matches(league_match_counts_by_player, loser_id)
-            ):
-                awarded_points = _apply_head_to_head_volume_modifier(3, games_before_pair)
+            loser_lead_before = int(pair_wins[loser_id] or 0) - int(pair_wins[winner_id] or 0)
+            winner_points = LEAGUE_POINTS_FAVORITE_WIN if winner_lead_before >= LEAGUE_HEAD_TO_HEAD_POINT_LEAD_LIMIT else LEAGUE_POINTS_WIN
+            loser_points = LEAGUE_POINTS_FAVORITE_LOSS if loser_lead_before >= LEAGUE_HEAD_TO_HEAD_POINT_LEAD_LIMIT else LEAGUE_POINTS_LOSS
 
             if winner_id == player1_id:
-                player1['points'] += awarded_points
+                if _opponent_has_enough_league_matches(league_match_counts_by_player, player2_id):
+                    player1['points'] += winner_points
+                if _opponent_has_enough_league_matches(league_match_counts_by_player, player1_id):
+                    player2['points'] += loser_points
             elif winner_id == player2_id:
-                player2['points'] += awarded_points
+                if _opponent_has_enough_league_matches(league_match_counts_by_player, player1_id):
+                    player2['points'] += winner_points
+                if _opponent_has_enough_league_matches(league_match_counts_by_player, player2_id):
+                    player1['points'] += loser_points
 
             pair_wins[winner_id] += 1
-
-        pair_stats['games'] = games_before_pair + 1
 
     prepared_players: list[dict] = []
     for stats in stats_by_player.values():
