@@ -882,6 +882,14 @@ def sitemap_xml():
     ]
     return _render_sitemap_index(entries)
 
+@app.route('/service-worker.js')
+def service_worker():
+    response = make_response(
+        send_from_directory(app.static_folder, 'service-worker.js', mimetype='application/javascript')
+    )
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
 
 @app.route('/sitemap-pages.xml')
 def sitemap_pages_xml():

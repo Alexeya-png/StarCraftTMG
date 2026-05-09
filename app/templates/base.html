@@ -21,8 +21,10 @@
     <meta name="twitter:description" content="{{ meta_description }}">
     <meta name="twitter:image" content="{{ site_url }}{{ url_for('static', filename='Race/logo.png', v=asset_version) }}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png', v=asset_version) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v=asset_version) }}">
-</head>
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='app-icon-192.png', v=asset_version) }}">
+    <link rel="manifest" href="/static/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v=asset_version) }}"></head>
 <body>
     <header class="site-header">
 
@@ -31,7 +33,7 @@
                 <img class="brand-logo" src="{{ url_for('static', filename='Race/logo.png', v=asset_version) }}" alt="Archon Studio logo" width="96" height="64" decoding="async">
     <div class="brand-meta">
         <span class="brand-title">TMG Stats</span>
-        <span class="brand-version">Version 0.73b</span>
+        <span class="brand-version">Version 0.74</span>
         <span class="brand-note">Unofficial fan project</span>
     </div>
         </a>
@@ -58,5 +60,13 @@
     <main>
         {% block content %}{% endblock %}
     </main>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/service-worker.js');
+            });
+        }
+    </script>
 </body>
 </html>
