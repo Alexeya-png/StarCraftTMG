@@ -154,6 +154,8 @@ ACTIVE_PLAYER_DAYS_WINDOW = 365
 DATA_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_DATA_CACHE_TTL_SECONDS', '300') or '300'))
 LEAGUE_SUMMARY_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_LEAGUE_SUMMARY_CACHE_TTL_SECONDS', '300') or '300'))
 PAGE_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_PAGE_CACHE_TTL_SECONDS', '900') or '900'))
+DISK_CACHE_MAX_AGE_SECONDS = max(0, int(os.getenv('APP_DISK_CACHE_MAX_AGE_SECONDS', '604800') or '604800'))
+DISK_CACHE_PATH = Path(os.getenv('APP_DISK_CACHE_PATH') or (BASE_DIR / '.cache' / 'application_data.json'))
 TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS = max(0, int(os.getenv('TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS', '3600') or '3600'))
 FEEDBACK_MESSAGE_MAX_LENGTH = 300
 FEEDBACK_PLAYER_NAME_MAX_LENGTH = 80
@@ -219,10 +221,15 @@ LEAGUE_POINTS_RULES_TEXT = (
 
 _DATA_CACHE_LOCK = threading.RLock()
 _SUBMIT_MATCH_LOCK = threading.RLock()
+_DATA_CACHE_REFRESH_LOCK = threading.Lock()
+_DATA_CACHE_REFRESH_IN_PROGRESS = False
 _DATA_CACHE: dict[str, Any] = {
     'players': None,
     'matches': None,
     'rating_history': None,
+    'all_leagues': None,
+    'current_league': None,
+    'player_league_badges': None,
     'loaded_at': 0.0,
     'version': 0,
 }
@@ -1235,6 +1242,30 @@ def _load_league_config_cache(*, force_refresh: bool = False) -> dict[str, Any]:
                 'current_league': copy.deepcopy(_LEAGUE_CONFIG_CACHE.get('current_league')),
             }
 
+    if not force_refresh:
+        with _DATA_CACHE_LOCK:
+            data_all_leagues = copy.deepcopy(_DATA_CACHE.get('all_leagues') or [])
+            data_current_league = copy.deepcopy(_DATA_CACHE.get('current_league'))
+            data_loaded_at = float(_DATA_CACHE.get('loaded_at') or 0.0)
+
+        if data_loaded_at > 0 and (data_all_leagues or data_current_league):
+            with _LEAGUE_CONFIG_CACHE_LOCK:
+                _LEAGUE_CONFIG_CACHE['all_leagues'] = copy.deepcopy(data_all_leagues)
+                _LEAGUE_CONFIG_CACHE['current_league'] = copy.deepcopy(data_current_league)
+                _LEAGUE_CONFIG_CACHE['loaded_at'] = data_loaded_at
+            return {
+                'all_leagues': data_all_leagues,
+                'current_league': data_current_league,
+            }
+
+        disk_snapshot = _read_disk_cache_snapshot()
+        if disk_snapshot and (disk_snapshot.get('all_leagues') or disk_snapshot.get('current_league')):
+            snapshot = _apply_cache_snapshot(disk_snapshot)
+            return {
+                'all_leagues': copy.deepcopy(snapshot.get('all_leagues') or []),
+                'current_league': copy.deepcopy(snapshot.get('current_league')),
+            }
+
     all_leagues = _fetch_all_leagues_uncached()
     current_league = _fetch_current_league_uncached(required=False)
 
@@ -1270,6 +1301,14 @@ def _fetch_leagues_by_ids(league_ids: list[int]) -> dict[int, dict]:
     clean_ids = sorted({int(league_id) for league_id in league_ids if _coerce_positive_int(league_id)})
     if not clean_ids:
         return {}
+
+    cached_leagues = {
+        int(league['id']): dict(league)
+        for league in fetch_all_leagues()
+        if int(league.get('id') or 0) in clean_ids
+    }
+    if len(cached_leagues) == len(clean_ids):
+        return cached_leagues
 
     rows = _rest_select(
         LEAGUE_TABLE_NAME,
@@ -1422,12 +1461,12 @@ def _prepare_league_player_card(row: dict | None) -> dict | None:
 
 def _build_league_results_summary(league: dict) -> dict:
     league_id = int(league['id'])
-    match_rows = _rest_fetch_all(
-        'matches',
-        select='id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,is_ranked,result_type,league_id',
-        filters=[('league_id', 'eq', league_id), ('is_ranked', 'eq', True)],
-        order='played_at.asc,id.asc',
-    )
+    match_rows = [
+        dict(row)
+        for row in _fetch_all_matches_raw()
+        if _coerce_positive_int(row.get('league_id')) == league_id and bool(row.get('is_ranked'))
+    ]
+    match_rows.sort(key=lambda row: (_parse_datetime(row.get('played_at')) or datetime.min, int(row.get('id') or 0)))
 
     player_ids: set[int] = set()
     player_rows: dict[int, dict] = {}
@@ -1446,12 +1485,7 @@ def _build_league_results_summary(league: dict) -> dict:
             league_match_counts_by_player[player2_id] += 1
 
     if player_ids:
-        for row in _rest_select(
-            'players',
-            select='id,name,current_elo,priority_race,country_code',
-            filters=[('id', 'in', sorted(player_ids))],
-        ):
-            player_rows[int(row['id'])] = dict(row)
+        player_rows = _fetch_players_by_ids_cached(sorted(player_ids))
 
     def ensure_player(player_id: int) -> dict:
         if player_id not in stats_by_player:
@@ -1958,17 +1992,33 @@ def fetch_player_badges(player_id: int) -> list[dict]:
     if not target_player_id:
         return []
 
-    try:
-        rows = _rest_select(
-            LEAGUE_BADGES_TABLE_NAME,
-            select='id,player_id,league_id,badge_code,awarded_at,awarded_match_id',
-            filters=[('player_id', 'eq', target_player_id)],
-            order='league_id.desc,badge_code.asc',
+    with _DATA_CACHE_LOCK:
+        cached_badges = _DATA_CACHE.get('player_league_badges')
+
+    if cached_badges is not None:
+        rows = [
+            dict(row)
+            for row in cached_badges
+            if _coerce_positive_int(row.get('player_id')) == target_player_id
+        ]
+        rows.sort(
+            key=lambda row: (
+                -int(row.get('league_id') or 0),
+                _normalize_text(row.get('badge_code')),
+            )
         )
-    except Exception as exc:
-        if _is_missing_league_badges_table_error(exc):
-            return []
-        raise
+    else:
+        try:
+            rows = _rest_select(
+                LEAGUE_BADGES_TABLE_NAME,
+                select='id,player_id,league_id,badge_code,awarded_at,awarded_match_id',
+                filters=[('player_id', 'eq', target_player_id)],
+                order='league_id.desc,badge_code.asc',
+            )
+        except Exception as exc:
+            if _is_missing_league_badges_table_error(exc):
+                return []
+            raise
 
     rows = [row for row in rows if _normalize_league_badge_code(row.get('badge_code'))]
     league_ids = [_coerce_positive_int(row.get('league_id')) for row in rows]
@@ -2023,11 +2073,110 @@ def _cache_is_fresh() -> bool:
     return (time.time() - loaded_at) < DATA_CACHE_TTL_SECONDS
 
 
+def _cache_has_core_data() -> bool:
+    return all(_DATA_CACHE.get(key) is not None for key in ('players', 'matches', 'rating_history'))
+
+
+def _cache_snapshot_from_memory() -> dict[str, Any]:
+    return {
+        'players': [dict(row) for row in _DATA_CACHE.get('players') or []],
+        'matches': [dict(row) for row in _DATA_CACHE.get('matches') or []],
+        'rating_history': [dict(row) for row in _DATA_CACHE.get('rating_history') or []],
+        'all_leagues': copy.deepcopy(_DATA_CACHE.get('all_leagues') or []),
+        'current_league': copy.deepcopy(_DATA_CACHE.get('current_league')),
+        'player_league_badges': [dict(row) for row in _DATA_CACHE.get('player_league_badges') or []],
+        'loaded_at': float(_DATA_CACHE.get('loaded_at') or 0.0),
+        'version': int(_DATA_CACHE.get('version') or 0),
+    }
+
+
+def _apply_cache_snapshot(snapshot: dict[str, Any], *, increment_version: bool = False) -> dict[str, Any]:
+    loaded_at = float(snapshot.get('loaded_at') or time.time())
+    players = [dict(row) for row in snapshot.get('players') or []]
+    matches = [dict(row) for row in snapshot.get('matches') or []]
+    rating_history = [dict(row) for row in snapshot.get('rating_history') or []]
+    all_leagues = copy.deepcopy(snapshot.get('all_leagues') or [])
+    current_league = copy.deepcopy(snapshot.get('current_league'))
+    player_league_badges = [dict(row) for row in snapshot.get('player_league_badges') or []]
+
+    with _DATA_CACHE_LOCK:
+        _DATA_CACHE['players'] = players
+        _DATA_CACHE['matches'] = matches
+        _DATA_CACHE['rating_history'] = rating_history
+        _DATA_CACHE['all_leagues'] = all_leagues
+        _DATA_CACHE['current_league'] = current_league
+        _DATA_CACHE['player_league_badges'] = player_league_badges
+        _DATA_CACHE['loaded_at'] = loaded_at
+        if increment_version:
+            _DATA_CACHE['version'] = int(_DATA_CACHE.get('version') or 0) + 1
+        elif snapshot.get('version') is not None:
+            _DATA_CACHE['version'] = int(snapshot.get('version') or 0)
+        result = _cache_snapshot_from_memory()
+
+    if all_leagues or current_league:
+        with _LEAGUE_CONFIG_CACHE_LOCK:
+            _LEAGUE_CONFIG_CACHE['all_leagues'] = copy.deepcopy(all_leagues)
+            _LEAGUE_CONFIG_CACHE['current_league'] = copy.deepcopy(current_league)
+            _LEAGUE_CONFIG_CACHE['loaded_at'] = loaded_at
+
+    return result
+
+
+def _read_disk_cache_snapshot() -> dict[str, Any] | None:
+    if DISK_CACHE_MAX_AGE_SECONDS <= 0:
+        return None
+    try:
+        payload = json.loads(DISK_CACHE_PATH.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    loaded_at = float(payload.get('loaded_at') or 0.0)
+    if loaded_at <= 0 or (time.time() - loaded_at) > DISK_CACHE_MAX_AGE_SECONDS:
+        return None
+    if not all(isinstance(payload.get(key), list) for key in ('players', 'matches', 'rating_history')):
+        return None
+    return payload
+
+
+def _write_disk_cache_snapshot(snapshot: dict[str, Any]) -> None:
+    try:
+        DISK_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = DISK_CACHE_PATH.with_suffix(f'{DISK_CACHE_PATH.suffix}.tmp')
+        temp_path.write_text(json.dumps(snapshot, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+        temp_path.replace(DISK_CACHE_PATH)
+    except OSError:
+        return
+
+
+def _refresh_application_cache_background() -> None:
+    global _DATA_CACHE_REFRESH_IN_PROGRESS
+    with _DATA_CACHE_REFRESH_LOCK:
+        if _DATA_CACHE_REFRESH_IN_PROGRESS:
+            return
+        _DATA_CACHE_REFRESH_IN_PROGRESS = True
+
+    def worker() -> None:
+        global _DATA_CACHE_REFRESH_IN_PROGRESS
+        try:
+            warmup_application_cache(force_refresh=True)
+        except Exception:
+            pass
+        finally:
+            with _DATA_CACHE_REFRESH_LOCK:
+                _DATA_CACHE_REFRESH_IN_PROGRESS = False
+
+    threading.Thread(target=worker, daemon=True).start()
+
+
 def invalidate_application_cache() -> None:
     with _DATA_CACHE_LOCK:
         _DATA_CACHE['players'] = None
         _DATA_CACHE['matches'] = None
         _DATA_CACHE['rating_history'] = None
+        _DATA_CACHE['all_leagues'] = None
+        _DATA_CACHE['current_league'] = None
+        _DATA_CACHE['player_league_badges'] = None
         _DATA_CACHE['loaded_at'] = 0.0
         _DATA_CACHE['version'] = int(_DATA_CACHE.get('version') or 0) + 1
 
@@ -2044,31 +2193,52 @@ def invalidate_application_cache() -> None:
 
 def warmup_application_cache(*, force_refresh: bool = False) -> dict[str, Any]:
     with _DATA_CACHE_LOCK:
-        if not force_refresh and _cache_is_fresh() and all(_DATA_CACHE.get(key) is not None for key in ('players', 'matches', 'rating_history')):
-            return {
-                'players': [dict(row) for row in _DATA_CACHE['players']],
-                'matches': [dict(row) for row in _DATA_CACHE['matches']],
-                'rating_history': [dict(row) for row in _DATA_CACHE['rating_history']],
-                'version': int(_DATA_CACHE.get('version') or 0),
-            }
+        if not force_refresh and _cache_is_fresh() and _cache_has_core_data():
+            return _cache_snapshot_from_memory()
+        if not force_refresh and _cache_has_core_data():
+            snapshot = _cache_snapshot_from_memory()
+            _refresh_application_cache_background()
+            return snapshot
+
+    if not force_refresh:
+        disk_snapshot = _read_disk_cache_snapshot()
+        if disk_snapshot:
+            snapshot = _apply_cache_snapshot(disk_snapshot)
+            _refresh_application_cache_background()
+            return snapshot
 
     players = _rest_fetch_all('players', order='id.asc')
     matches = _rest_fetch_all('matches', order='played_at.asc,id.asc')
     rating_history = _rest_fetch_all('rating_history', order='id.asc')
-    loaded_at = time.time()
+    all_leagues = _fetch_all_leagues_uncached()
+    current_league = _fetch_current_league_uncached(required=False)
+    try:
+        player_league_badges = _rest_fetch_all(
+            LEAGUE_BADGES_TABLE_NAME,
+            select='id,player_id,league_id,badge_code,awarded_at,awarded_match_id',
+            order='league_id.desc,badge_code.asc',
+        )
+    except Exception as exc:
+        if _is_missing_league_badges_table_error(exc):
+            player_league_badges = []
+        else:
+            raise
 
-    with _DATA_CACHE_LOCK:
-        _DATA_CACHE['players'] = [dict(row) for row in players]
-        _DATA_CACHE['matches'] = [dict(row) for row in matches]
-        _DATA_CACHE['rating_history'] = [dict(row) for row in rating_history]
-        _DATA_CACHE['loaded_at'] = loaded_at
-        version = int(_DATA_CACHE.get('version') or 0)
-        return {
-            'players': [dict(row) for row in _DATA_CACHE['players']],
-            'matches': [dict(row) for row in _DATA_CACHE['matches']],
-            'rating_history': [dict(row) for row in _DATA_CACHE['rating_history']],
-            'version': version,
-        }
+    loaded_at = time.time()
+    snapshot = {
+        'players': players,
+        'matches': matches,
+        'rating_history': rating_history,
+        'all_leagues': all_leagues,
+        'current_league': current_league,
+        'player_league_badges': player_league_badges,
+        'loaded_at': loaded_at,
+        'version': int(_DATA_CACHE.get('version') or 0),
+    }
+
+    result = _apply_cache_snapshot(snapshot)
+    _write_disk_cache_snapshot(result)
+    return result
 
 
 def _cache_snapshot(*, force_refresh: bool = False) -> dict[str, Any]:
@@ -2406,11 +2576,12 @@ def _fetch_all_rating_history_raw(*, force_refresh: bool = False) -> list[dict]:
 
 def fetch_player_name_suggestions(limit: int = 500) -> list[str]:
     safe_limit = max(1, min(limit, 2000))
-    rows = _rest_select(
-        'players',
-        select='name,current_elo',
-        order='current_elo.desc,name.asc',
-        limit=safe_limit,
+    rows = _fetch_all_players_raw()
+    rows.sort(
+        key=lambda row: (
+            -int(row.get('current_elo') or 0),
+            _normalize_player_name(row.get('name')).casefold(),
+        )
     )
 
     suggestions: list[str] = []
@@ -2422,6 +2593,8 @@ def fetch_player_name_suggestions(limit: int = 500) -> list[str]:
             continue
         seen.add(player_key)
         suggestions.append(player_name)
+        if len(suggestions) >= safe_limit:
+            break
     return suggestions
 
 
@@ -2429,7 +2602,15 @@ def fetch_mission_suggestions(limit: int = 50) -> list[str]:
     safe_limit = max(1, min(limit, 200))
     missions = []
     seen = set()
-    for row in _rest_fetch_all('matches', select='mission_name', order='played_at.desc,id.desc'):
+    rows = _fetch_all_matches_raw()
+    rows.sort(
+        key=lambda row: (
+            _parse_datetime(row.get('played_at')) or datetime.min,
+            int(row.get('id') or 0),
+        ),
+        reverse=True,
+    )
+    for row in rows:
         mission = _normalize_player_name(row.get('mission_name'))
         if mission and mission not in seen:
             seen.add(mission)
@@ -2534,6 +2715,9 @@ def _fetch_players_by_ids(player_ids: list[int]) -> dict[int, dict]:
     unique_ids = sorted({int(player_id) for player_id in player_ids if player_id is not None})
     if not unique_ids:
         return {}
+    cached = _fetch_players_by_ids_cached(unique_ids)
+    if cached:
+        return cached
     rows = _rest_select('players', select='id,name', filters=[('id', 'in', unique_ids)])
     return {int(row['id']): dict(row) for row in rows}
 
@@ -2544,11 +2728,13 @@ def _fetch_history_for_matches(match_ids: list[int], player_ids: list[int]) -> d
     if not unique_match_ids or not unique_player_ids:
         return {}
 
-    rows = _rest_select(
-        'rating_history',
-        select='match_id,player_id,old_elo,new_elo,elo_delta',
-        filters=[('match_id', 'in', unique_match_ids), ('player_id', 'in', unique_player_ids)],
-    )
+    match_id_set = set(unique_match_ids)
+    player_id_set = set(unique_player_ids)
+    rows = [
+        row for row in _fetch_all_rating_history_raw()
+        if int(row.get('match_id') or 0) in match_id_set
+        and int(row.get('player_id') or 0) in player_id_set
+    ]
     return {(int(row['match_id']), int(row['player_id'])): dict(row) for row in rows}
 
 

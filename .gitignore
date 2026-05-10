@@ -4,3 +4,4 @@ Tools/.env
 .idea/
 __pycache__/
 *.pyc
+app/.cache/
