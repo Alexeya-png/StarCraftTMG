@@ -18,6 +18,7 @@
         {% else %}
         {% set race_slug = player.priority_race|lower if player.priority_race else '' %}
         {% set priority_race_code = 'T' if race_slug == 'terran' else 'P' if race_slug == 'protoss' else 'Z' if race_slug == 'zerg' else 'Pr' %}
+        {% set has_head_to_head = head_to_head_report is defined and head_to_head_report and head_to_head_report.opponents %}
 
         {% macro render_matchup_card(matchup_code, opponent_name, opponent_slug, wins, losses) %}
         {% set total = wins + losses %}
@@ -108,6 +109,9 @@
         <div class="profile-header-card">
             <div class="profile-header-top">
                 <a class="button button-secondary profile-back-button" href="/leaderboard">← Back to leaderboard</a>
+                {% if has_head_to_head %}
+                <button type="button" class="button button-secondary profile-h2h-open-button" data-h2h-open>League matchup</button>
+                {% endif %}
             </div>
 
             <div class="profile-header-main">
@@ -196,6 +200,88 @@
                 <strong class="profile-meta-value">{{ player.member_since_label }}</strong>
             </article>
         </div>
+
+        {% if has_head_to_head %}
+        <div id="head-to-head" class="profile-section-card profile-h2h-section" data-h2h-root hidden>
+            <div class="profile-section-head profile-h2h-head">
+                <div>
+                    <h2>League matchup report</h2>
+                    <p>Current league score, favorite status and match history.</p>
+                </div>
+                <label class="profile-h2h-select-label">
+                    <span>Opponent</span>
+                    <select class="profile-h2h-select" data-h2h-select>
+                        {% for opponent in head_to_head_report.opponents %}
+                        <option value="{{ opponent.opponent_id }}">
+                            {{ opponent.opponent_name }} - {{ opponent.current_league.score_display if opponent.current_league else opponent.score_display }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+
+            <div class="profile-h2h-summary-grid">
+                <article class="profile-h2h-stat">
+                    <span>Current league score</span>
+                    <strong data-h2h-league-score>0-0</strong>
+                    <small data-h2h-league-meta></small>
+                </article>
+                <article class="profile-h2h-stat profile-h2h-favorite-stat">
+                    <span>League favorite</span>
+                    <strong class="profile-h2h-status" data-h2h-favorite>No favorite yet</strong>
+                    <small data-h2h-favorite-detail></small>
+                </article>
+                <article class="profile-h2h-stat">
+                    <span>All-time matchup</span>
+                    <strong data-h2h-overall-score>0-0</strong>
+                    <small data-h2h-overall-meta></small>
+                </article>
+            </div>
+
+            <div class="profile-h2h-league-panel">
+                <div>
+                    <span class="profile-h2h-panel-label">Next league points</span>
+                    <strong data-h2h-points-eligibility>Points active</strong>
+                </div>
+                <div class="profile-h2h-points-list">
+                    <span>Win <strong data-h2h-points-win>0</strong></span>
+                    <span>Draw <strong data-h2h-points-draw>0</strong></span>
+                    <span>Loss <strong data-h2h-points-loss>0</strong></span>
+                </div>
+            </div>
+
+            <div class="profile-h2h-matches-head">
+                <h3>Matches vs <span data-h2h-opponent-name></span></h3>
+                <a class="profile-h2h-opponent-link" href="#" data-h2h-opponent-link>Open profile</a>
+            </div>
+
+            <div class="leaderboard-table-wrap profile-table-wrap profile-h2h-table-wrap">
+                <table class="leaderboard-table leaderboard-table-polished profile-h2h-table">
+                    <colgroup>
+                        <col style="width: 150px;">
+                        <col style="width: 110px;">
+                        <col style="width: 140px;">
+                        <col style="width: 150px;">
+                        <col style="width: 100px;">
+                        <col style="width: 170px;">
+                        <col style="width: 130px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Result</th>
+                            <th>Player race</th>
+                            <th>Opponent race</th>
+                            <th>Score</th>
+                            <th>League</th>
+                            <th>League points</th>
+                        </tr>
+                    </thead>
+                    <tbody data-h2h-matches></tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
 
         <div class="profile-section-card profile-rating-chart-section">
             <div class="profile-section-head profile-section-head-chart">
@@ -724,6 +810,177 @@ document.addEventListener('DOMContentLoaded', function () {
 
     setMode('smoothed');
     applyZoom();
+});
+</script>
+{% endif %}
+
+{% if has_head_to_head %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const root = document.querySelector('[data-h2h-root]');
+    if (!root) {
+        return;
+    }
+
+    const report = {{ head_to_head_report | tojson }};
+    const opponents = Array.isArray(report.opponents) ? report.opponents : [];
+    const select = root.querySelector('[data-h2h-select]');
+    const tbody = root.querySelector('[data-h2h-matches]');
+    const openButton = document.querySelector('[data-h2h-open]');
+
+    const setText = function (selector, value) {
+        const node = root.querySelector(selector);
+        if (node) {
+            node.textContent = value || '-';
+        }
+    };
+
+    const raceSlug = function (race) {
+        return String(race || '').trim().toLowerCase();
+    };
+
+    const makeCell = function (className, value) {
+        const cell = document.createElement('td');
+        if (className) {
+            cell.className = className;
+        }
+        cell.textContent = value || '-';
+        return cell;
+    };
+
+    const makeRaceCell = function (race) {
+        const cell = document.createElement('td');
+        const wrap = document.createElement('span');
+        const cleanSlug = raceSlug(race);
+        wrap.className = 'profile-race-inline';
+
+        if (['terran', 'protoss', 'zerg'].includes(cleanSlug)) {
+            const icon = document.createElement('img');
+            icon.className = 'race-inline-icon';
+            icon.src = '/static/Race/' + cleanSlug + '.svg';
+            icon.alt = String(race || '') + ' icon';
+            wrap.appendChild(icon);
+        }
+
+        const label = document.createElement('span');
+        label.textContent = race || '-';
+        wrap.appendChild(label);
+        cell.appendChild(wrap);
+        return cell;
+    };
+
+    const makeResultCell = function (match) {
+        const cell = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = 'match-result-badge '
+            + (match.is_tie ? 'match-result-tie' : match.is_win ? 'match-result-win' : 'match-result-loss');
+        badge.textContent = match.result_label || '-';
+        cell.appendChild(badge);
+        return cell;
+    };
+
+    const renderMatches = function (matches) {
+        if (!tbody) {
+            return;
+        }
+
+        tbody.innerHTML = '';
+        if (!Array.isArray(matches) || !matches.length) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 7;
+            cell.textContent = 'No matches against this player yet.';
+            row.appendChild(cell);
+            tbody.appendChild(row);
+            return;
+        }
+
+        matches.forEach(function (match) {
+            const row = document.createElement('tr');
+            if (match.is_current_league) {
+                row.classList.add('profile-h2h-current-league-row');
+            }
+
+            row.appendChild(makeCell('', match.played_at_label));
+            row.appendChild(makeResultCell(match));
+            row.appendChild(makeRaceCell(match.player_race));
+            row.appendChild(makeRaceCell(match.opponent_race));
+            row.appendChild(makeCell('', match.score_display));
+            row.appendChild(makeCell('', match.league_name));
+            row.appendChild(makeCell(match.league_points_delta_class, match.league_points_delta_display));
+            tbody.appendChild(row);
+        });
+    };
+
+    const renderOpponent = function (opponent) {
+        if (!opponent) {
+            return;
+        }
+
+        const league = opponent.current_league || {};
+        const pointsPreview = league.points_preview || {};
+        const favoriteNode = root.querySelector('[data-h2h-favorite]');
+        const opponentLink = root.querySelector('[data-h2h-opponent-link]');
+
+        setText('[data-h2h-overall-score]', opponent.score_display);
+        setText('[data-h2h-overall-meta]', opponent.matches_label);
+        setText('[data-h2h-league-score]', league.score_display);
+        setText('[data-h2h-league-meta]', (league.league_name || 'Current league') + ' - ' + String(league.matches_count || 0) + ' matches');
+        setText('[data-h2h-favorite]', league.favorite_label);
+        setText('[data-h2h-favorite-detail]', league.favorite_detail);
+        setText('[data-h2h-points-eligibility]', league.points_eligibility_label);
+        setText('[data-h2h-points-win]', pointsPreview.win);
+        setText('[data-h2h-points-draw]', pointsPreview.draw);
+        setText('[data-h2h-points-loss]', pointsPreview.loss);
+        setText('[data-h2h-opponent-name]', opponent.opponent_name);
+
+        if (favoriteNode) {
+            favoriteNode.className = 'profile-h2h-status profile-h2h-status-' + String(league.favorite_status || 'none');
+        }
+
+        if (opponentLink) {
+            opponentLink.href = opponent.opponent_profile_url || '#';
+        }
+
+        renderMatches(opponent.matches || []);
+    };
+
+    const findOpponent = function (opponentId) {
+        const targetId = Number(opponentId || 0);
+        return opponents.find(function (opponent) {
+            return Number(opponent.opponent_id || 0) === targetId;
+        }) || opponents[0] || null;
+    };
+
+    if (select) {
+        select.addEventListener('change', function () {
+            renderOpponent(findOpponent(select.value));
+        });
+    }
+
+    const openHeadToHead = function (shouldScroll) {
+        root.hidden = false;
+        if (openButton) {
+            openButton.setAttribute('aria-expanded', 'true');
+        }
+        if (shouldScroll) {
+            root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    if (openButton) {
+        openButton.setAttribute('aria-controls', 'head-to-head');
+        openButton.setAttribute('aria-expanded', root.hidden ? 'false' : 'true');
+        openButton.addEventListener('click', function () {
+            openHeadToHead(true);
+        });
+    }
+
+    if (window.location.hash === '#head-to-head') {
+        openHeadToHead(false);
+    }
+
+    renderOpponent(findOpponent(select ? select.value : null));
 });
 </script>
 {% endif %}

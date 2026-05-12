@@ -27,6 +27,21 @@ The project is designed for local use first, with later deployment to a server.
 - match editing and deletion
 - rating recalculation after match changes
 
+## Supabase cache webhook
+
+The app exposes `POST /api/supabase/cache-webhook` to refresh the in-memory, page, league and disk caches after direct Supabase changes.
+
+Server env required:
+
+- `SUPABASE_WEBHOOK_SECRET` - shared secret used by the webhook request.
+- `APP_CACHE_REFRESH_BACKGROUND=0` - refresh synchronously so the next page/API request sees fresh data. Set to `1` only if the webhook starts timing out.
+
+Supabase setup:
+
+1. Set the same secret in the app env and in the webhook Authorization header as `Bearer <secret>`.
+2. Run `Tools/supabase_cache_webhook.sql` in Supabase SQL editor after replacing `REPLACE_WITH_SUPABASE_WEBHOOK_SECRET`.
+3. Test with `POST https://tmg-stats.org/api/supabase/cache-webhook` and the same Authorization header.
+
 <img width="1890" height="899" alt="image" src="https://github.com/user-attachments/assets/78898ff6-da24-4a75-ba3b-ca46fd9c3080" />
 <img width="1910" height="905" alt="image" src="https://github.com/user-attachments/assets/17677d81-82aa-4501-bbc7-b10a391eb32b" />
 <img width="1798" height="819" alt="image" src="https://github.com/user-attachments/assets/31e56c0e-ccd9-4d3b-b051-bfc93045dde5" />

@@ -141,7 +141,7 @@
                                 {% set race_name = race.label %}
                             {% endif %}
                             <div class="choice-card-wrapper">
-                                <input class="choice-input" type="radio" id="winner_race_{{ race_slug }}" name="winner_race" value="{{ race.label }}" {% if form_state.winner_race == race.label %}checked{% endif %}>
+                                <input class="choice-input" type="radio" id="winner_race_{{ race_slug }}" name="winner_race" value="{{ race_name }}" {% if form_state.winner_race == race.label or form_state.winner_race == race_name %}checked{% endif %}>
                                 <label class="choice-card choice-card-race choice-card-race-{{ race_slug }}" for="winner_race_{{ race_slug }}">{{ race_name }}</label>
                             </div>
                             {% endfor %}
@@ -165,7 +165,7 @@
                                 {% set race_name = race.label %}
                             {% endif %}
                             <div class="choice-card-wrapper">
-                                <input class="choice-input" type="radio" id="opponent_race_{{ race_slug }}" name="opponent_race" value="{{ race.label }}" {% if form_state.opponent_race == race.label %}checked{% endif %}>
+                                <input class="choice-input" type="radio" id="opponent_race_{{ race_slug }}" name="opponent_race" value="{{ race_name }}" {% if form_state.opponent_race == race.label or form_state.opponent_race == race_name %}checked{% endif %}>
                                 <label class="choice-card choice-card-race choice-card-race-{{ race_slug }}" for="opponent_race_{{ race_slug }}">{{ race_name }}</label>
                             </div>
                             {% endfor %}
