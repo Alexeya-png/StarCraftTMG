@@ -3280,6 +3280,8 @@ def _build_player_head_to_head_report(
                 current_league_match_counts_by_player[int(player2_id)] += 1
 
     league_points_delta_lookup = _build_league_points_delta_lookup()
+    current_league_player_points = 0.0
+    current_league_player_matches = 0
 
     league_ids = [
         league_id
@@ -3362,6 +3364,9 @@ def _build_player_head_to_head_report(
         match_id = int(match.get('id') or 0)
         history_row = history_by_match_id.get(match_id, {})
         league_points_delta = league_points_delta_lookup.get((match_id, player_id))
+        if current_league_id and league_id == current_league_id and bool(match.get('is_ranked')):
+            current_league_player_matches += 1
+            current_league_player_points += float(league_points_delta or 0.0)
         if league_points_delta is None:
             league_points_delta_class = ''
         elif league_points_delta > 0:
@@ -3495,6 +3500,14 @@ def _build_player_head_to_head_report(
         'player_id': player_id,
         'player_name': player_name,
         'current_league': current_league,
+        'current_league_player': {
+            'league_id': int(current_league_id) if current_league_id else None,
+            'league_name': current_league_name,
+            'points': current_league_player_points,
+            'points_display': _format_league_points(current_league_player_points),
+            'matches_count': current_league_player_matches,
+            'matches_label': f'{current_league_player_matches} match' + ('' if current_league_player_matches == 1 else 'es'),
+        },
         'points_rules': LEAGUE_POINTS_RULES_TEXT,
         'opponents': prepared_opponents,
     }

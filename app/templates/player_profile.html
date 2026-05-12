@@ -206,7 +206,6 @@
             <div class="profile-section-head profile-h2h-head">
                 <div>
                     <h2>League matchup report</h2>
-                    <p>Current league score, favorite status and match history.</p>
                 </div>
                 <label class="profile-h2h-select-label">
                     <span>Opponent</span>
@@ -221,6 +220,15 @@
             </div>
 
             <div class="profile-h2h-summary-grid">
+                <article class="profile-h2h-stat">
+                    <span>League points</span>
+                    <strong>{{ head_to_head_report.current_league_player.points_display if head_to_head_report.current_league_player else '0' }}</strong>
+                    <small>
+                        {{ (head_to_head_report.current_league_player.league_name if head_to_head_report.current_league_player else '') or 'Current league' }}
+                        -
+                        {{ (head_to_head_report.current_league_player.matches_label if head_to_head_report.current_league_player else '0 matches') }}
+                    </small>
+                </article>
                 <article class="profile-h2h-stat">
                     <span>Current league score</span>
                     <strong data-h2h-league-score>0-0</strong>
