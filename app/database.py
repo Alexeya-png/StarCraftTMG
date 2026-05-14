@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import math
 import os
 import re
@@ -175,7 +176,9 @@ PAGE_CACHE_TTL_SECONDS = max(0, int(os.getenv('APP_PAGE_CACHE_TTL_SECONDS', '900
 DISK_CACHE_MAX_AGE_SECONDS = max(0, int(os.getenv('APP_DISK_CACHE_MAX_AGE_SECONDS', '604800') or '604800'))
 DISK_CACHE_PATH = Path(os.getenv('APP_DISK_CACHE_PATH') or (BASE_DIR / '.cache' / 'application_data.json'))
 SUPABASE_HTTP_TIMEOUT_SECONDS = max(1, int(os.getenv('SUPABASE_HTTP_TIMEOUT_SECONDS', '8') or '8'))
-BLOCKING_CACHE_LOAD_ON_MISS = (os.getenv('APP_BLOCKING_CACHE_LOAD_ON_MISS') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
+USE_DISK_CACHE_ON_MISS = (os.getenv('APP_USE_DISK_CACHE_ON_MISS') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
+BLOCKING_CACHE_LOAD_ON_MISS = (os.getenv('APP_BLOCKING_CACHE_LOAD_ON_MISS') or '1').strip().lower() not in {'0', 'false', 'no', 'off'}
+ALLOW_EMPTY_CACHE_ON_MISS = (os.getenv('APP_ALLOW_EMPTY_CACHE_ON_MISS') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
 HEALTH_CHECK_DATABASE = (os.getenv('APP_HEALTH_CHECK_DB') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
 TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS = max(0, int(os.getenv('TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS', '3600') or '3600'))
 FEEDBACK_MESSAGE_MAX_LENGTH = 300
@@ -2270,6 +2273,8 @@ def _apply_cache_snapshot(snapshot: dict[str, Any], *, increment_version: bool =
 
 
 def _read_disk_cache_snapshot() -> dict[str, Any] | None:
+    if not USE_DISK_CACHE_ON_MISS:
+        return None
     if DISK_CACHE_MAX_AGE_SECONDS <= 0:
         return None
     try:
@@ -2308,7 +2313,7 @@ def _refresh_application_cache_background() -> None:
         try:
             refresh_application_cache(force_refresh=True)
         except Exception:
-            pass
+            logging.getLogger(__name__).exception('Background application cache refresh failed')
         finally:
             with _DATA_CACHE_REFRESH_LOCK:
                 _DATA_CACHE_REFRESH_IN_PROGRESS = False
@@ -2353,7 +2358,7 @@ def warmup_application_cache(*, force_refresh: bool = False) -> dict[str, Any]:
             snapshot = _apply_cache_snapshot(disk_snapshot)
             _refresh_application_cache_background()
             return snapshot
-        if not BLOCKING_CACHE_LOAD_ON_MISS:
+        if not BLOCKING_CACHE_LOAD_ON_MISS and ALLOW_EMPTY_CACHE_ON_MISS:
             _refresh_application_cache_background()
             return _empty_cache_snapshot()
 

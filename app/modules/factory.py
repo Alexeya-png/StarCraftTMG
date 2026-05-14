@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Flask, request
 
 from .cache import warmup_cache_on_startup
-from .config import ASSET_VERSION, BASE_DIR
+from .config import APP_DISPLAY_VERSION, ASSET_VERSION, BASE_DIR
 from .routes import admin, api, interactions, public, seo
 
 
@@ -18,7 +18,7 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_asset_version() -> dict:
-        return {'asset_version': ASSET_VERSION}
+        return {'app_display_version': APP_DISPLAY_VERSION, 'asset_version': ASSET_VERSION}
 
     @app.after_request
     def apply_fast_page_headers(response):
@@ -28,7 +28,10 @@ def create_app() -> Flask:
             response.headers.pop('Expires', None)
             return response
 
-        response.headers['Cache-Control'] = 'no-cache, max-age=0, must-revalidate'
+        if request.path.startswith('/api') or request.path.startswith('/admin'):
+            response.headers['Cache-Control'] = 'no-store, max-age=0, must-revalidate'
+        else:
+            response.headers['Cache-Control'] = 'no-cache, max-age=0, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
         response.headers['Vary'] = 'Cookie'

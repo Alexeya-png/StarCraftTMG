@@ -37,6 +37,7 @@ FEEDBACK_MESSAGE_MAX_LENGTH = 300
 
 CACHE_WARMUP_ON_STARTUP = (os.getenv('APP_WARMUP_ON_STARTUP') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
 CACHE_REFRESH_BACKGROUND = (os.getenv('APP_CACHE_REFRESH_BACKGROUND') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
+APP_DISPLAY_VERSION = (os.getenv('APP_DISPLAY_VERSION') or 'v2').strip() or 'v2'
 
 
 def _build_asset_version() -> str:

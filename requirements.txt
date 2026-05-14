@@ -1,5 +1,6 @@
 Flask
 Jinja2
+Pillow
 python-dotenv
 psycopg2-binary
 Werkzeug

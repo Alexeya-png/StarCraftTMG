@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import request
 
 from app.database import fetch_game_reports_page, fetch_leaderboard
+from app.modules.visual_backgrounds import resolve_player_visual_background
 
 def _serialize_leaderboard_players(players: list[dict]) -> list[dict]:
     serialized: list[dict] = []
@@ -27,6 +28,7 @@ def _serialize_leaderboard_players(players: list[dict]) -> list[dict]:
                 'is_current_league_best_overall': bool(player.get('is_current_league_best_overall')),
                 'is_current_league_most_active': bool(player.get('is_current_league_most_active')),
                 'award_name_class': str(player.get('award_name_class') or ''),
+                'visual_background': resolve_player_visual_background(player),
             }
         )
 

@@ -19,6 +19,7 @@
         {% set race_slug = player.priority_race|lower if player.priority_race else '' %}
         {% set priority_race_code = 'T' if race_slug == 'terran' else 'P' if race_slug == 'protoss' else 'Z' if race_slug == 'zerg' else 'Pr' %}
         {% set has_head_to_head = head_to_head_report is defined and head_to_head_report and head_to_head_report.opponents %}
+        {% set profile_background = profile_background if profile_background is defined else none %}
 
         {% macro render_matchup_card(matchup_code, opponent_name, opponent_slug, wins, losses) %}
         {% set total = wins + losses %}
@@ -106,7 +107,13 @@
             </div>
         </article>
         {% endmacro %}
-        <div class="profile-header-card">
+        <div
+            class="profile-header-card profile-header-card-{{ race_slug if race_slug in ['terran', 'protoss', 'zerg'] else 'neutral' }}{% if profile_background %} profile-header-card-custom{% endif %}"
+            {% if profile_background %}
+            style="--profile-header-bg: url('{{ profile_background.url }}'); --profile-header-bg-position: {{ profile_background.position }};"
+            data-background-id="{{ profile_background.id }}"
+            {% endif %}
+        >
             <div class="profile-header-top">
                 <a class="button button-secondary profile-back-button" href="/leaderboard">← Back to leaderboard</a>
                 {% if has_head_to_head %}

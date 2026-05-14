@@ -7,6 +7,7 @@ from flask import Blueprint, Response, abort, jsonify, make_response, redirect, 
 from app.database import (
     fetch_current_league,
     fetch_league_results_overview,
+    HEALTH_CHECK_DATABASE,
     fetch_player_profile,
     ping_database,
 )
@@ -14,6 +15,7 @@ from app.modules.context import base_context
 from app.modules.forms import _render_submit_page
 from app.modules.payloads import _parse_leaderboard_filters
 from app.modules.roster import _build_beta_roster_pdf_url, _clean_roster_id, _download_roster_pdf_via_browser
+from app.modules.visual_backgrounds import resolve_player_visual_background
 
 bp = Blueprint('public', __name__)
 
@@ -29,7 +31,7 @@ def home():
 
 @bp.route('/health')
 def health():
-    if request.args.get('db') != '1':
+    if request.args.get('db') != '1' and not HEALTH_CHECK_DATABASE:
         return jsonify({'status': 'ok', 'database_error': None})
     ok, error = ping_database()
     return jsonify({'status': 'ok' if ok else 'error', 'database_error': error})
@@ -170,6 +172,7 @@ def player_profile(player_id: int):
             'rating_chart': profile.get('rating_chart'),
             'priority_matchup_report': profile.get('priority_matchup_report'),
             'head_to_head_report': profile.get('head_to_head_report'),
+            'profile_background': resolve_player_visual_background(profile['player']),
             'db_error': None,
         }
     )

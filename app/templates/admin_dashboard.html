@@ -27,7 +27,69 @@
                 <p>Open the feedback tab to read short messages that users leave for the admin.</p>
                 <a class="button button-secondary" href="/feedback">Open messages</a>
             </article>
+            <article class="card">
+                <h3>Cache</h3>
+                <p>Reload leaderboard, reports and league data from Supabase after deploy or direct database edits.</p>
+                <button class="button button-secondary" type="button" data-cache-refresh-button>Refresh cache</button>
+                <p class="page-text" data-cache-refresh-status hidden></p>
+            </article>
         </div>
     </div>
 </section>
+
+<script>
+(function () {
+    var button = document.querySelector('[data-cache-refresh-button]');
+    var statusNode = document.querySelector('[data-cache-refresh-status]');
+
+    if (!button || !statusNode) {
+        return;
+    }
+
+    function setStatus(message) {
+        statusNode.hidden = false;
+        statusNode.textContent = message;
+    }
+
+    button.addEventListener('click', function () {
+        button.disabled = true;
+        setStatus('Refreshing cache...');
+
+        fetch('/admin/cache/refresh', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
+            .then(function (response) {
+                return response.json().catch(function () {
+                    return { ok: false, error: 'Could not parse server response.' };
+                }).then(function (payload) {
+                    return { response: response, payload: payload };
+                });
+            })
+            .then(function (result) {
+                if (!result.response.ok || !result.payload.ok) {
+                    throw new Error(result.payload.error || 'Cache refresh failed.');
+                }
+
+                var cache = result.payload.cache || {};
+                setStatus(
+                    'Done: '
+                    + String(cache.players_count || 0)
+                    + ' players, '
+                    + String(cache.matches_count || 0)
+                    + ' matches.'
+                );
+            })
+            .catch(function (error) {
+                setStatus(error.message || 'Cache refresh failed.');
+            })
+            .finally(function () {
+                button.disabled = false;
+            });
+    });
+}());
+</script>
 {% endblock %}
