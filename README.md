@@ -50,6 +50,39 @@ Supabase setup:
 2. Run `Tools/supabase_cache_webhook.sql` in Supabase SQL editor after replacing `REPLACE_WITH_SUPABASE_WEBHOOK_SECRET`.
 3. Test with `POST https://tmg-stats.org/api/supabase/cache-webhook` and the same Authorization header.
 
+## Firebase app auth
+
+The site can authenticate against Firebase Auth and read roles from Firestore `users/{firebase_uid}` documents.
+When Firebase env is complete, `/login` expects email/password and creates a normal site session for users whose Firestore `role` is in `FIREBASE_LOGIN_ROLES`.
+Admin tools still require a role from `ADMIN_ALLOWED_ROLES`.
+The login page uses Firebase Auth in the browser and then sends the Firebase ID token to Flask, where the role is checked again before the session cookie is created.
+If Firebase env is not set at all, the legacy `ADMIN_USERNAME` / `ADMIN_PASSWORD` login remains active for local use.
+
+Required server env:
+
+```dotenv
+FIREBASE_WEB_API_KEY=your_web_api_key
+FIREBASE_PROJECT_ID=your_project_id
+FIREBASE_DATABASE_ID=starcrafttmgbeta
+FIREBASE_LOGIN_ROLES=user,operator,aggregator,admin
+ADMIN_ALLOWED_ROLES=admin
+FIREBASE_OPERATOR_EMAILS=operator@example.com
+```
+
+Optional env:
+
+```dotenv
+FIREBASE_EMAIL_VERIFICATION_CUTOFF=2026-03-10T00:00:00Z
+FIREBASE_AUTH_TIMEOUT_SECONDS=8
+```
+
+Expected Firestore user fields:
+
+- `role`: `user` or `operator` for a normal operator session; `admin` for admin-panel access. Add extra admin roles with `ADMIN_ALLOWED_ROLES=admin,aggregator`.
+- `nickname`: optional display name shown in the site header.
+
+If Firestore rules block server-side reads of `users/{uid}`, keep operator emails in `FIREBASE_OPERATOR_EMAILS` until a service account or server-readable role rule is configured.
+
 ## Deployment archive
 
 Build the hosting archive with:

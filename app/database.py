@@ -2124,6 +2124,48 @@ def _sync_all_current_league_badges() -> list[dict]:
     return awarded_badges
 
 
+def _computed_current_league_badge_for_player(player_id: int) -> dict | None:
+    target_player_id = _coerce_positive_int(player_id)
+    if not target_player_id:
+        return None
+
+    try:
+        current_league = fetch_current_league(required=False)
+    except Exception:
+        current_league = None
+
+    current_league_id = _coerce_positive_int((current_league or {}).get('id'))
+    if not current_league or not current_league_id:
+        return None
+
+    summary = _get_league_results_summary_cached(current_league)
+    if _normalize_league_badge_kind(summary.get('badge_kind')) != LEAGUE_BADGE_KIND_CONTENDER:
+        return None
+
+    for entry in summary.get('race_leaders') or []:
+        leader = (entry or {}).get('player') or {}
+        if _coerce_positive_int(leader.get('id')) != target_player_id:
+            continue
+
+        badge = (entry or {}).get('badge')
+        if not badge:
+            badge = _build_league_race_badge(
+                league=current_league,
+                race=(entry or {}).get('race'),
+                kind=LEAGUE_BADGE_KIND_CONTENDER,
+            )
+        if not badge:
+            return None
+
+        computed_badge = dict(badge)
+        computed_badge['awarded_at'] = ''
+        computed_badge['awarded_match_id'] = None
+        computed_badge['source'] = 'league_summary'
+        return computed_badge
+
+    return None
+
+
 def fetch_player_badges(player_id: int) -> list[dict]:
     target_player_id = _coerce_positive_int(player_id)
     if not target_player_id:
@@ -2161,6 +2203,12 @@ def fetch_player_badges(player_id: int) -> list[dict]:
     league_ids = [_coerce_positive_int(row.get('league_id')) for row in rows]
     leagues_by_id = _fetch_leagues_by_ids([league_id for league_id in league_ids if league_id])
 
+    current_league_id = None
+    try:
+        current_league_id = _coerce_positive_int((fetch_current_league(required=False) or {}).get('id'))
+    except Exception:
+        current_league_id = None
+
     badges: list[dict] = []
     for row in rows:
         league_id = _coerce_positive_int(row.get('league_id'))
@@ -2170,13 +2218,17 @@ def fetch_player_badges(player_id: int) -> list[dict]:
             row=row,
         )
         if badge:
+            if (
+                current_league_id
+                and int(badge.get('league_id') or 0) == current_league_id
+                and badge.get('kind') == LEAGUE_BADGE_KIND_CONTENDER
+            ):
+                continue
             badges.append(badge)
 
-    current_league_id = None
-    try:
-        current_league_id = _coerce_positive_int((fetch_current_league(required=False) or {}).get('id'))
-    except Exception:
-        current_league_id = None
+    current_league_badge = _computed_current_league_badge_for_player(target_player_id)
+    if current_league_badge:
+        badges.append(current_league_badge)
 
     badges.sort(
         key=lambda badge: (
