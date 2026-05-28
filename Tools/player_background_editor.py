@@ -13,9 +13,10 @@ except ImportError as exc:  # pragma: no cover - startup guard for local desktop
     sys.exit(1)
 
 try:
-    from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, ImageTk
+    from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageOps, ImageTk
 except ImportError:  # pragma: no cover - handled in main()
     Image = None
+    ImageChops = None
     ImageDraw = None
     ImageFilter = None
     ImageFont = None
@@ -32,6 +33,11 @@ EXPORT_WIDTH = 2400
 EXPORT_HEIGHT = 780
 PREVIEW_WIDTH = 720
 PREVIEW_HEIGHT = round(PREVIEW_WIDTH * EXPORT_HEIGHT / EXPORT_WIDTH)
+MIN_CROP_OVERLAP = 48.0
+OUT_OF_BOUNDS_FADE_RATIO = 0.18
+WEBP_QUALITY = 92
+MIN_ZOOM = 0.25
+MAX_ZOOM = 5.0
 
 RACE_PREFIX = {
     'protoss': 'p',
@@ -143,6 +149,91 @@ def apply_banner_grade(image: Any, race: str) -> Any:
     return base.convert('RGB')
 
 
+def edge_fade_mask(size: tuple[int, int], edges: set[str], fade_size: int) -> Any:
+    if Image is None or ImageChops is None:
+        return None
+
+    width, height = size
+    mask = Image.new('L', size, 255)
+
+    def multiply(edge_mask: Any) -> None:
+        nonlocal mask
+        mask = ImageChops.multiply(mask, edge_mask)
+
+    if 'left' in edges:
+        fade = max(1, min(fade_size, width))
+        strip = Image.new('L', (fade, 1))
+        strip.putdata([round(255 * index / max(1, fade - 1)) for index in range(fade)])
+        edge = Image.new('L', size, 255)
+        edge.paste(strip.resize((fade, height)), (0, 0))
+        multiply(edge)
+
+    if 'right' in edges:
+        fade = max(1, min(fade_size, width))
+        strip = Image.new('L', (fade, 1))
+        strip.putdata([round(255 * (1 - index / max(1, fade - 1))) for index in range(fade)])
+        edge = Image.new('L', size, 255)
+        edge.paste(strip.resize((fade, height)), (width - fade, 0))
+        multiply(edge)
+
+    if 'top' in edges:
+        fade = max(1, min(fade_size, height))
+        strip = Image.new('L', (1, fade))
+        strip.putdata([round(255 * index / max(1, fade - 1)) for index in range(fade)])
+        edge = Image.new('L', size, 255)
+        edge.paste(strip.resize((width, fade)), (0, 0))
+        multiply(edge)
+
+    if 'bottom' in edges:
+        fade = max(1, min(fade_size, height))
+        strip = Image.new('L', (1, fade))
+        strip.putdata([round(255 * (1 - index / max(1, fade - 1))) for index in range(fade)])
+        edge = Image.new('L', size, 255)
+        edge.paste(strip.resize((width, fade)), (0, height - fade))
+        multiply(edge)
+
+    return mask
+
+
+def crop_on_dark_background(source: Any, crop_rect: tuple[float, float, float, float], race: str) -> Any:
+    _primary, _secondary, shadow = RACE_ACCENTS.get(race, RACE_ACCENTS['protoss'])
+    left, top, right, bottom = crop_rect
+    crop_left = round(left)
+    crop_top = round(top)
+    crop_w = max(1, round(right - left))
+    crop_h = max(1, round(bottom - top))
+    crop_right = crop_left + crop_w
+    crop_bottom = crop_top + crop_h
+
+    canvas = Image.new('RGBA', (crop_w, crop_h), shadow)
+    src_left = max(0, crop_left)
+    src_top = max(0, crop_top)
+    src_right = min(source.width, crop_right)
+    src_bottom = min(source.height, crop_bottom)
+    if src_right <= src_left or src_bottom <= src_top:
+        return canvas.convert('RGB')
+
+    piece = source.crop((src_left, src_top, src_right, src_bottom)).convert('RGBA')
+    fade_edges = set()
+    if crop_left < 0:
+        fade_edges.add('left')
+    if crop_right > source.width:
+        fade_edges.add('right')
+    if crop_top < 0:
+        fade_edges.add('top')
+    if crop_bottom > source.height:
+        fade_edges.add('bottom')
+
+    if fade_edges:
+        fade_size = max(12, round(min(crop_w, crop_h) * OUT_OF_BOUNDS_FADE_RATIO))
+        mask = edge_fade_mask(piece.size, fade_edges, fade_size)
+        if mask is not None:
+            piece.putalpha(mask)
+
+    canvas.alpha_composite(piece, (src_left - crop_left, src_top - crop_top))
+    return canvas.convert('RGB')
+
+
 class PlayerBackgroundEditor:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
@@ -161,7 +252,7 @@ class PlayerBackgroundEditor:
         self.image_offset = (0.0, 0.0)
 
         self.race_var = tk.StringVar(value='protoss')
-        self.output_var = tk.StringVar(value='p1.jpg')
+        self.output_var = tk.StringVar(value='p1.webp')
         self.output_dir_var = tk.StringVar(value=str(DEFAULT_OUTPUT_DIR))
         self.width_var = tk.StringVar(value=str(EXPORT_WIDTH))
         self.height_var = tk.StringVar(value=str(EXPORT_HEIGHT))
@@ -197,7 +288,7 @@ class PlayerBackgroundEditor:
         ttk.Button(toolbar, text='Next slot', command=self.suggest_next_slot).grid(row=0, column=3, padx=(0, 8))
         ttk.Label(toolbar, text='Output').grid(row=0, column=4, padx=(0, 5))
         ttk.Entry(toolbar, textvariable=self.output_var, width=18).grid(row=0, column=5, padx=(0, 8))
-        ttk.Button(toolbar, text='Export JPG', command=self.export_image).grid(row=0, column=6, padx=(0, 8))
+        ttk.Button(toolbar, text='Export WEBP', command=self.export_image).grid(row=0, column=6, padx=(0, 8))
         ttk.Button(toolbar, text='Output folder', command=self.choose_output_dir).grid(row=0, column=7)
 
         main = ttk.Frame(outer)
@@ -256,14 +347,14 @@ class PlayerBackgroundEditor:
         ttk.Label(controls, text='Zoom / crop size').grid(row=3, column=0, columnspan=4, sticky='w', padx=10, pady=(12, 3))
         ttk.Scale(
             controls,
-            from_=1.0,
-            to=5.0,
+            from_=MIN_ZOOM,
+            to=MAX_ZOOM,
             variable=self.zoom_var,
             command=lambda _value: self.on_zoom_changed(),
         ).grid(row=4, column=0, columnspan=4, sticky='ew', padx=10, pady=(0, 10))
 
         help_text = (
-            'Mouse: drag crop box, click to recenter, wheel to zoom.\n'
+            'Mouse: drag crop box beyond photo edges, click to recenter, wheel to zoom.\n'
             'Keys: arrows move crop, +/- zoom.\n'
             'Export size is profile banner aspect; default is 2400x780.'
         )
@@ -328,14 +419,15 @@ class PlayerBackgroundEditor:
         output_dir = Path(self.output_dir_var.get() or DEFAULT_OUTPUT_DIR)
         used = set()
         if output_dir.exists():
-            for file_path in output_dir.glob(f'{prefix}*.jpg'):
-                suffix = file_path.stem[len(prefix):]
-                if suffix.isdigit():
-                    used.add(int(suffix))
+            for extension in ('webp', 'jpg', 'jpeg'):
+                for file_path in output_dir.glob(f'{prefix}*.{extension}'):
+                    suffix = file_path.stem[len(prefix):]
+                    if suffix.isdigit():
+                        used.add(int(suffix))
         index = 1
         while index in used:
             index += 1
-        self.output_var.set(f'{prefix}{index}.jpg')
+        self.output_var.set(f'{prefix}{index}.webp')
 
     def reset_crop_for_aspect(self) -> None:
         if self.source_image is None:
@@ -362,16 +454,16 @@ class PlayerBackgroundEditor:
         elif center is None:
             center = (self.source_image.width / 2, self.source_image.height / 2)
 
-        zoom = max(1.0, float(self.zoom_var.get() or 1.0))
+        zoom = min(MAX_ZOOM, max(MIN_ZOOM, float(self.zoom_var.get() or 1.0)))
         crop_w = max(16.0, self.base_crop_size[0] / zoom)
         crop_h = max(16.0, self.base_crop_size[1] / zoom)
-        crop_w = min(crop_w, float(self.source_image.width))
-        crop_h = min(crop_h, float(self.source_image.height))
 
         left = center[0] - crop_w / 2
         top = center[1] - crop_h / 2
-        left = min(max(0.0, left), self.source_image.width - crop_w)
-        top = min(max(0.0, top), self.source_image.height - crop_h)
+        min_overlap_x = min(MIN_CROP_OVERLAP, crop_w, float(self.source_image.width))
+        min_overlap_y = min(MIN_CROP_OVERLAP, crop_h, float(self.source_image.height))
+        left = min(max(-crop_w + min_overlap_x, left), self.source_image.width - min_overlap_x)
+        top = min(max(-crop_h + min_overlap_y, top), self.source_image.height - min_overlap_y)
         self.crop_rect = (left, top, left + crop_w, top + crop_h)
         self.redraw_all()
 
@@ -383,10 +475,7 @@ class PlayerBackgroundEditor:
             return None
         x_value = (x_pos - offset_x) / self.image_scale
         y_value = (y_pos - offset_y) / self.image_scale
-        return (
-            min(max(0.0, x_value), float(self.source_image.width)),
-            min(max(0.0, y_value), float(self.source_image.height)),
-        )
+        return (x_value, y_value)
 
     def on_canvas_press(self, event: tk.Event) -> None:
         point = self.canvas_to_image(event.x, event.y)
@@ -421,7 +510,7 @@ class PlayerBackgroundEditor:
         self.update_crop()
 
     def zoom_by(self, factor: float) -> None:
-        value = min(5.0, max(1.0, float(self.zoom_var.get() or 1.0) * factor))
+        value = min(MAX_ZOOM, max(MIN_ZOOM, float(self.zoom_var.get() or 1.0) * factor))
         self.zoom_var.set(value)
         self.update_crop()
 
@@ -482,8 +571,7 @@ class PlayerBackgroundEditor:
     def make_banner_image(self, size: tuple[int, int]) -> Any:
         if self.source_image is None or self.crop_rect is None:
             raise RuntimeError('No crop is selected.')
-        left, top, right, bottom = self.crop_rect
-        crop = self.source_image.crop((round(left), round(top), round(right), round(bottom)))
+        crop = crop_on_dark_background(self.source_image, self.crop_rect, self.race_var.get())
         banner = crop.resize(size, Image.Resampling.LANCZOS)
         if self.grade_var.get():
             banner = apply_banner_grade(banner, self.race_var.get())
@@ -572,9 +660,9 @@ class PlayerBackgroundEditor:
             messagebox.showinfo('No source image', 'Open a photo first.')
             return
 
-        output_name = self.output_var.get().strip() or 'player-background.jpg'
-        if not output_name.lower().endswith(('.jpg', '.jpeg')):
-            output_name += '.jpg'
+        output_name = self.output_var.get().strip() or 'player-background.webp'
+        if not output_name.lower().endswith('.webp'):
+            output_name = f'{Path(output_name).stem}.webp'
 
         output_dir = Path(self.output_dir_var.get() or DEFAULT_OUTPUT_DIR)
         output_path = output_dir / output_name
@@ -586,7 +674,7 @@ class PlayerBackgroundEditor:
         try:
             output_dir.mkdir(parents=True, exist_ok=True)
             banner = self.make_banner_image(export_size)
-            banner.save(output_path, quality=93, optimize=True, progressive=True)
+            banner.save(output_path, format='WEBP', quality=WEBP_QUALITY, method=6)
             self.update_json_mapping(output_path)
         except Exception as exc:
             messagebox.showerror('Export failed', str(exc))

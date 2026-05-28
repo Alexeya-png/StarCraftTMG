@@ -128,10 +128,13 @@ def _render_account_page(
     success_message: str | None = None,
     status_code: int = 200,
 ):
-    try:
-        name_suggestions = fetch_player_name_suggestions(limit=300)
-    except Exception:
+    if account.get('player'):
         name_suggestions = []
+    else:
+        try:
+            name_suggestions = fetch_player_name_suggestions(limit=300)
+        except Exception:
+            name_suggestions = []
     try:
         flag_options = fetch_flag_options()
     except Exception:
@@ -265,7 +268,7 @@ def account_page():
         return redirect('/login', code=303)
 
     try:
-        account = fetch_user_account(int(session['account_id']))
+        account = fetch_user_account(int(session['account_id']), include_player_extras=False)
     except Exception as exc:
         response = redirect('/login?error=' + urllib_parse.quote(str(exc)), code=303)
         response.delete_cookie(USER_COOKIE_NAME, path='/')
@@ -286,7 +289,7 @@ def account_page_post():
         return redirect('/login', code=303)
 
     try:
-        account = fetch_user_account(int(session['account_id']))
+        account = fetch_user_account(int(session['account_id']), include_player_extras=False)
     except Exception as exc:
         response = redirect('/login?error=' + urllib_parse.quote(str(exc)), code=303)
         response.delete_cookie(USER_COOKIE_NAME, path='/')

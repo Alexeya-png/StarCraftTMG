@@ -49,7 +49,6 @@
             </nav>
             {% if current_user %}
             <div class="admin-header-box user-header-box">
-                <span class="admin-badge">{{ current_user.display_name }}</span>
                 <form method="post" action="/logout">
                     <button class="button button-secondary button-small" type="submit">Logout</button>
                 </form>

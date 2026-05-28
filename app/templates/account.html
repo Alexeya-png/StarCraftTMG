@@ -99,7 +99,7 @@
                                 <div class="account-flag-grid" data-flag-grid>
                                     {% for flag in flag_options %}
                                     <button class="account-flag-option{% if flag.code == form_state.country_code|lower %} is-selected{% endif %}" type="button" data-flag-code="{{ flag.code }}" data-flag-url="{{ flag.flag_url }}" data-flag-label="{{ flag.label }}">
-                                        <img src="{{ flag.flag_url }}" alt="">
+                                        <img data-flag-img data-flag-src="{{ flag.flag_url }}" alt="">
                                         <span class="account-flag-text">
                                             <strong>{{ flag.label }}</strong>
                                             <small>{{ flag.code|upper }}</small>
@@ -278,6 +278,14 @@
         });
     }
 
+    function hydrateFlagImages() {
+        grid.querySelectorAll('[data-flag-img]').forEach(function (image) {
+            if (!image.getAttribute('src') && image.dataset.flagSrc) {
+                image.setAttribute('src', image.dataset.flagSrc);
+            }
+        });
+    }
+
     function closeFlagMenu() {
         flagMenu.hidden = true;
         flagTrigger.setAttribute('aria-expanded', 'false');
@@ -285,6 +293,7 @@
     }
 
     function openFlagMenu() {
+        hydrateFlagImages();
         flagMenu.hidden = false;
         flagTrigger.setAttribute('aria-expanded', 'true');
         flagPicker.classList.add('is-open');

@@ -1,11 +1,21 @@
 {
-  "generated_at": "2026-05-14",
+  "generated_at": "2026-05-28",
   "asset_groups": {
     "profile_banners": [
       {
         "filename": "profile_back_protoss.webp",
         "url": "/static/art/profile-banners/profile_back_protoss.webp",
-        "size_bytes": 34756
+        "size_bytes": 66390
+      },
+      {
+        "filename": "profile_back_protoss2.webp",
+        "url": "/static/art/profile-banners/profile_back_protoss2.webp",
+        "size_bytes": 44720
+      },
+      {
+        "filename": "profile_back_protoss3.webp",
+        "url": "/static/art/profile-banners/profile_back_protoss3.webp",
+        "size_bytes": 59638
       },
       {
         "filename": "profile_back_terran.webp",
@@ -15,7 +25,17 @@
       {
         "filename": "profile_back_zerg.webp",
         "url": "/static/art/profile-banners/profile_back_zerg.webp",
+        "size_bytes": 56612
+      },
+      {
+        "filename": "profile_back_zerg2.webp",
+        "url": "/static/art/profile-banners/profile_back_zerg2.webp",
         "size_bytes": 55692
+      },
+      {
+        "filename": "profile_back_zerg3.webp",
+        "url": "/static/art/profile-banners/profile_back_zerg3.webp",
+        "size_bytes": 59340
       }
     ]
   }

@@ -158,6 +158,16 @@ RACE_DB_LABEL_BY_SLUG = {
     slug: RACE_DB_LABELS[label]
     for label, slug in RACE_SLUG_BY_DISPLAY_LABEL.items()
 }
+PROFILE_BACKGROUND_VARIANTS_BY_RACE_SLUG = {
+    'terran': ('profile_back_terran',),
+    'protoss': ('profile_back_protoss', 'profile_back_protoss2', 'profile_back_protoss3'),
+    'zerg': ('profile_back_zerg', 'profile_back_zerg2', 'profile_back_zerg3'),
+}
+PROFILE_BACKGROUND_RACE_BY_ID = {
+    background_id: race_slug
+    for race_slug, background_ids in PROFILE_BACKGROUND_VARIANTS_BY_RACE_SLUG.items()
+    for background_id in background_ids
+}
 GAME_TYPE_OPTIONS = ('1к', '2к', 'Grand Offensive')
 GAME_TYPE_DB_LABELS = {
     '1к': '1к',
@@ -602,6 +612,29 @@ def _race_slug_from_value(value: str | None) -> str:
 
     normalized = _normalize_text(value).strip().lower()
     return normalized if normalized in RACE_DISPLAY_LABEL_BY_SLUG else ''
+
+
+def _resolve_profile_background_id_for_priority_race(
+    priority_race: str | None,
+    *,
+    player_id: int | None = None,
+    current_background_id: str | None = None,
+) -> str | None:
+    race_slug = _race_slug_from_value(priority_race)
+    if not race_slug:
+        return current_background_id or None
+    if PROFILE_BACKGROUND_RACE_BY_ID.get(current_background_id or '') == race_slug:
+        return current_background_id
+
+    background_ids = PROFILE_BACKGROUND_VARIANTS_BY_RACE_SLUG.get(race_slug) or ()
+    if not background_ids:
+        return current_background_id or None
+
+    try:
+        variant_index = int(player_id or 0) % len(background_ids)
+    except (TypeError, ValueError):
+        variant_index = 0
+    return background_ids[variant_index]
 
 
 def _normalize_ladder_rating_race(value: str | None) -> str:
@@ -3211,14 +3244,26 @@ def _fetch_all_player_aliases_raw(*, force_refresh: bool = False) -> list[dict]:
     return [dict(row) for row in snapshot.get('player_aliases') or []]
 
 
-def _fetch_public_aliases_by_player_ids(player_ids: list[int]) -> dict[int, list[dict]]:
+def _fetch_public_aliases_by_player_ids(
+    player_ids: list[int],
+    *,
+    use_application_cache: bool = True,
+) -> dict[int, list[dict]]:
     target_ids = {int(player_id) for player_id in player_ids if player_id}
     aliases_by_player_id: dict[int, list[dict]] = {player_id: [] for player_id in target_ids}
     if not target_ids:
         return aliases_by_player_id
 
     try:
-        rows = _fetch_all_player_aliases_raw()
+        if use_application_cache:
+            rows = _fetch_all_player_aliases_raw()
+        else:
+            rows = _rest_select(
+                PLAYER_ALIASES_TABLE_NAME,
+                select='id,player_id,alias_name,alias_name_normalized,created_by_account_id,is_public,created_at',
+                filters=[('player_id', 'in', sorted(target_ids))],
+                order='player_id.asc,alias_name.asc',
+            )
     except Exception as exc:
         if _is_missing_user_profile_table_error(exc):
             return aliases_by_player_id
@@ -5349,7 +5394,7 @@ def get_or_create_user_account_from_google(profile: dict) -> dict:
     return prepared
 
 
-def fetch_user_account(account_id: int) -> dict | None:
+def fetch_user_account(account_id: int, *, include_player_extras: bool = True) -> dict | None:
     clean_account_id = _coerce_positive_int(account_id)
     if not clean_account_id:
         return None
@@ -5374,13 +5419,20 @@ def fetch_user_account(account_id: int) -> dict | None:
         player_row = _rest_get_player_by_id(player_id)
         if player_row:
             player = _prepare_player_row(player_row)
-            race_ratings = (_fetch_race_ratings_by_player_ids([player_id]).get(player_id) or {})
-            player['race_ratings'] = {
-                _race_slug_from_value(race): rating
-                for race, rating in race_ratings.items()
-            }
-            player['badges'] = fetch_player_badges(player_id)
-            aliases = _fetch_public_aliases_by_player_ids([player_id]).get(player_id, [])
+            if include_player_extras:
+                race_ratings = (_fetch_race_ratings_by_player_ids([player_id]).get(player_id) or {})
+                player['race_ratings'] = {
+                    _race_slug_from_value(race): rating
+                    for race, rating in race_ratings.items()
+                }
+                player['badges'] = fetch_player_badges(player_id)
+            else:
+                player['race_ratings'] = {}
+                player['badges'] = []
+            aliases = _fetch_public_aliases_by_player_ids(
+                [player_id],
+                use_application_cache=include_player_extras,
+            ).get(player_id, [])
             player['public_aliases'] = aliases
             prepared['player'] = player
             prepared['aliases'] = aliases
@@ -5395,7 +5447,7 @@ def link_user_account_to_player(*, account_id: int, player_name: str) -> dict:
     if not clean_player_name:
         raise ValueError('Enter your player name.')
 
-    account = fetch_user_account(clean_account_id)
+    account = fetch_user_account(clean_account_id, include_player_extras=False)
     if not account:
         raise ValueError('Account not found.')
 
@@ -5426,7 +5478,7 @@ def link_user_account_to_player(*, account_id: int, player_name: str) -> dict:
         raise ValueError('Account not found.')
 
     invalidate_application_cache()
-    return fetch_user_account(clean_account_id) or {}
+    return fetch_user_account(clean_account_id, include_player_extras=False) or {}
 
 
 def _replace_account_player_aliases(*, account_id: int, player_id: int, aliases: list[str]) -> None:
@@ -5491,11 +5543,12 @@ def update_user_profile_settings(
     if not clean_account_id:
         raise ValueError('Sign in again.')
 
-    account = fetch_user_account(clean_account_id)
+    account = fetch_user_account(clean_account_id, include_player_extras=False)
     if not account or not account.get('player_id'):
         raise ValueError('Link your account to a player first.')
 
     player_id = int(account['player_id'])
+    current_player = account.get('player') or {}
     clean_country_code = _resolve_country_code(country_code)
     clean_discord_url = _normalize_text(discord_url)
     clean_priority_race = _normalize_race_db_label(priority_race)
@@ -5520,6 +5573,11 @@ def update_user_profile_settings(
         'country_code': clean_country_code or None,
         'discord_url': clean_discord_url or None,
         'priority_race': clean_priority_race or None,
+        'profile_background_id': _resolve_profile_background_id_for_priority_race(
+            clean_priority_race,
+            player_id=player_id,
+            current_background_id=current_player.get('profile_background_id'),
+        ),
         'name_color': clean_name_color or None,
         'ladder_show_flag': _coerce_ladder_visibility(ladder_show_flag, default=False),
         'ladder_show_aliases': _coerce_ladder_visibility(ladder_show_aliases, default=False),
@@ -5557,7 +5615,7 @@ def update_user_profile_settings(
         raise _user_profile_storage_error(exc) from None
 
     invalidate_application_cache()
-    return fetch_user_account(clean_account_id) or {}
+    return fetch_user_account(clean_account_id, include_player_extras=False) or {}
 
 def fetch_player_admin(player_id: int) -> dict | None:
     row = _rest_get_player_by_id(player_id)
@@ -5614,6 +5672,11 @@ def update_player_admin(
             'country_code': clean_country_code or None,
             'discord_url': clean_discord_url or None,
             'priority_race': clean_priority_race or None,
+            'profile_background_id': _resolve_profile_background_id_for_priority_race(
+                clean_priority_race,
+                player_id=player_id,
+                current_background_id=current_player.get('profile_background_id'),
+            ),
             'is_active': _is_player_active_by_last_match(current_player.get('last_match_at')),
             'updated_at': datetime.utcnow().isoformat(),
         },

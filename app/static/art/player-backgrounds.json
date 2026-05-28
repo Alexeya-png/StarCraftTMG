@@ -1,49 +1,165 @@
 {
-  "version": 3,
-  "note": "Profile banner mapping only.",
-  "backgrounds": {
-    "profile_back_protoss": {
-      "name": "Protoss profile banner",
-      "race": "protoss",
-      "url": "/static/art/profile-banners/profile_back_protoss.webp",
-      "position": "center 50%"
-    },
-    "profile_back_terran": {
-      "name": "Terran profile banner",
-      "race": "terran",
-      "url": "/static/art/profile-banners/profile_back_terran.webp",
-      "position": "center 50%"
-    },
-    "profile_back_zerg": {
-      "name": "Zerg profile banner",
-      "race": "zerg",
-      "url": "/static/art/profile-banners/profile_back_zerg.webp",
-      "position": "center 50%"
-    }
-  },
-  "race_variants": {
-    "protoss": [
-      "profile_back_protoss"
-    ],
-    "terran": [
-      "profile_back_terran"
-    ],
-    "zerg": [
-      "profile_back_zerg"
-    ]
-  },
-  "race_defaults": {
-    "protoss": "profile_back_protoss",
-    "terran": "profile_back_terran",
-    "zerg": "profile_back_zerg"
-  },
-  "players": {
-    "246": "profile_back_protoss",
-    "242": "profile_back_protoss",
-    "195": "profile_back_terran",
-    "192": "profile_back_zerg",
-    "249": "profile_back_zerg",
-    "252": "profile_back_zerg",
-    "196": "profile_back_zerg"
-  }
+    "version":  3,
+    "note":  "Profile banner mapping only.",
+    "backgrounds":  {
+                        "profile_back_protoss":  {
+                                                     "name":  "Protoss profile_back_protoss",
+                                                     "race":  "protoss",
+                                                     "url":  "/static/art/profile-banners/profile_back_protoss.webp",
+                                                     "position":  "center 50%"
+                                                 },
+                        "profile_back_terran":  {
+                                                    "name":  "Terran profile banner",
+                                                    "race":  "terran",
+                                                    "url":  "/static/art/profile-banners/profile_back_terran.webp",
+                                                    "position":  "center 50%"
+                                                },
+                        "profile_back_zerg":  {
+                                                  "name":  "Zerg profile_back_zerg",
+                                                  "race":  "zerg",
+                                                  "url":  "/static/art/profile-banners/profile_back_zerg.webp",
+                                                  "position":  "center 50%"
+                                              },
+                        "profile_back_protoss2":  {
+                                                      "name":  "Protoss profile_back_protoss2",
+                                                      "race":  "protoss",
+                                                      "url":  "/static/art/profile-banners/profile_back_protoss2.webp",
+                                                      "position":  "center 50%"
+                                                  },
+                        "profile_back_protoss3":  {
+                                                      "name":  "Protoss profile_back_protoss3",
+                                                      "race":  "protoss",
+                                                      "url":  "/static/art/profile-banners/profile_back_protoss3.webp",
+                                                      "position":  "center 50%"
+                                                  },
+                        "profile_back_zerg2":  {
+                                                   "name":  "Zerg profile_back_zerg2",
+                                                   "race":  "zerg",
+                                                   "url":  "/static/art/profile-banners/profile_back_zerg2.webp",
+                                                   "position":  "center 50%"
+                                               },
+                        "profile_back_zerg3":  {
+                                                   "name":  "Zerg profile_back_zerg3",
+                                                   "race":  "zerg",
+                                                   "url":  "/static/art/profile-banners/profile_back_zerg3.webp",
+                                                   "position":  "center 50%"
+                                               }
+                    },
+    "race_variants":  {
+                          "protoss":  [
+                                          "profile_back_protoss",
+                                          "profile_back_protoss2",
+                                          "profile_back_protoss3"
+                                      ],
+                          "terran":  [
+                                         "profile_back_terran"
+                                     ],
+                          "zerg":  [
+                                       "profile_back_zerg",
+                                       "profile_back_zerg2",
+                                       "profile_back_zerg3"
+                                   ]
+                      },
+    "race_defaults":  {
+                          "protoss":  "profile_back_protoss",
+                          "terran":  "profile_back_terran",
+                          "zerg":  "profile_back_zerg"
+                      },
+    "players":  {
+                    "188":  "profile_back_zerg2",
+                    "277":  "profile_back_zerg3",
+                    "215":  "profile_back_protoss2",
+                    "246":  "profile_back_terran",
+                    "278":  "profile_back_zerg",
+                    "199":  "profile_back_protoss3",
+                    "249":  "profile_back_protoss",
+                    "298":  "profile_back_zerg2",
+                    "272":  "profile_back_zerg3",
+                    "237":  "profile_back_protoss2",
+                    "212":  "profile_back_terran",
+                    "192":  "profile_back_zerg",
+                    "229":  "profile_back_protoss3",
+                    "245":  "profile_back_protoss",
+                    "218":  "profile_back_zerg2",
+                    "263":  "profile_back_zerg3",
+                    "293":  "profile_back_protoss2",
+                    "273":  "profile_back_terran",
+                    "262":  "profile_back_zerg",
+                    "230":  "profile_back_protoss3",
+                    "255":  "profile_back_protoss",
+                    "260":  "profile_back_zerg2",
+                    "279":  "profile_back_zerg3",
+                    "214":  "profile_back_protoss2",
+                    "236":  "profile_back_terran",
+                    "210":  "profile_back_zerg",
+                    "287":  "profile_back_protoss3",
+                    "225":  "profile_back_protoss",
+                    "288":  "profile_back_zerg2",
+                    "235":  "profile_back_zerg3",
+                    "227":  "profile_back_protoss2",
+                    "257":  "profile_back_terran",
+                    "276":  "profile_back_zerg",
+                    "198":  "profile_back_protoss3",
+                    "209":  "profile_back_protoss",
+                    "231":  "profile_back_zerg2",
+                    "265":  "profile_back_zerg3",
+                    "228":  "profile_back_protoss2",
+                    "232":  "profile_back_terran",
+                    "289":  "profile_back_zerg",
+                    "297":  "profile_back_protoss3",
+                    "234":  "profile_back_protoss",
+                    "290":  "profile_back_zerg2",
+                    "243":  "profile_back_zerg3",
+                    "271":  "profile_back_protoss2",
+                    "282":  "profile_back_terran",
+                    "256":  "profile_back_zerg",
+                    "220":  "profile_back_protoss3",
+                    "291":  "profile_back_protoss",
+                    "193":  "profile_back_zerg2",
+                    "233":  "profile_back_zerg3",
+                    "195":  "profile_back_protoss2",
+                    "269":  "profile_back_terran",
+                    "261":  "profile_back_zerg",
+                    "244":  "profile_back_protoss3",
+                    "197":  "profile_back_protoss",
+                    "280":  "profile_back_zerg2",
+                    "283":  "profile_back_zerg3",
+                    "194":  "profile_back_protoss2",
+                    "217":  "profile_back_terran",
+                    "216":  "profile_back_zerg",
+                    "248":  "profile_back_protoss3",
+                    "258":  "profile_back_protoss",
+                    "292":  "profile_back_zerg2",
+                    "242":  "profile_back_zerg3",
+                    "274":  "profile_back_protoss2",
+                    "213":  "profile_back_terran",
+                    "259":  "profile_back_zerg",
+                    "208":  "profile_back_protoss3",
+                    "268":  "profile_back_protoss",
+                    "219":  "profile_back_zerg2",
+                    "270":  "profile_back_zerg3",
+                    "275":  "profile_back_protoss2",
+                    "221":  "profile_back_terran",
+                    "223":  "profile_back_zerg",
+                    "251":  "profile_back_protoss3",
+                    "241":  "profile_back_protoss",
+                    "238":  "profile_back_zerg2",
+                    "254":  "profile_back_zerg3",
+                    "250":  "profile_back_protoss2",
+                    "264":  "profile_back_terran",
+                    "247":  "profile_back_zerg",
+                    "295":  "profile_back_protoss3",
+                    "281":  "profile_back_protoss",
+                    "240":  "profile_back_zerg2",
+                    "296":  "profile_back_zerg3",
+                    "253":  "profile_back_protoss2",
+                    "224":  "profile_back_terran",
+                    "196":  "profile_back_zerg",
+                    "252":  "profile_back_protoss3",
+                    "191":  "profile_back_protoss",
+                    "239":  "profile_back_zerg2",
+                    "190":  "profile_back_zerg3",
+                    "267":  "profile_back_protoss2",
+                    "211":  "profile_back_terran"
+                }
 }

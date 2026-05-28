@@ -740,6 +740,7 @@ h3 {
 }
 
 .profile-header-card {
+    --profile-name-badge-size: 146px;
     padding: 24px;
     margin-bottom: 20px;
 }
@@ -765,6 +766,7 @@ h3 {
     align-items: center;
     justify-content: space-between;
     gap: 24px;
+    min-height: var(--profile-name-badge-size);
 }
 
 .profile-identity {
@@ -825,16 +827,16 @@ h3 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 146px;
-    height: 146px;
+    width: var(--profile-name-badge-size);
+    height: var(--profile-name-badge-size);
     flex: 0 0 auto;
     cursor: help;
 }
 
 .profile-name-badge-icon {
     display: block;
-    width: 146px;
-    height: 146px;
+    width: var(--profile-name-badge-size);
+    height: var(--profile-name-badge-size);
     object-fit: contain;
     filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.42));
 }
@@ -1124,18 +1126,16 @@ select option:checked {
 }
 
 @media (max-width: 640px) {
+    .profile-header-card {
+        --profile-name-badge-size: 40px;
+    }
+
     .profile-stats-grid {
         grid-template-columns: 1fr;
     }
 
     .profile-player-name {
         font-size: 30px;
-    }
-
-    .profile-name-badge,
-    .profile-name-badge-icon {
-        width: 40px;
-        height: 40px;
     }
 }
 
@@ -3797,7 +3797,7 @@ select option:checked {
     z-index: 2;
 }
 
-.profile-header-card-custom::before {
+.profile-header-card.profile-header-card-custom::before {
     background-image: var(--profile-header-bg);
 }
 

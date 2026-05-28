@@ -15,6 +15,21 @@ def _clean_slug(value: Any) -> str:
     return str(value or '').strip().lower()
 
 
+RACE_SLUG_ALIASES = {
+    'terran': 'terran',
+    'protoss': 'protoss',
+    'zerg': 'zerg',
+    '\u0442\u0435\u0440\u0440\u0430\u043d': 'terran',
+    '\u043f\u0440\u043e\u0442\u043e\u0441\u0441': 'protoss',
+    '\u0437\u0435\u0440\u0433': 'zerg',
+}
+
+
+def _clean_race_slug(value: Any) -> str:
+    slug = _clean_slug(value)
+    return RACE_SLUG_ALIASES.get(slug, slug)
+
+
 @lru_cache(maxsize=1)
 def _load_background_config() -> dict[str, Any]:
     try:
@@ -60,6 +75,38 @@ def _normalise_background(background_id: Any) -> dict[str, str] | None:
     }
 
 
+def resolve_race_visual_background_id(
+    race_slug: Any,
+    *,
+    player_id: Any = None,
+    current_background_id: Any = None,
+) -> str | None:
+    clean_race_slug = _clean_race_slug(race_slug)
+    if not clean_race_slug:
+        return None
+
+    current_background = _normalise_background(current_background_id)
+    if current_background and current_background.get('race') == clean_race_slug:
+        return current_background['id']
+
+    config = _load_background_config()
+    race_variants = config['race_variants'].get(clean_race_slug)
+    if isinstance(race_variants, list) and race_variants:
+        try:
+            variant_index = int(player_id) % len(race_variants)
+        except (TypeError, ValueError):
+            variant_index = 0
+        background = _normalise_background(race_variants[variant_index])
+        if background and background.get('race') == clean_race_slug:
+            return background['id']
+
+    background = _normalise_background(config['race_defaults'].get(clean_race_slug))
+    if background and background.get('race') == clean_race_slug:
+        return background['id']
+
+    return None
+
+
 def resolve_player_visual_background(player: dict[str, Any] | None) -> dict[str, str] | None:
     if not player:
         return None
@@ -67,22 +114,14 @@ def resolve_player_visual_background(player: dict[str, Any] | None) -> dict[str,
     config = _load_background_config()
     player_id = str(player.get('id') or '').strip()
     background_id = player.get('background_id') or player.get('profile_background_id')
+    race_slug = _clean_race_slug(player.get('priority_race_slug') or player.get('priority_race'))
 
     if background_id in (None, '') and player_id:
         background_id = config['players'].get(player_id)
 
-    if background_id in (None, ''):
-        race_slug = _clean_slug(player.get('priority_race_slug') or player.get('priority_race'))
-        race_variants = config['race_variants'].get(race_slug)
-        if isinstance(race_variants, list) and race_variants:
-            try:
-                variant_index = int(player_id) % len(race_variants)
-            except (TypeError, ValueError):
-                variant_index = 0
-            background_id = race_variants[variant_index]
+    background = _normalise_background(background_id)
+    if background and (not race_slug or background.get('race') == race_slug):
+        return background
 
-    if background_id in (None, ''):
-        race_slug = _clean_slug(player.get('priority_race_slug') or player.get('priority_race'))
-        background_id = config['race_defaults'].get(race_slug)
-
+    background_id = resolve_race_visual_background_id(race_slug, player_id=player_id)
     return _normalise_background(background_id)
