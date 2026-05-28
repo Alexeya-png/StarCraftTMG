@@ -73,45 +73,6 @@ Admin tools still require a role from `ADMIN_ALLOWED_ROLES`.
 The login page uses Firebase Auth in the browser and then sends the Firebase ID token to Flask, where the role is checked again before the session cookie is created.
 If Firebase env is not set at all, the legacy `ADMIN_USERNAME` / `ADMIN_PASSWORD` login remains active for local use.
 
-Required server env:
-
-```dotenv
-FIREBASE_WEB_API_KEY=your_web_api_key
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_DATABASE_ID=starcrafttmgbeta
-FIREBASE_LOGIN_ROLES=user,operator,aggregator,admin
-ADMIN_ALLOWED_ROLES=admin
-FIREBASE_OPERATOR_EMAILS=operator@example.com
-```
-
-Optional env:
-
-```dotenv
-FIREBASE_EMAIL_VERIFICATION_CUTOFF=2026-03-10T00:00:00Z
-FIREBASE_AUTH_TIMEOUT_SECONDS=8
-```
-
-Expected Firestore user fields:
-
-- `role`: `user` or `operator` for a normal operator session; `admin` for admin-panel access. Add extra admin roles with `ADMIN_ALLOWED_ROLES=admin,aggregator`.
-- `nickname`: optional display name shown in the site header.
-
-If Firestore rules block server-side reads of `users/{uid}`, keep operator emails in `FIREBASE_OPERATOR_EMAILS` until a service account or server-readable role rule is configured.
-
-## Deployment archive
-
-Build the hosting archive with:
-
-```powershell
-.\Tools\build_deploy_zip.ps1
-```
-
-If Windows blocks local scripts, run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Tools\build_deploy_zip.ps1
-```
-
 Do not package `app/.cache` or `__pycache__`; those files can make hosting serve stale data from an old snapshot.
 
 <img width="1890" height="899" alt="image" src="https://github.com/user-attachments/assets/78898ff6-da24-4a75-ba3b-ca46fd9c3080" />
