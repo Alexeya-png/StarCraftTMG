@@ -4,7 +4,7 @@ from flask import Flask, request
 
 from .cache import warmup_cache_on_startup
 from .config import APP_DISPLAY_VERSION, ASSET_VERSION, BASE_DIR
-from .routes import admin, api, interactions, public, seo
+from .routes import account, admin, api, interactions, public, seo
 
 
 def create_app() -> Flask:
@@ -45,6 +45,7 @@ def create_app() -> Flask:
 
     app.register_blueprint(seo.bp)
     app.register_blueprint(public.bp)
+    app.register_blueprint(account.bp)
     app.register_blueprint(api.bp)
     app.register_blueprint(interactions.bp)
     app.register_blueprint(admin.bp)

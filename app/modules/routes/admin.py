@@ -11,6 +11,8 @@ from app.database import (
 )
 from app.modules.auth import (
     build_admin_cookie,
+    current_user_session,
+    get_admin_email,
     get_admin_login,
     get_admin_password,
     is_admin,
@@ -29,40 +31,21 @@ bp = Blueprint('admin', __name__)
 
 @bp.route('/admin', methods=['GET'])
 def admin():
+    if not is_admin():
+        return redirect_to_admin_login()
+
     context = base_context('Admin Panel', 'admin', meta_description='Admin area.', canonical_path='/admin',
                             meta_robots='noindex,nofollow')
-    context.update({'login_error': None, 'admin_login_default': get_admin_login()})
-    template_name = 'admin_dashboard.html' if context['is_admin'] else 'admin_login.html'
-    return render_template(template_name, **context)
+    context.update({'admin_google_email': get_admin_email()})
+    return render_template('admin_dashboard.html', **context)
 
 @bp.route('/admin/login', methods=['POST'])
 def admin_login():
-    login = str(request.form.get('login', '')).strip()
-    password = str(request.form.get('password', '')).strip()
-
-    if login != get_admin_login() or password != get_admin_password():
-        context = base_context('Admin Panel', 'admin', meta_description='Admin area.', canonical_path='/admin',
-                                meta_robots='noindex,nofollow')
-        context.update({'login_error': 'Wrong login or password.', 'admin_login_default': login})
-        return make_response(render_template('admin_login.html', **context), 401)
-
-    response = redirect('/admin', code=303)
-    response.set_cookie(
-        ADMIN_COOKIE_NAME,
-        build_admin_cookie(login),
-        max_age=ADMIN_SESSION_HOURS * 60 * 60,
-        httponly=True,
-        samesite='Lax',
-        secure=False,
-        path='/',
-    )
-    return response
+    return redirect('/login', code=303)
 
 @bp.route('/admin/logout', methods=['POST'])
 def admin_logout():
-    response = redirect('/admin', code=303)
-    response.delete_cookie(ADMIN_COOKIE_NAME, path='/')
-    return response
+    return redirect('/account', code=303)
 
 @bp.route('/admin/players/<int:player_id>', methods=['GET'])
 def admin_edit_player(player_id: int):

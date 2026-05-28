@@ -62,7 +62,7 @@
             <button class="app-notice-close" type="button" id="appNoticeClose" aria-label="Close notification">×</button>
         </div>
         <div class="app-notice-body">
-            <p>If you want to add a flag to your profile, please write in <a class="inline-link" href="/feedback">Contact Admin</a>.</p>
+            <p>You can choose your flag in <a class="inline-link" href="/account">Dashboard</a>.</p>
         </div>
         <div class="app-notice-actions">
             <button class="button button-primary" type="button" id="appNoticeOk">Got it</button>
@@ -153,15 +153,15 @@
 
             const rows = players.map(function (player) {
                 const flagHtml = player.flag_url ? '<img class="country-flag-image player-flag" src="' + escapeHtml(player.flag_url) + '" alt="">' : '';
-                const raceSlug = String(player.priority_race_slug || '').trim().toLowerCase();
+                const raceSlug = String(player.leaderboard_race_slug || player.priority_race_slug || '').trim().toLowerCase();
                 const raceHtml = ['terran', 'protoss', 'zerg'].includes(raceSlug)
-                    ? '<img class="race-inline-icon" src="/static/Race/' + raceSlug + '.svg" alt="' + escapeHtml(player.priority_race || '') + ' icon">'
+                    ? '<img class="race-inline-icon" src="/static/Race/' + raceSlug + '.svg" alt="' + escapeHtml(player.leaderboard_race || player.priority_race || '') + ' icon" title="' + escapeHtml(player.leaderboard_rating_label || '') + '">'
                     : '';
                 const adminHtml = isAdmin ? '<td class="value-admin-action"><a class="admin-action-link" href="/admin/players/' + Number(player.id || 0) + '">Edit</a></td>' : '';
                 return '<tr class="leaderboard-row-link" data-href="' + escapeHtml(player.profile_url || '#') + '" tabindex="0" aria-label="Open ' + escapeHtml(player.name || 'player') + ' profile">'
                     + '<td class="value-rank">' + escapeHtml(player.rank_position) + '</td>'
                     + '<td class="value-elo">' + escapeHtml(player.current_elo_display || player.current_elo || '') + '</td>'
-                    + '<td class="value-player"><a class="player-profile-link" href="' + escapeHtml(player.profile_url || '#') + '"><div class="sc2-player-inline polished-player-inline">' + flagHtml + raceHtml + '<span class="player-name sc2-player-name">' + escapeHtml(player.name || '') + '</span></div></a></td>'
+                    + '<td class="value-player"><a class="player-profile-link" href="' + escapeHtml(player.profile_url || '#') + '"><div class="sc2-player-inline polished-player-inline">' + flagHtml + raceHtml + '<span class="player-name-stack"><span class="player-name sc2-player-name">' + escapeHtml(player.name || '') + '</span></span></div></a></td>'
                     + '<td class="value-games-all">' + escapeHtml(player.matches_count || 0) + '</td>'
                     + '<td class="value-winrate">' + escapeHtml(player.win_rate_display || player.win_rate || '') + '</td>'
                     + '<td class="value-wins col-divider-left">' + escapeHtml(player.wins || 0) + '</td>'

@@ -570,11 +570,29 @@ h3 {
     min-width: 0;
 }
 
+.player-name-stack {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
 .sc2-player-name {
     color: #18b1ff;
     font-size: 10px;
     font-weight: 700;
     line-height: 1;
+}
+
+.player-aliases {
+    max-width: 360px;
+    overflow: hidden;
+    color: rgba(226, 236, 255, 0.58);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .race-inline-icon,
@@ -766,6 +784,17 @@ h3 {
     line-height: 1.05;
 }
 
+.profile-player-name.is-custom-name-color,
+.league-player-name.is-custom-name-color {
+    color: var(--player-name-color) !important;
+    text-shadow: none !important;
+    filter: none !important;
+}
+
+.league-player-name.is-custom-name-color {
+    font-weight: 900;
+}
+
 .profile-subtitle {
     margin: 12px 0 0;
     color: var(--muted);
@@ -820,6 +849,7 @@ h3 {
 }
 
 .profile-elo-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -830,6 +860,32 @@ h3 {
     background: linear-gradient(180deg, rgba(40, 61, 136, 0.55), rgba(19, 31, 77, 0.88));
     border: none;
     box-shadow: 0 16px 36px rgba(6, 13, 33, 0.32);
+}
+
+.profile-elo-card-switchable {
+    cursor: pointer;
+}
+
+.profile-elo-card-switchable:hover,
+.profile-elo-card-switchable:focus-visible {
+    outline: none;
+    box-shadow: 0 16px 36px rgba(6, 13, 33, 0.32), 0 0 0 1px rgba(122, 163, 255, 0.36);
+}
+
+.profile-elo-card-scope-global {
+    background: linear-gradient(180deg, rgba(40, 61, 136, 0.55), rgba(19, 31, 77, 0.88));
+}
+
+.profile-elo-card-scope-terran {
+    background: linear-gradient(180deg, rgba(24, 177, 255, 0.2), rgba(19, 31, 77, 0.9));
+}
+
+.profile-elo-card-scope-protoss {
+    background: linear-gradient(180deg, rgba(245, 184, 75, 0.18), rgba(19, 31, 77, 0.9));
+}
+
+.profile-elo-card-scope-zerg {
+    background: linear-gradient(180deg, rgba(181, 108, 255, 0.19), rgba(19, 31, 77, 0.9));
 }
 
 .profile-elo-label,
@@ -843,9 +899,35 @@ h3 {
     line-height: 1;
 }
 
+.profile-elo-value-global {
+    color: #ffffff;
+}
+
+.profile-elo-value-terran {
+    color: #18b1ff;
+}
+
+.profile-elo-value-protoss {
+    color: #f5b84b;
+}
+
+.profile-elo-value-zerg {
+    color: #b56cff;
+}
+
+.profile-elo-scope {
+    color: rgba(226, 236, 255, 0.74);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.profile-elo-choices {
+    display: none;
+}
+
 .profile-stats-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 18px;
     margin-bottom: 20px;
 }
@@ -873,9 +955,90 @@ h3 {
     margin-bottom: 18px;
 }
 
+.profile-section-head-with-control {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+}
+
 .profile-section-head p {
     margin: 8px 0 0;
     color: var(--muted);
+}
+
+.profile-race-report-select-label {
+    display: grid;
+    gap: 8px;
+    min-width: 190px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.profile-race-report-select {
+    width: 100%;
+    min-height: 42px;
+    padding: 0 42px 0 14px;
+    border: 1px solid rgba(121, 146, 255, 0.24);
+    border-radius: 14px;
+    appearance: none;
+    background:
+        linear-gradient(45deg, transparent 50%, rgba(236, 242, 255, 0.96) 50%),
+        linear-gradient(135deg, rgba(236, 242, 255, 0.96) 50%, transparent 50%),
+        linear-gradient(180deg, rgba(9, 16, 35, 0.96) 0%, rgba(7, 12, 26, 0.98) 100%);
+    background-position:
+        calc(100% - 21px) calc(50% - 3px),
+        calc(100% - 15px) calc(50% - 3px),
+        0 0;
+    background-size: 6px 6px, 6px 6px, 100% 100%;
+    background-repeat: no-repeat;
+    color: #f5f8ff;
+    font-size: 14px;
+    font-weight: 800;
+    color-scheme: dark;
+}
+
+.profile-race-report-select option,
+select option {
+    background: #0b1328 !important;
+    color: #f5f8ff !important;
+}
+
+select {
+    color-scheme: dark;
+}
+
+select option:checked {
+    background: #1f63c8 !important;
+    color: #ffffff !important;
+}
+
+.profile-race-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.profile-race-filter-button {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid rgba(121, 146, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(9, 16, 35, 0.72);
+    color: rgba(236, 244, 255, 0.78);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.profile-race-filter-button.is-active {
+    border-color: rgba(121, 200, 255, 0.58);
+    background: rgba(74, 111, 201, 0.28);
+    color: #ffffff;
 }
 
 .profile-empty-state {
@@ -884,6 +1047,26 @@ h3 {
 
 .profile-history-table {
     min-width: 1080px;
+}
+
+.profile-history-table .rating-race-value {
+    font-weight: 900;
+}
+
+.profile-history-table .rating-race-global {
+    color: #ffffff;
+}
+
+.profile-history-table .rating-race-terran {
+    color: #18b1ff;
+}
+
+.profile-history-table .rating-race-protoss {
+    color: #f5b84b;
+}
+
+.profile-history-table .rating-race-zerg {
+    color: #b56cff;
 }
 
 .profile-race-inline {
@@ -958,7 +1141,7 @@ h3 {
 
 .profile-meta-grid {
     display: grid;
-    grid-template-columns: 1.4fr 0.8fr;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 18px;
     margin-bottom: 20px;
 }
@@ -999,6 +1182,36 @@ h3 {
 
 .profile-meta-empty {
     color: rgba(255, 255, 255, 0.48);
+}
+
+.profile-alias-list {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 18px;
+}
+
+.offrace-badge {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(121, 200, 255, 0.18);
+    background: rgba(74, 111, 201, 0.18);
+    color: #c8e3ff;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.profile-alias-item {
+    color: #dce9ff;
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.offrace-badge {
+    padding: 5px 7px;
+    border-radius: 8px;
+    white-space: nowrap;
 }
 
 .profile-h2h-section {
@@ -2137,6 +2350,780 @@ h3 {
     font-size: 14px;
 }
 
+.account-auth-card {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.google-login-button {
+    width: 100%;
+    justify-content: center;
+}
+
+.account-muted-note {
+    margin: 0;
+    color: rgba(226, 236, 255, 0.58);
+    font-size: 13px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.account-editor-shell {
+    width: min(980px, 100%);
+}
+
+.account-summary {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.account-avatar-wrap {
+    flex: 0 0 auto;
+}
+
+.account-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(121, 200, 255, 0.18);
+    color: #eaf4ff;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.account-summary-label {
+    color: rgba(226, 236, 255, 0.58);
+    font-size: 13px;
+}
+
+.account-summary-player {
+    display: block;
+    margin: 4px 0;
+    color: #18b1ff;
+    font-size: 24px;
+    line-height: 1.1;
+}
+
+.account-toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.account-toggle-row {
+    min-height: 42px;
+    padding: 12px 14px;
+}
+
+.account-flag-select {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 64px;
+    padding: 10px 14px;
+    border: 1px solid rgba(97, 132, 255, 0.36);
+    border-radius: 14px;
+    background: rgba(4, 11, 26, 0.76);
+    color: #ffffff;
+    text-align: left;
+    cursor: pointer;
+}
+
+.account-flag-select strong,
+.account-flag-select small {
+    display: block;
+}
+
+.account-flag-select small {
+    margin-top: 3px;
+    color: rgba(226, 236, 255, 0.58);
+    font-size: 12px;
+}
+
+.account-flag-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 32px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(226, 236, 255, 0.62);
+    font-weight: 800;
+}
+
+.account-flag-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.account-color-picker {
+    position: relative;
+    width: 100%;
+}
+
+.account-color-trigger {
+    --account-player-color: #18b1ff;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 58px;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--account-player-color) 52%, rgba(122, 163, 255, 0.24));
+    border-radius: 15px;
+    background:
+        radial-gradient(circle at 26px 50%, color-mix(in srgb, var(--account-player-color) 26%, transparent), transparent 42%),
+        linear-gradient(135deg, color-mix(in srgb, var(--account-player-color) 18%, rgba(12, 22, 48, 0.94)), rgba(2, 8, 20, 0.82));
+    color: #ffffff;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 0 0 1px color-mix(in srgb, var(--account-player-color) 18%, transparent),
+        0 12px 30px rgba(0, 0, 0, 0.24),
+        0 0 22px color-mix(in srgb, var(--account-player-color) 10%, transparent);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.account-color-trigger.is-default {
+    border-color: rgba(122, 163, 255, 0.36);
+    background:
+        radial-gradient(circle at 26px 50%, rgba(24, 177, 255, 0.18), transparent 42%),
+        linear-gradient(135deg, rgba(21, 35, 68, 0.95), rgba(2, 8, 20, 0.82));
+}
+
+.account-color-trigger:hover,
+.account-color-picker.is-open .account-color-trigger {
+    border-color: color-mix(in srgb, var(--account-player-color) 76%, rgba(34, 211, 238, 0.42));
+    background:
+        radial-gradient(circle at 26px 50%, color-mix(in srgb, var(--account-player-color) 34%, transparent), transparent 46%),
+        linear-gradient(135deg, color-mix(in srgb, var(--account-player-color) 24%, rgba(14, 28, 58, 0.96)), rgba(6, 13, 29, 0.94));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 0 0 1px color-mix(in srgb, var(--account-player-color) 28%, transparent),
+        0 14px 34px rgba(0, 0, 0, 0.28),
+        0 0 28px color-mix(in srgb, var(--account-player-color) 18%, transparent);
+}
+
+.account-color-trigger:active {
+    transform: translateY(1px);
+}
+
+.account-color-trigger-text,
+.account-color-text {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.account-color-trigger-text strong,
+.account-color-text strong {
+    overflow: hidden;
+    color: #ffffff;
+    font-size: 13px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-color-trigger-text small,
+.account-color-text small {
+    overflow: hidden;
+    color: rgba(226, 236, 255, 0.66);
+    font-size: 11px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-color-trigger-arrow {
+    margin-left: auto;
+    color: rgba(226, 236, 255, 0.78);
+    font-size: 18px;
+    line-height: 1;
+    transition: transform 0.16s ease;
+}
+
+.account-color-picker.is-open .account-color-trigger-arrow {
+    transform: rotate(180deg);
+}
+
+.account-color-menu {
+    position: absolute;
+    z-index: 60;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    max-height: 360px;
+    overflow: auto;
+    padding: 10px;
+    border: 1px solid rgba(122, 163, 255, 0.28);
+    border-radius: 16px;
+    background: rgba(7, 13, 29, 0.98);
+    box-shadow: 0 22px 55px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(14px);
+}
+
+.account-color-menu[hidden] {
+    display: none;
+}
+
+.account-color-option {
+    --account-player-color: #18b1ff;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 56px;
+    padding: 10px 34px 10px 10px;
+    border: 1px solid color-mix(in srgb, var(--account-player-color) 34%, rgba(255, 255, 255, 0.08));
+    border-radius: 13px;
+    background:
+        radial-gradient(circle at 18px 50%, color-mix(in srgb, var(--account-player-color) 16%, transparent), transparent 44%),
+        rgba(255, 255, 255, 0.04);
+    color: #ffffff;
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        0 0 0 1px color-mix(in srgb, var(--account-player-color) 10%, transparent),
+        0 8px 18px rgba(0, 0, 0, 0.14);
+    transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.account-color-option.is-default {
+    border-color: rgba(122, 163, 255, 0.22);
+    background:
+        radial-gradient(circle at 18px 50%, rgba(24, 177, 255, 0.12), transparent 44%),
+        rgba(255, 255, 255, 0.035);
+}
+
+.account-color-option:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--account-player-color) 66%, rgba(34, 211, 238, 0.32));
+    background:
+        radial-gradient(circle at 18px 50%, color-mix(in srgb, var(--account-player-color) 24%, transparent), transparent 44%),
+        rgba(255, 255, 255, 0.06);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 0 0 1px color-mix(in srgb, var(--account-player-color) 22%, transparent),
+        0 10px 22px rgba(0, 0, 0, 0.18),
+        0 0 20px color-mix(in srgb, var(--account-player-color) 14%, transparent);
+}
+
+.account-color-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.account-color-option.is-selected,
+.account-color-option:has(input:checked) {
+    border-color: color-mix(in srgb, var(--account-player-color) 82%, #ffffff 8%);
+    background:
+        radial-gradient(circle at 18px 50%, color-mix(in srgb, var(--account-player-color) 30%, transparent), transparent 46%),
+        color-mix(in srgb, var(--account-player-color) 14%, rgba(34, 211, 238, 0.08));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 0 0 1px color-mix(in srgb, var(--account-player-color) 32%, transparent),
+        0 10px 24px rgba(0, 0, 0, 0.2),
+        0 0 24px color-mix(in srgb, var(--account-player-color) 22%, transparent);
+}
+
+.account-color-swatch {
+    --account-player-color: #18b1ff;
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.52);
+    border-radius: 999px;
+    background: var(--account-player-color);
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--account-player-color) 30%, rgba(255, 255, 255, 0.12)),
+        0 0 14px color-mix(in srgb, var(--account-player-color) 52%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.account-color-swatch.is-default {
+    background:
+        linear-gradient(135deg, #18b1ff, #5f84ff);
+}
+
+.account-color-trigger-swatch {
+    width: 24px;
+    height: 24px;
+}
+
+.account-color-check {
+    position: absolute;
+    right: 11px;
+    color: color-mix(in srgb, var(--account-player-color) 82%, #ffffff 16%);
+    font-size: 13px;
+    font-weight: 900;
+    opacity: 0;
+    text-shadow: 0 0 12px color-mix(in srgb, var(--account-player-color) 62%, transparent);
+    transform: scale(0.72);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.account-color-option.is-selected .account-color-check,
+.account-color-option:has(input:checked) .account-color-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.account-offrace-panel {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid rgba(97, 132, 255, 0.28);
+    border-radius: 16px;
+    background: rgba(21, 32, 60, 0.5);
+}
+
+.account-offrace-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.account-offrace-card {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    background: rgba(2, 8, 20, 0.48);
+}
+
+.account-offrace-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ffffff;
+}
+
+.account-offrace-toggle,
+.account-ladder-choice {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 38px;
+    padding: 9px 10px;
+    border: 1px solid rgba(121, 146, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+    color: rgba(236, 244, 255, 0.88);
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.account-offrace-toggle input,
+.account-ladder-choice input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.account-control-mark {
+    position: relative;
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(236, 244, 255, 0.68);
+    border-radius: 5px;
+    background: rgba(2, 8, 20, 0.88);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.account-ladder-choice .account-control-mark {
+    border-radius: 50%;
+}
+
+.account-offrace-toggle input:checked + .account-control-mark,
+.account-ladder-choice input:checked + .account-control-mark {
+    border-color: #28d7dc;
+    background: #28d7dc;
+    box-shadow: 0 0 0 3px rgba(40, 215, 220, 0.14);
+}
+
+.account-offrace-toggle input:checked + .account-control-mark::after {
+    content: none;
+}
+
+.account-ladder-choice input:checked + .account-control-mark::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: #05202a;
+}
+
+.account-offrace-toggle:has(input:checked),
+.account-ladder-choice:has(input:checked) {
+    border-color: rgba(40, 215, 220, 0.46);
+    background: rgba(40, 215, 220, 0.1);
+    color: #ffffff;
+}
+
+.account-ladder-choice.is-disabled,
+.account-ladder-choice:has(input:disabled) {
+    opacity: 0.48;
+    cursor: not-allowed;
+}
+
+.account-ladder-global {
+    min-height: 42px;
+    width: 100%;
+}
+
+.account-flag-picker-open {
+    overflow: hidden;
+}
+
+.account-flag-modal[hidden] {
+    display: none;
+}
+
+.account-flag-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+}
+
+.account-flag-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 6, 16, 0.78);
+    backdrop-filter: blur(8px);
+}
+
+.account-flag-dialog {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 14px;
+    width: min(860px, 100%);
+    max-height: min(760px, calc(100vh - 48px));
+    padding: 18px;
+    border: 1px solid rgba(122, 163, 255, 0.34);
+    border-radius: 18px;
+    background: #0d1528;
+    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
+}
+
+.account-flag-dialog-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.account-flag-dialog-head h2,
+.account-flag-dialog-head p {
+    margin: 0;
+}
+
+.account-flag-dialog-head p {
+    margin-top: 4px;
+    color: rgba(226, 236, 255, 0.56);
+    font-size: 13px;
+}
+
+.account-flag-search {
+    width: 100%;
+    min-height: 46px;
+    padding: 0 14px;
+    border: 1px solid rgba(97, 132, 255, 0.32);
+    border-radius: 12px;
+    background: rgba(2, 8, 20, 0.82);
+    color: #ffffff;
+}
+
+.account-flag-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+    gap: 10px;
+    min-height: 0;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.account-flag-option {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    min-height: 58px;
+    padding: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.045);
+    color: #ffffff;
+    text-align: left;
+    cursor: pointer;
+}
+
+.account-flag-option:hover,
+.account-flag-option:focus-visible {
+    border-color: rgba(122, 163, 255, 0.78);
+    background: rgba(80, 120, 255, 0.16);
+}
+
+.account-flag-option img {
+    grid-row: span 2;
+    width: 34px;
+    height: 24px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.account-flag-option span,
+.account-flag-option small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-flag-option span {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.account-flag-option small {
+    color: rgba(226, 236, 255, 0.56);
+    font-size: 11px;
+}
+
+
+/* Account flag selector uses the same compact dropdown style as the nickname color selector. */
+.account-flag-picker {
+    position: relative;
+    width: 100%;
+}
+
+.account-flag-trigger {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 58px;
+    padding: 12px 14px;
+    border: 1px solid rgba(122, 163, 255, 0.28);
+    border-radius: 15px;
+    background:
+        radial-gradient(circle at left top, rgba(58, 108, 255, 0.22), transparent 42%),
+        rgba(2, 8, 20, 0.64);
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 30px rgba(0, 0, 0, 0.22);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+}
+
+.account-flag-trigger:hover,
+.account-flag-picker.is-open .account-flag-trigger {
+    border-color: rgba(34, 211, 238, 0.66);
+    background:
+        radial-gradient(circle at left top, rgba(34, 211, 238, 0.18), transparent 46%),
+        rgba(12, 21, 43, 0.92);
+}
+
+.account-flag-trigger:active {
+    transform: translateY(1px);
+}
+
+.account-flag-trigger-text,
+.account-flag-text {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.account-flag-trigger-text strong,
+.account-flag-text strong {
+    overflow: hidden;
+    color: #ffffff;
+    font-size: 13px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-flag-trigger-text small,
+.account-flag-text small {
+    overflow: hidden;
+    color: rgba(226, 236, 255, 0.62);
+    font-size: 11px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-flag-trigger-arrow {
+    margin-left: auto;
+    color: rgba(226, 236, 255, 0.66);
+    font-size: 18px;
+    line-height: 1;
+    transition: transform 0.16s ease;
+}
+
+.account-flag-picker.is-open .account-flag-trigger-arrow {
+    transform: rotate(180deg);
+}
+
+.account-flag-menu {
+    position: absolute;
+    z-index: 70;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px;
+    max-height: 390px;
+    overflow: hidden;
+    padding: 10px;
+    border: 1px solid rgba(122, 163, 255, 0.28);
+    border-radius: 16px;
+    background: rgba(7, 13, 29, 0.98);
+    box-shadow: 0 22px 55px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(14px);
+}
+
+.account-flag-menu[hidden] {
+    display: none;
+}
+
+.account-flag-menu .account-flag-search {
+    width: 100%;
+    min-height: 42px;
+    padding: 0 12px;
+    border: 1px solid rgba(97, 132, 255, 0.32);
+    border-radius: 12px;
+    background: rgba(2, 8, 20, 0.82);
+    color: #ffffff;
+    outline: none;
+}
+
+.account-flag-menu .account-flag-search:focus {
+    border-color: rgba(34, 211, 238, 0.66);
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.11);
+}
+
+.account-flag-menu .account-flag-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    min-height: 0;
+    max-height: 306px;
+    overflow: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(92, 140, 255, 0.78) rgba(7, 13, 29, 0.92);
+}
+
+.account-flag-menu .account-flag-grid::-webkit-scrollbar {
+    width: 9px;
+}
+
+.account-flag-menu .account-flag-grid::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: rgba(7, 13, 29, 0.92);
+    box-shadow: inset 0 0 0 1px rgba(122, 163, 255, 0.12);
+}
+
+.account-flag-menu .account-flag-grid::-webkit-scrollbar-thumb {
+    border: 2px solid rgba(7, 13, 29, 0.92);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(92, 140, 255, 0.9), rgba(34, 211, 238, 0.7));
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.18);
+}
+
+.account-flag-menu .account-flag-grid::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(139, 174, 255, 0.96), rgba(34, 211, 238, 0.86));
+}
+
+.account-flag-menu .account-flag-option {
+    position: relative;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 18px;
+    gap: 10px;
+    align-items: center;
+    min-height: 56px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #ffffff;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+}
+
+.account-flag-menu .account-flag-option:hover,
+.account-flag-menu .account-flag-option:focus-visible {
+    border-color: rgba(34, 211, 238, 0.42);
+    background: rgba(34, 211, 238, 0.07);
+}
+
+.account-flag-menu .account-flag-option.is-selected {
+    border-color: rgba(34, 211, 238, 0.78);
+    background: rgba(34, 211, 238, 0.13);
+}
+
+.account-flag-trigger-preview {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 28px;
+    border-radius: 7px;
+}
+
+.account-flag-menu .account-flag-option img {
+    grid-row: auto;
+    width: 42px;
+    height: 28px;
+    border-radius: 7px;
+    object-fit: cover;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.account-flag-check {
+    color: #22d3ee;
+    font-size: 13px;
+    font-weight: 900;
+    opacity: 0;
+    transform: scale(0.72);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.account-flag-option.is-selected .account-flag-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
 .button-danger {
     background: rgba(255, 99, 132, 0.16);
     border-color: rgba(255, 99, 132, 0.35);
@@ -2151,8 +3138,27 @@ h3 {
 
     .admin-form-two-col,
     .admin-dashboard-grid,
-    .admin-editor-meta {
+    .admin-editor-meta,
+    .account-toggle-grid,
+    .account-offrace-grid {
         grid-template-columns: 1fr;
+    }
+
+    .account-color-menu {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-section-head-with-control {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .profile-race-report-select-label {
+        min-width: 0;
+    }
+
+    .profile-race-filter-bar {
+        justify-content: flex-start;
     }
 
     .admin-result-choice-grid {
@@ -2818,6 +3824,26 @@ h3 {
     backdrop-filter: blur(12px);
 }
 
+.profile-elo-card.profile-elo-card-scope-global {
+    background: rgba(5, 8, 16, 0.56);
+    border-color: rgba(221, 232, 255, 0.16);
+}
+
+.profile-elo-card.profile-elo-card-scope-terran {
+    background: linear-gradient(180deg, rgba(24, 177, 255, 0.18), rgba(5, 8, 16, 0.62));
+    border-color: rgba(24, 177, 255, 0.34);
+}
+
+.profile-elo-card.profile-elo-card-scope-protoss {
+    background: linear-gradient(180deg, rgba(245, 184, 75, 0.18), rgba(5, 8, 16, 0.62));
+    border-color: rgba(245, 184, 75, 0.34);
+}
+
+.profile-elo-card.profile-elo-card-scope-zerg {
+    background: linear-gradient(180deg, rgba(181, 108, 255, 0.19), rgba(5, 8, 16, 0.62));
+    border-color: rgba(181, 108, 255, 0.34);
+}
+
 .league-race-card {
     position: relative;
     overflow: hidden;
@@ -2864,17 +3890,17 @@ h3 {
 }
 
 .league-race-card-terran::before {
-    background-image: url('/static/art/profile-banners/league_back_terran.webp');
+    background-image: url('/static/art/profile-banners/profile_back_terran.webp');
     background-position: center 46%;
 }
 
 .league-race-card-protoss::before {
-    background-image: url('/static/art/profile-banners/league_back_protoss.webp');
+    background-image: url('/static/art/profile-banners/profile_back_protoss.webp');
     background-position: center 44%;
 }
 
 .league-race-card-zerg::before {
-    background-image: url('/static/art/profile-banners/league_back_zerg.webp');
+    background-image: url('/static/art/profile-banners/profile_back_zerg.webp');
     background-position: center 54%;
     background-size: 132% auto;
     opacity: 0.42;
@@ -3059,6 +4085,10 @@ h3 {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 18px;
+}
+
+.profile-matchup-report-grid[hidden] {
+    display: none !important;
 }
 
 .matchup-report-card {
@@ -4332,7 +5362,9 @@ h3 {
 }
 
 
-.league-points-help {
+.league-points-help,
+.profile-elo-column-help,
+.field-help-label {
     cursor: help;
     text-decoration: underline dotted rgba(139, 174, 255, 0.55);
     text-underline-offset: 3px;
@@ -5135,4 +6167,353 @@ h3 {
         text-overflow: ellipsis;
         line-height: 1.4;
     }
+}
+
+/* UI tune-up: calmer dashboard accents, flat profile ELO card, custom profile dropdown, and fixed reports pagination. */
+.account-color-trigger {
+    border-color: color-mix(in srgb, var(--account-player-color) 28%, rgba(122, 163, 255, 0.22));
+    background:
+        radial-gradient(circle at 26px 50%, color-mix(in srgb, var(--account-player-color) 10%, transparent), transparent 42%),
+        linear-gradient(135deg, color-mix(in srgb, var(--account-player-color) 6%, rgba(12, 22, 48, 0.94)), rgba(2, 8, 20, 0.84));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.055),
+        0 10px 24px rgba(0, 0, 0, 0.20);
+}
+
+.account-color-trigger.is-default {
+    border-color: rgba(122, 163, 255, 0.28);
+    background:
+        radial-gradient(circle at 26px 50%, rgba(24, 177, 255, 0.10), transparent 42%),
+        linear-gradient(135deg, rgba(21, 35, 68, 0.94), rgba(2, 8, 20, 0.84));
+}
+
+.account-color-trigger:hover,
+.account-color-picker.is-open .account-color-trigger {
+    border-color: color-mix(in srgb, var(--account-player-color) 48%, rgba(34, 211, 238, 0.28));
+    background:
+        radial-gradient(circle at 26px 50%, color-mix(in srgb, var(--account-player-color) 16%, transparent), transparent 46%),
+        linear-gradient(135deg, color-mix(in srgb, var(--account-player-color) 9%, rgba(14, 28, 58, 0.96)), rgba(6, 13, 29, 0.94));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.065),
+        0 12px 26px rgba(0, 0, 0, 0.24),
+        0 0 14px color-mix(in srgb, var(--account-player-color) 5%, transparent);
+}
+
+.account-color-option {
+    border-color: color-mix(in srgb, var(--account-player-color) 20%, rgba(255, 255, 255, 0.08));
+    background:
+        radial-gradient(circle at 18px 50%, color-mix(in srgb, var(--account-player-color) 7%, transparent), transparent 44%),
+        rgba(255, 255, 255, 0.035);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.035),
+        0 7px 15px rgba(0, 0, 0, 0.12);
+}
+
+.account-color-option.is-default {
+    border-color: rgba(122, 163, 255, 0.18);
+    background:
+        radial-gradient(circle at 18px 50%, rgba(24, 177, 255, 0.07), transparent 44%),
+        rgba(255, 255, 255, 0.03);
+}
+
+.account-color-option:hover {
+    border-color: color-mix(in srgb, var(--account-player-color) 42%, rgba(34, 211, 238, 0.24));
+    background:
+        radial-gradient(circle at 18px 50%, color-mix(in srgb, var(--account-player-color) 12%, transparent), transparent 44%),
+        rgba(255, 255, 255, 0.05);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.045),
+        0 8px 18px rgba(0, 0, 0, 0.16),
+        0 0 12px color-mix(in srgb, var(--account-player-color) 5%, transparent);
+}
+
+.account-color-option.is-selected,
+.account-color-option:has(input:checked) {
+    border-color: color-mix(in srgb, var(--account-player-color) 55%, #ffffff 6%);
+    background:
+        radial-gradient(circle at 18px 50%, color-mix(in srgb, var(--account-player-color) 14%, transparent), transparent 46%),
+        color-mix(in srgb, var(--account-player-color) 6%, rgba(34, 211, 238, 0.06));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.055),
+        0 8px 18px rgba(0, 0, 0, 0.16),
+        0 0 14px color-mix(in srgb, var(--account-player-color) 8%, transparent);
+}
+
+.account-color-swatch {
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--account-player-color) 18%, rgba(255, 255, 255, 0.11)),
+        0 0 8px color-mix(in srgb, var(--account-player-color) 22%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+.account-color-check {
+    text-shadow: none;
+}
+
+.profile-elo-card,
+.profile-elo-card * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.profile-elo-card {
+    -webkit-tap-highlight-color: transparent;
+}
+.profile-elo-card.profile-elo-card-scope-global,
+.profile-elo-card.profile-elo-card-scope-terran,
+.profile-elo-card.profile-elo-card-scope-protoss,
+.profile-elo-card.profile-elo-card-scope-zerg {
+    background: rgba(5, 8, 16, 0.62);
+    box-shadow: 0 16px 36px rgba(6, 13, 33, 0.30);
+}
+
+.profile-elo-card.profile-elo-card-scope-global {
+    border-color: rgba(221, 232, 255, 0.16);
+}
+
+.profile-elo-card.profile-elo-card-scope-terran {
+    border-color: rgba(24, 177, 255, 0.34);
+}
+
+.profile-elo-card.profile-elo-card-scope-protoss {
+    border-color: rgba(245, 184, 75, 0.34);
+}
+
+.profile-elo-card.profile-elo-card-scope-zerg {
+    border-color: rgba(181, 108, 255, 0.34);
+}
+
+.profile-alias-inline {
+    color: #dce9ff;
+    font-size: 15px;
+    line-height: 1.45;
+}
+
+.profile-native-select-source {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.profile-custom-select {
+    position: relative;
+    width: 100%;
+}
+
+.profile-custom-select-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-height: 42px;
+    padding: 0 14px;
+    border: 1px solid rgba(121, 146, 255, 0.24);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(9, 16, 35, 0.96) 0%, rgba(7, 12, 26, 0.98) 100%);
+    color: #f5f8ff;
+    font-size: 14px;
+    font-weight: 800;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.profile-custom-select-trigger:hover,
+.profile-custom-select.is-open .profile-custom-select-trigger {
+    border-color: rgba(121, 146, 255, 0.48);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.065), 0 0 0 4px rgba(92, 140, 255, 0.10);
+}
+
+.profile-custom-select-arrow {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid rgba(236, 242, 255, 0.92);
+    transition: transform 0.16s ease;
+}
+
+.profile-custom-select.is-open .profile-custom-select-arrow {
+    transform: rotate(180deg);
+}
+
+.profile-custom-select-menu {
+    position: absolute;
+    z-index: 70;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    display: grid;
+    gap: 5px;
+    padding: 7px;
+    border: 1px solid rgba(121, 146, 255, 0.28);
+    border-radius: 14px;
+    background: rgba(7, 13, 29, 0.98);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+}
+
+.profile-custom-select-menu[hidden] {
+    display: none;
+}
+
+.profile-custom-select-option {
+    width: 100%;
+    min-height: 36px;
+    padding: 0 11px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: #dfe8ff;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+.profile-custom-select-option:hover,
+.profile-custom-select-option:focus-visible {
+    outline: none;
+    border-color: rgba(121, 146, 255, 0.28);
+    background: rgba(121, 146, 255, 0.11);
+    color: #ffffff;
+}
+
+.profile-custom-select-option.is-selected {
+    border-color: rgba(121, 146, 255, 0.42);
+    background: rgba(64, 98, 202, 0.32);
+    color: #ffffff;
+}
+
+.toolbar-field--priority-race {
+    position: relative;
+    z-index: 20;
+}
+
+.toolbar-field--priority-race:focus-within,
+.toolbar-field--priority-race:has(.account-priority-select.is-open) {
+    z-index: 90;
+}
+
+.account-priority-select .profile-custom-select-trigger {
+    min-height: 52px;
+    border-radius: 16px;
+    font-size: 15px;
+}
+
+.account-priority-menu {
+    z-index: 95;
+}
+
+.account-priority-menu .profile-custom-select-option {
+    min-height: 38px;
+}
+
+.game-reports-pagination-bar {
+    flex: 0 0 auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    background: linear-gradient(180deg, rgba(14, 20, 41, 0.96) 0%, rgba(10, 15, 31, 0.98) 100%);
+}
+
+.game-reports-pagination-bar[hidden] {
+    display: none;
+}
+
+.game-reports-pagination-bar .table-footer-pagination {
+    border-top: 0;
+    background: transparent;
+}
+
+.pagination-link-step {
+    font-size: 20px;
+    padding-bottom: 2px;
+}
+
+@media (max-width: 980px) {
+    .game-reports-pagination-bar {
+        margin: 0 10px 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 0 0 16px 16px;
+        background: transparent;
+    }
+
+    .game-reports-pagination-bar .table-footer-pagination {
+        margin: 0;
+        padding: 12px 4px 2px;
+    }
+}
+
+.profile-native-select-source.profile-race-report-select {
+    min-height: 1px;
+    padding: 0;
+    border: 0;
+}
+
+/* Custom select reuse: submit match and league matchup report use the same rounded dropdown as the offrace selector. */
+.profile-h2h-custom-select,
+.submit-custom-select {
+    width: 100%;
+}
+
+.profile-h2h-custom-select .profile-custom-select-trigger,
+.submit-custom-select .profile-custom-select-trigger {
+    min-height: 44px;
+}
+
+.profile-custom-select-menu-scroll {
+    max-height: 340px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.submit-custom-select-menu {
+    max-height: 280px;
+}
+
+.profile-custom-select-menu-scroll::-webkit-scrollbar {
+    width: 9px;
+}
+
+.profile-custom-select-menu-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+}
+
+.profile-custom-select-menu-scroll::-webkit-scrollbar-thumb {
+    background: rgba(190, 205, 235, 0.44);
+    border-radius: 999px;
+}
+
+.profile-custom-select-menu-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(220, 230, 250, 0.62);
+}
+
+.profile-custom-select.is-invalid .profile-custom-select-trigger {
+    border-color: rgba(255, 99, 132, 0.62);
+    box-shadow: 0 0 0 4px rgba(255, 99, 132, 0.12);
+}
+
+
+/* Player profile recent matches: opponent cell uses the same roster seed badge as Game Reports. */
+.profile-history-table tbody td.value-player {
+    height: 58px;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: visible;
+}
+
+.profile-history-table .game-report-player-cell,
+.profile-history-table .game-report-player-meta {
+    overflow: visible;
+}
+
+.profile-history-table .game-report-seed-link {
+    z-index: 5;
 }

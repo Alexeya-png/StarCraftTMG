@@ -429,10 +429,14 @@ document.addEventListener('DOMContentLoaded', function () {
             ? '<span class="league-player-race' + raceClassName(raceSlug) + '"><img class="race-inline-icon" src="/static/Race/' + escapeHtml(raceSlug) + '.svg" alt="' + escapeHtml(raceLabel) + ' icon"><span>' + escapeHtml(raceLabel) + '</span></span>'
             : '';
 
+        const cleanNameColor = /^#[0-9A-Fa-f]{6}$/.test(String(player.name_color || '')) ? String(player.name_color) : '';
+        const nameClass = cleanNameColor ? 'league-player-name is-custom-name-color' : 'league-player-name';
+        const nameStyle = cleanNameColor ? ' style="--player-name-color:' + escapeHtml(cleanNameColor) + '; color:' + escapeHtml(cleanNameColor) + '"' : '';
+
         return '<span class="league-player-identity ' + escapeHtml(extraClass || '') + '">'
             + flagHtml
             + raceHtml
-            + '<span class="league-player-name">' + escapeHtml(player.name || '') + '</span>'
+            + '<span class="' + nameClass + '"' + nameStyle + '>' + escapeHtml(player.name || '') + '</span>'
             + '</span>';
     }
 
@@ -456,7 +460,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderPointsValue(player, pointsRules) {
-        return '<span class="league-points-help" title="' + escapeHtml(pointsRules || '') + '">' + pointsDisplay(player) + '</span>';
+        return pointsDisplay(player);
     }
 
     function renderLeagueBadge(badge, raceSlug, badgeKind) {
@@ -527,7 +531,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ? '<div class="leaderboard-table-wrap polished-table-wrap league-table-wrap">'
                 + '<table class="leaderboard-table leaderboard-table-sc2 leaderboard-table-polished leaderboard-table-tight league-standings-table">'
                 + '<colgroup><col class="col-rank"><col class="col-player"><col class="col-games-all"><col class="col-wins"><col class="col-losses"><col class="col-winrate"><col class="col-elo"></colgroup>'
-                + '<thead><tr><th class="col-rank">Rank</th><th class="col-player">Player</th><th class="col-games-all">Points</th><th class="col-wins league-points-help" title="' + escapeHtml(pointsRules) + '">Matches</th><th class="col-losses">Record</th><th class="col-winrate">Winrate</th><th class="col-elo">ELO</th></tr></thead>'
+                + '<thead><tr><th class="col-rank">Rank</th><th class="col-player">Player</th><th class="col-games-all league-points-help" title="' + escapeHtml(pointsRules) + '">Points</th><th class="col-wins">Matches</th><th class="col-losses">Record</th><th class="col-winrate">Winrate</th><th class="col-elo">ELO</th></tr></thead>'
                 + '<tbody>' + renderTopPlayerRows(standings, pointsRules) + '</tbody>'
                 + '</table>'
                 + '</div>'

@@ -148,6 +148,16 @@ COUNTRY_NAME_BY_CODE = {
 }
 
 RACE_OPTIONS = ('Терран', 'Протосс', 'Зерг')
+RACE_SLUG_BY_DISPLAY_LABEL = {
+    'Terran': 'terran',
+    'Protoss': 'protoss',
+    'Zerg': 'zerg',
+}
+RACE_DISPLAY_LABEL_BY_SLUG = {slug: label for label, slug in RACE_SLUG_BY_DISPLAY_LABEL.items()}
+RACE_DB_LABEL_BY_SLUG = {
+    slug: RACE_DB_LABELS[label]
+    for label, slug in RACE_SLUG_BY_DISPLAY_LABEL.items()
+}
 GAME_TYPE_OPTIONS = ('1к', '2к', 'Grand Offensive')
 GAME_TYPE_DB_LABELS = {
     '1к': '1к',
@@ -184,6 +194,92 @@ TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS = max(0, int(os.getenv('TTS_PLAYER_SUBMIT_COO
 FEEDBACK_MESSAGE_MAX_LENGTH = 300
 FEEDBACK_PLAYER_NAME_MAX_LENGTH = 80
 FEEDBACK_TABLE_NAME = 'admin_feedback_messages'
+USER_ACCOUNTS_TABLE_NAME = 'user_accounts'
+PLAYER_ALIASES_TABLE_NAME = 'player_aliases'
+PLAYER_RACE_RATINGS_TABLE_NAME = 'player_race_ratings'
+MATCH_RATING_SCOPE_GLOBAL = 'global'
+MATCH_RATING_SCOPE_RACE = 'race'
+MATCH_RATING_SCOPES = (MATCH_RATING_SCOPE_GLOBAL, MATCH_RATING_SCOPE_RACE)
+PLAYER_ALIAS_MAX_LENGTH = 64
+PLAYER_ALIAS_MAX_COUNT = 8
+PROFILE_COLOR_OPTIONS = (
+    {
+        'value': '',
+        'swatch': '#18B1FF',
+        'label': 'Default',
+        'meta_label': 'Default site color',
+        'terran_label': 'Default',
+        'zerg_label': 'Default',
+        'protoss_label': 'Default',
+        'is_default': True,
+    },
+    {
+        'value': '#F40404',
+        'swatch': '#F40404',
+        'label': 'Red',
+        'terran_label': 'Elite Guard',
+        'zerg_label': 'Tiamat Brood',
+        'protoss_label': 'Ara Tribe',
+    },
+    {
+        'value': '#0C48CC',
+        'swatch': '#0C48CC',
+        'label': 'Blue',
+        'terran_label': 'Mar Sara',
+        'zerg_label': 'Surtur Brood',
+        'protoss_label': 'Sargas Tribe',
+    },
+    {
+        'value': '#2CB494',
+        'swatch': '#2CB494',
+        'label': 'Teal',
+        'terran_label': 'Kel-Morian Combine',
+        'zerg_label': 'Fenris Brood',
+        'protoss_label': 'Akilae Tribe',
+    },
+    {
+        'value': '#88409C',
+        'swatch': '#88409C',
+        'label': 'Purple',
+        'terran_label': 'Antiga',
+        'zerg_label': 'Jormungand Brood',
+        'protoss_label': 'Furinax Tribe',
+    },
+    {
+        'value': '#F88C14',
+        'swatch': '#F88C14',
+        'label': 'Orange',
+        'terran_label': 'Delta Squadron',
+        'zerg_label': 'Garm Brood',
+        'protoss_label': 'Auriga Tribe',
+    },
+    {
+        'value': '#703014',
+        'swatch': '#703014',
+        'label': 'Brown',
+        'terran_label': 'Omega Squadron',
+        'zerg_label': 'Grendel Brood',
+        'protoss_label': 'Venatir Tribe',
+    },
+    {
+        'value': '#CCE0D0',
+        'swatch': '#CCE0D0',
+        'label': 'White',
+        'terran_label': 'Alpha Squadron',
+        'zerg_label': 'Baelrog Brood',
+        'protoss_label': 'Shelak Tribe',
+    },
+    {
+        'value': '#FCFC38',
+        'swatch': '#FCFC38',
+        'label': 'Yellow',
+        'terran_label': 'Epsilon Squadron',
+        'zerg_label': 'Leviathan Brood',
+        'protoss_label': 'Velari Tribe',
+    },
+)
+PROFILE_COLOR_VALUES = frozenset(option['value'] for option in PROFILE_COLOR_OPTIONS if option.get('value'))
+PROFILE_COLOR_DEFAULT = ''
 LEAGUE_TABLE_NAME = 'leagues'
 LEAGUE_BADGES_TABLE_NAME = 'player_league_badges'
 CURRENT_LEAGUE_SETTING_KEY = 'current_league_id'
@@ -220,7 +316,7 @@ LEAGUE_BADGE_DEFINITIONS = {
         'kind': kind,
         'race': race,
         'race_slug': race_slug,
-        'image_url': f'/static/badges/{kind}-{race_slug}.png',
+        'image_url': f'/static/badges/{kind}-{race_slug}.webp',
         'description_template': f'{LEAGUE_BADGE_KIND_TITLES[kind]} of {{league_name}} for {race}.',
     }
     for kind in LEAGUE_BADGE_KINDS
@@ -254,6 +350,8 @@ _DATA_CACHE: dict[str, Any] = {
     'all_leagues': None,
     'current_league': None,
     'player_league_badges': None,
+    'player_aliases': None,
+    'player_race_ratings': None,
     'loaded_at': 0.0,
     'version': 0,
 }
@@ -497,6 +595,106 @@ def _normalize_race_db_label(value: str | None) -> str:
     return RACE_DB_LABELS.get(clean_value, clean_value)
 
 
+def _race_slug_from_value(value: str | None) -> str:
+    display_label = _normalize_race_label(value)
+    if display_label in RACE_SLUG_BY_DISPLAY_LABEL:
+        return RACE_SLUG_BY_DISPLAY_LABEL[display_label]
+
+    normalized = _normalize_text(value).strip().lower()
+    return normalized if normalized in RACE_DISPLAY_LABEL_BY_SLUG else ''
+
+
+def _normalize_ladder_rating_race(value: str | None) -> str:
+    clean_race = _normalize_race_db_label(value)
+    return clean_race if clean_race in RACE_OPTIONS else ''
+
+
+def _player_offrace_field_for_race(value: str | None) -> str:
+    race_slug = _race_slug_from_value(value)
+    return f'offrace_{race_slug}_enabled' if race_slug else ''
+
+
+def _player_uses_separate_race_rating(player: dict | None, race: str | None) -> bool:
+    field = _player_offrace_field_for_race(race)
+    if not player or not field:
+        return False
+    return _coerce_ladder_visibility((player or {}).get(field), default=False)
+
+
+def _normalize_match_rating_scope(value: str | None) -> str:
+    normalized = _normalize_text(value).strip().lower()
+    return MATCH_RATING_SCOPE_RACE if normalized == MATCH_RATING_SCOPE_RACE else MATCH_RATING_SCOPE_GLOBAL
+
+
+def _build_match_rating_snapshot(rating_context: dict | None, fallback_race: str | None = None) -> dict:
+    context = rating_context or {}
+    uses_race_rating = bool(context.get('uses_race_rating') or context.get('scope') == MATCH_RATING_SCOPE_RACE)
+    race = _normalize_ladder_rating_race(context.get('race') or fallback_race)
+    if uses_race_rating and race:
+        return {
+            'scope': MATCH_RATING_SCOPE_RACE,
+            'race': race,
+            'uses_race_rating': True,
+            'race_label': _normalize_race_label(race),
+            'race_slug': _race_slug_from_value(race),
+            'label': f'{_normalize_race_label(race)} ELO',
+        }
+    return {
+        'scope': MATCH_RATING_SCOPE_GLOBAL,
+        'race': None,
+        'uses_race_rating': False,
+        'race_label': '',
+        'race_slug': 'global',
+        'label': 'Global ELO',
+    }
+
+
+def _get_match_side_rating_snapshot(match: dict | None, side: str) -> dict:
+    row = match or {}
+    safe_side = 'player1' if side == 'player1' else 'player2'
+    scope = _normalize_match_rating_scope(row.get(f'{safe_side}_rating_scope'))
+    if scope == MATCH_RATING_SCOPE_RACE:
+        race = _normalize_ladder_rating_race(row.get(f'{safe_side}_rating_race'))
+        if not race:
+            race = _normalize_ladder_rating_race(row.get(f'{safe_side}_race'))
+        if race:
+            return {
+                'scope': MATCH_RATING_SCOPE_RACE,
+                'race': race,
+                'uses_race_rating': True,
+                'race_label': _normalize_race_label(race),
+                'race_slug': _race_slug_from_value(race),
+                'label': f'{_normalize_race_label(race)} ELO',
+            }
+    return {
+        'scope': MATCH_RATING_SCOPE_GLOBAL,
+        'race': None,
+        'uses_race_rating': False,
+        'race_label': '',
+        'race_slug': 'global',
+        'label': 'Global ELO',
+    }
+
+
+def _get_match_rating_snapshot_for_player(match: dict | None, player_id: int) -> dict:
+    row = match or {}
+    target_id = _coerce_positive_int(player_id)
+    if target_id and target_id == _coerce_positive_int(row.get('player1_id')):
+        return _get_match_side_rating_snapshot(row, 'player1')
+    if target_id and target_id == _coerce_positive_int(row.get('player2_id')):
+        return _get_match_side_rating_snapshot(row, 'player2')
+    return _build_match_rating_snapshot(None)
+
+
+def _rating_snapshot_update_payload(prefix: str, snapshot: dict) -> dict:
+    safe_prefix = prefix if prefix in {'player1', 'player2'} else 'player1'
+    clean_snapshot = _build_match_rating_snapshot(snapshot)
+    return {
+        f'{safe_prefix}_rating_scope': clean_snapshot['scope'],
+        f'{safe_prefix}_rating_race': clean_snapshot['race'] if clean_snapshot['uses_race_rating'] else None,
+    }
+
+
 def _normalize_game_type_label(value: str | None) -> str:
     clean_value = _normalize_text(value)
     if not clean_value:
@@ -661,6 +859,41 @@ def _resolve_flag_url(country_code: str | None, country_name: str | None) -> str
     return ''
 
 
+def fetch_flag_options() -> list[dict]:
+    if not FLAGS_DIR.exists():
+        return []
+
+    preferred_codes = ('ua', 'pl', 'us', 'gb', 'de', 'fr', 'es', 'it', 'se', 'ca', 'br', 'kr', 'cn', 'jp', 'ru')
+    preferred_order = {code: index for index, code in enumerate(preferred_codes)}
+    options: list[dict] = []
+    seen: set[str] = set()
+
+    for path in FLAGS_DIR.iterdir():
+        if not path.is_file() or path.suffix.lower() not in ALLOWED_FLAG_EXTENSIONS:
+            continue
+        code = _slugify(path.stem)
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        canonical_code = COUNTRY_ALIASES.get(code, code)
+        options.append(
+            {
+                'code': code,
+                'label': COUNTRY_NAME_BY_CODE.get(canonical_code, path.stem.upper()),
+                'flag_url': f'/static/Flags/{path.name}',
+            }
+        )
+
+    options.sort(
+        key=lambda item: (
+            preferred_order.get(str(item.get('code') or ''), len(preferred_order)),
+            str(item.get('label') or '').casefold(),
+            str(item.get('code') or ''),
+        )
+    )
+    return options
+
+
 def _normalize_player_name(value: str | None) -> str:
     clean_value = _normalize_text(value)
     if not clean_value:
@@ -673,6 +906,77 @@ def _normalize_player_key(value: str | None) -> str:
     if not clean_value:
         return ''
     return clean_value.casefold()
+
+
+def _normalize_profile_color(value: str | None) -> str:
+    clean_value = _normalize_text(value)
+    if not clean_value:
+        return ''
+    clean_value = clean_value.upper()
+    if clean_value in PROFILE_COLOR_VALUES:
+        return clean_value
+    raise ValueError('Choose one of the available nickname colors.')
+
+
+def _coerce_ladder_visibility(value, *, default: bool = True) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    normalized = _normalize_text(value).lower()
+    if not normalized:
+        return False
+    return normalized in {'1', 'true', 'yes', 'y', 'on'}
+
+
+def _is_missing_user_profile_table_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        'schema cache' in message
+        or 'could not find the table' in message
+        or 'does not exist' in message
+    ) and (
+        USER_ACCOUNTS_TABLE_NAME in message
+        or PLAYER_ALIASES_TABLE_NAME in message
+        or PLAYER_RACE_RATINGS_TABLE_NAME in message
+        or 'offrace_terran_enabled' in message
+        or 'offrace_protoss_enabled' in message
+        or 'offrace_zerg_enabled' in message
+        or 'ladder_rating_race' in message
+    )
+
+
+def _normalize_alias_name(value: str | None) -> str:
+    alias = _normalize_player_name(value)
+    if not alias:
+        return ''
+    if len(alias) > PLAYER_ALIAS_MAX_LENGTH:
+        raise ValueError(f'Alias "{alias}" must be at most {PLAYER_ALIAS_MAX_LENGTH} characters long.')
+    return alias
+
+
+def _parse_alias_names(value) -> list[str]:
+    if isinstance(value, (list, tuple)):
+        raw_parts = [str(item or '') for item in value]
+    else:
+        raw_parts = re.split(r'[\n,;]+', str(value or ''))
+
+    aliases: list[str] = []
+    seen: set[str] = set()
+    for raw_part in raw_parts:
+        alias = _normalize_alias_name(raw_part)
+        if not alias:
+            continue
+        alias_key = _normalize_player_key(alias)
+        if alias_key in seen:
+            continue
+        seen.add(alias_key)
+        aliases.append(alias)
+
+    if len(aliases) > PLAYER_ALIAS_MAX_COUNT:
+        raise ValueError(f'Add at most {PLAYER_ALIAS_MAX_COUNT} additional names.')
+
+    return aliases
 
 
 def _normalize_search_term(value: str | None) -> str:
@@ -724,6 +1028,25 @@ def _count_player_ranked_matches_before_submit(player_id: int) -> int:
         count=True,
     )
     return int(total or 0)
+
+
+def _count_player_global_ranked_matches_before_submit(player: dict) -> int:
+    player_id = _coerce_positive_int((player or {}).get('id'))
+    if not player_id:
+        return 0
+
+    count = 0
+    for match in _fetch_all_matches_raw():
+        if not bool(match.get('is_ranked')):
+            continue
+        player1_id = _coerce_positive_int(match.get('player1_id'))
+        player2_id = _coerce_positive_int(match.get('player2_id'))
+        if player_id not in {player1_id, player2_id}:
+            continue
+        rating_snapshot = _get_match_rating_snapshot_for_player(match, player_id)
+        if not rating_snapshot.get('uses_race_rating'):
+            count += 1
+    return count
 
 
 def _resolve_ranked_elo_multiplier(game_type: str | None) -> float:
@@ -1634,6 +1957,7 @@ def _build_league_results_summary(league: dict) -> dict:
                 'priority_race': _normalize_race_label(base_player.get('priority_race')),
                 'country_code': _resolve_country_code(base_player.get('country_code'), base_player.get('country_name')),
                 'country_name': _resolve_country_name(base_player.get('country_code'), base_player.get('country_name')),
+                'name_color': _normalize_profile_color(base_player.get('name_color')),
                 'matches_count': 0,
                 'wins': 0,
                 'losses': 0,
@@ -2274,6 +2598,8 @@ def _cache_snapshot_from_memory() -> dict[str, Any]:
         'all_leagues': copy.deepcopy(_DATA_CACHE.get('all_leagues') or []),
         'current_league': copy.deepcopy(_DATA_CACHE.get('current_league')),
         'player_league_badges': [dict(row) for row in _DATA_CACHE.get('player_league_badges') or []],
+        'player_aliases': [dict(row) for row in _DATA_CACHE.get('player_aliases') or []],
+        'player_race_ratings': [dict(row) for row in _DATA_CACHE.get('player_race_ratings') or []],
         'loaded_at': float(_DATA_CACHE.get('loaded_at') or 0.0),
         'version': int(_DATA_CACHE.get('version') or 0),
     }
@@ -2287,6 +2613,8 @@ def _empty_cache_snapshot() -> dict[str, Any]:
         'all_leagues': [],
         'current_league': None,
         'player_league_badges': [],
+        'player_aliases': [],
+        'player_race_ratings': [],
         'loaded_at': 0.0,
         'version': int(_DATA_CACHE.get('version') or 0),
     }
@@ -2300,6 +2628,8 @@ def _apply_cache_snapshot(snapshot: dict[str, Any], *, increment_version: bool =
     all_leagues = copy.deepcopy(snapshot.get('all_leagues') or [])
     current_league = copy.deepcopy(snapshot.get('current_league'))
     player_league_badges = [dict(row) for row in snapshot.get('player_league_badges') or []]
+    player_aliases = [dict(row) for row in snapshot.get('player_aliases') or []]
+    player_race_ratings = [dict(row) for row in snapshot.get('player_race_ratings') or []]
 
     with _DATA_CACHE_LOCK:
         _DATA_CACHE['players'] = players
@@ -2308,6 +2638,8 @@ def _apply_cache_snapshot(snapshot: dict[str, Any], *, increment_version: bool =
         _DATA_CACHE['all_leagues'] = all_leagues
         _DATA_CACHE['current_league'] = current_league
         _DATA_CACHE['player_league_badges'] = player_league_badges
+        _DATA_CACHE['player_aliases'] = player_aliases
+        _DATA_CACHE['player_race_ratings'] = player_race_ratings
         _DATA_CACHE['loaded_at'] = loaded_at
         if increment_version:
             _DATA_CACHE['version'] = int(_DATA_CACHE.get('version') or 0) + 1
@@ -2381,6 +2713,8 @@ def invalidate_application_cache() -> None:
         _DATA_CACHE['all_leagues'] = None
         _DATA_CACHE['current_league'] = None
         _DATA_CACHE['player_league_badges'] = None
+        _DATA_CACHE['player_aliases'] = None
+        _DATA_CACHE['player_race_ratings'] = None
         _DATA_CACHE['loaded_at'] = 0.0
         _DATA_CACHE['version'] = int(_DATA_CACHE.get('version') or 0) + 1
 
@@ -2431,6 +2765,30 @@ def warmup_application_cache(*, force_refresh: bool = False) -> dict[str, Any]:
         else:
             raise
 
+    try:
+        player_aliases = _rest_fetch_all(
+            PLAYER_ALIASES_TABLE_NAME,
+            select='id,player_id,alias_name,alias_name_normalized,created_by_account_id,is_public,created_at',
+            order='player_id.asc,alias_name.asc',
+        )
+    except Exception as exc:
+        if _is_missing_user_profile_table_error(exc):
+            player_aliases = []
+        else:
+            raise
+
+    try:
+        player_race_ratings = _rest_fetch_all(
+            PLAYER_RACE_RATINGS_TABLE_NAME,
+            select='id,player_id,race,current_elo,matches_count,wins,losses,draws,last_match_at,updated_at',
+            order='player_id.asc,race.asc',
+        )
+    except Exception as exc:
+        if _is_missing_user_profile_table_error(exc):
+            player_race_ratings = []
+        else:
+            raise
+
     loaded_at = time.time()
     snapshot = {
         'players': players,
@@ -2439,6 +2797,8 @@ def warmup_application_cache(*, force_refresh: bool = False) -> dict[str, Any]:
         'all_leagues': all_leagues,
         'current_league': current_league,
         'player_league_badges': player_league_badges,
+        'player_aliases': player_aliases,
+        'player_race_ratings': player_race_ratings,
         'loaded_at': loaded_at,
         'version': int(_DATA_CACHE.get('version') or 0),
     }
@@ -2502,6 +2862,30 @@ def _prepare_player_row(row: dict) -> dict:
     player['last_played_label'] = _humanize_last_played(player.get('last_match_at'))
     player['current_elo_display'] = _normalize_elo_value(player.get('current_elo'))
     player['win_rate_display'] = _format_percent(player.get('win_rate'))
+    player['name_color'] = _normalize_text(player.get('name_color'))
+    if player['name_color'] and player['name_color'].upper() in PROFILE_COLOR_VALUES:
+        player['name_color'] = player['name_color'].upper()
+    elif player['name_color']:
+        player['name_color'] = ''
+    player['ladder_show_flag'] = _coerce_ladder_visibility(player.get('ladder_show_flag'), default=True)
+    player['ladder_show_aliases'] = _coerce_ladder_visibility(player.get('ladder_show_aliases'), default=False)
+    player['ladder_show_badges'] = _coerce_ladder_visibility(player.get('ladder_show_badges'), default=True)
+    for race_slug in RACE_DISPLAY_LABEL_BY_SLUG:
+        player[f'offrace_{race_slug}_enabled'] = _coerce_ladder_visibility(
+            player.get(f'offrace_{race_slug}_enabled'),
+            default=False,
+        )
+    ladder_rating_race = _normalize_ladder_rating_race(player.get('ladder_rating_race'))
+    player['ladder_rating_race'] = _normalize_race_label(ladder_rating_race)
+    player['ladder_rating_race_db'] = ladder_rating_race
+    player['ladder_rating_race_slug'] = _race_slug_from_value(ladder_rating_race)
+    player['leaderboard_race'] = player['ladder_rating_race'] or player['priority_race']
+    player['leaderboard_race_slug'] = _race_slug_from_value(player['leaderboard_race'])
+    player['leaderboard_rating_label'] = (
+        f"{player['ladder_rating_race']} ELO"
+        if player['ladder_rating_race']
+        else 'Global ELO'
+    )
     player['profile_url'] = f"/players/{player['id']}"
     return player
 
@@ -2783,9 +3167,15 @@ def _fetch_all_rating_history_raw(*, force_refresh: bool = False) -> list[dict]:
     return [dict(row) for row in snapshot['rating_history']]
 
 
+def _fetch_all_player_race_ratings_raw(*, force_refresh: bool = False) -> list[dict]:
+    snapshot = _cache_snapshot(force_refresh=force_refresh)
+    return [dict(row) for row in snapshot.get('player_race_ratings') or []]
+
+
 def fetch_player_name_suggestions(limit: int = 500) -> list[str]:
     safe_limit = max(1, min(limit, 2000))
     rows = _fetch_all_players_raw()
+    aliases_by_player_id = _fetch_public_aliases_by_player_ids([int(row.get('id') or 0) for row in rows])
     rows.sort(
         key=lambda row: (
             -int(row.get('current_elo') or 0),
@@ -2802,9 +3192,201 @@ def fetch_player_name_suggestions(limit: int = 500) -> list[str]:
             continue
         seen.add(player_key)
         suggestions.append(player_name)
+        for alias in aliases_by_player_id.get(int(row.get('id') or 0), []):
+            alias_name = _normalize_alias_name(alias.get('alias_name'))
+            alias_key = _normalize_player_key(alias_name)
+            if not alias_name or alias_key in seen:
+                continue
+            seen.add(alias_key)
+            suggestions.append(alias_name)
+            if len(suggestions) >= safe_limit:
+                break
         if len(suggestions) >= safe_limit:
             break
     return suggestions
+
+
+def _fetch_all_player_aliases_raw(*, force_refresh: bool = False) -> list[dict]:
+    snapshot = _cache_snapshot(force_refresh=force_refresh)
+    return [dict(row) for row in snapshot.get('player_aliases') or []]
+
+
+def _fetch_public_aliases_by_player_ids(player_ids: list[int]) -> dict[int, list[dict]]:
+    target_ids = {int(player_id) for player_id in player_ids if player_id}
+    aliases_by_player_id: dict[int, list[dict]] = {player_id: [] for player_id in target_ids}
+    if not target_ids:
+        return aliases_by_player_id
+
+    try:
+        rows = _fetch_all_player_aliases_raw()
+    except Exception as exc:
+        if _is_missing_user_profile_table_error(exc):
+            return aliases_by_player_id
+        raise
+
+    for row in rows:
+        player_id = _coerce_positive_int(row.get('player_id'))
+        if not player_id or player_id not in target_ids:
+            continue
+        if not _coerce_ladder_visibility(row.get('is_public'), default=True):
+            continue
+        alias_name = _normalize_alias_name(row.get('alias_name'))
+        if not alias_name:
+            continue
+        prepared = dict(row)
+        prepared['alias_name'] = alias_name
+        prepared['alias_name_normalized'] = _normalize_player_key(alias_name)
+        aliases_by_player_id.setdefault(int(player_id), []).append(prepared)
+
+    for aliases in aliases_by_player_id.values():
+        aliases.sort(key=lambda alias: _normalize_player_name(alias.get('alias_name')).casefold())
+
+    return aliases_by_player_id
+
+
+def _rest_get_player_alias_by_key(alias_key: str) -> dict | None:
+    clean_key = _normalize_player_key(alias_key)
+    if not clean_key:
+        return None
+    try:
+        return _rest_select(
+            PLAYER_ALIASES_TABLE_NAME,
+            filters=[('alias_name_normalized', 'eq', clean_key)],
+            single=True,
+        )
+    except Exception as exc:
+        if _is_missing_user_profile_table_error(exc):
+            return None
+        raise
+
+
+def _prepare_player_race_rating_row(row: dict | None) -> dict | None:
+    if not row:
+        return None
+    race = _normalize_ladder_rating_race(row.get('race'))
+    if not race:
+        return None
+    prepared = dict(row)
+    prepared['player_id'] = int(prepared.get('player_id') or 0)
+    prepared['race'] = race
+    prepared['race_label'] = _normalize_race_label(race)
+    prepared['race_slug'] = _race_slug_from_value(race)
+    prepared['current_elo'] = int(prepared.get('current_elo') or 1000)
+    prepared['matches_count'] = int(prepared.get('matches_count') or 0)
+    prepared['wins'] = int(prepared.get('wins') or 0)
+    prepared['losses'] = int(prepared.get('losses') or 0)
+    prepared['draws'] = int(prepared.get('draws') or 0)
+    return prepared
+
+
+def _fetch_race_ratings_by_player_ids(player_ids: list[int]) -> dict[int, dict[str, dict]]:
+    target_ids = {int(player_id) for player_id in player_ids if player_id is not None}
+    if not target_ids:
+        return {}
+
+    rows_by_player: dict[int, dict[str, dict]] = {}
+    for row in _fetch_all_player_race_ratings_raw():
+        player_id = _coerce_positive_int(row.get('player_id'))
+        if not player_id or player_id not in target_ids:
+            continue
+        prepared = _prepare_player_race_rating_row(row)
+        if not prepared:
+            continue
+        rows_by_player.setdefault(player_id, {})[prepared['race']] = prepared
+    return rows_by_player
+
+
+def _rest_get_player_race_rating(player_id: int, race: str) -> dict | None:
+    clean_player_id = _coerce_positive_int(player_id)
+    clean_race = _normalize_ladder_rating_race(race)
+    if not clean_player_id or not clean_race:
+        return None
+    try:
+        row = _rest_select(
+            PLAYER_RACE_RATINGS_TABLE_NAME,
+            filters=[('player_id', 'eq', clean_player_id), ('race', 'eq', clean_race)],
+            single=True,
+        )
+    except Exception as exc:
+        if _is_missing_user_profile_table_error(exc):
+            return None
+        raise
+    return _prepare_player_race_rating_row(row)
+
+
+def _save_player_race_rating_state(
+    *,
+    player_id: int,
+    race: str,
+    current_elo: int,
+    matches_count: int,
+    wins: int,
+    losses: int,
+    draws: int,
+    last_match_at: str | None,
+) -> None:
+    clean_player_id = int(player_id)
+    clean_race = _normalize_ladder_rating_race(race)
+    if not clean_race:
+        return
+
+    payload = {
+        'player_id': clean_player_id,
+        'race': clean_race,
+        'current_elo': int(current_elo),
+        'matches_count': int(matches_count),
+        'wins': int(wins),
+        'losses': int(losses),
+        'draws': int(draws),
+        'last_match_at': last_match_at,
+        'updated_at': datetime.utcnow().isoformat(),
+    }
+
+    try:
+        existing = _rest_get_player_race_rating(clean_player_id, clean_race)
+        if existing:
+            _rest_update(
+                PLAYER_RACE_RATINGS_TABLE_NAME,
+                {key: value for key, value in payload.items() if key not in {'player_id', 'race'}},
+                filters=[('player_id', 'eq', clean_player_id), ('race', 'eq', clean_race)],
+            )
+        else:
+            _rest_insert(PLAYER_RACE_RATINGS_TABLE_NAME, payload)
+    except Exception as exc:
+        raise _user_profile_storage_error(exc) from None
+
+
+def _build_submit_rating_context(player: dict, race: str, *, ranked_match: bool) -> dict:
+    player_id = int(player.get('id') or 0)
+    clean_race = _normalize_ladder_rating_race(race)
+    uses_race_rating = bool(ranked_match and _player_uses_separate_race_rating(player, clean_race))
+    if uses_race_rating:
+        race_rating = _rest_get_player_race_rating(player_id, clean_race) or {}
+        return {
+            'scope': 'race',
+            'race': clean_race,
+            'uses_race_rating': True,
+            'old_elo': int(race_rating.get('current_elo') or 1000),
+            'ranked_matches_count': int(race_rating.get('matches_count') or 0),
+            'matches_count': int(race_rating.get('matches_count') or 0),
+            'wins': int(race_rating.get('wins') or 0),
+            'losses': int(race_rating.get('losses') or 0),
+            'draws': int(race_rating.get('draws') or 0),
+            'last_match_at': race_rating.get('last_match_at'),
+        }
+
+    return {
+        'scope': 'global',
+        'race': '',
+        'uses_race_rating': False,
+        'old_elo': int(player.get('current_elo') or 1000),
+        'ranked_matches_count': _count_player_global_ranked_matches_before_submit(player),
+        'matches_count': int(player.get('matches_count') or 0),
+        'wins': int(player.get('wins') or 0),
+        'losses': int(player.get('losses') or 0),
+        'draws': int(player.get('draws') or 0),
+        'last_match_at': player.get('last_match_at'),
+    }
 
 
 def fetch_mission_suggestions(limit: int = 50) -> list[str]:
@@ -2843,6 +3425,8 @@ def _fetch_leaderboard_uncached(
         include_active = True
 
     rows = _fetch_all_players_raw()
+    aliases_by_player_id = _fetch_public_aliases_by_player_ids([int(row.get('id') or 0) for row in rows])
+    race_ratings_by_player_id = _fetch_race_ratings_by_player_ids([int(row.get('id') or 0) for row in rows])
     ranked_player_ids = _fetch_ranked_player_ids() if active_ranked_only else set()
 
     filtered_rows: list[dict] = []
@@ -2854,9 +3438,24 @@ def _fetch_leaderboard_uncached(
         prepared['draws'] = int(row.get('draws') or 0)
         prepared['current_elo'] = int(row.get('current_elo') or 0)
         prepared['is_active'] = _is_player_active_by_last_match(row.get('last_match_at'))
+        prepared['public_aliases'] = aliases_by_player_id.get(int(prepared.get('id') or 0), [])
+        ladder_rating_race = _normalize_ladder_rating_race(row.get('ladder_rating_race'))
+        if ladder_rating_race:
+            race_rating = (race_ratings_by_player_id.get(int(prepared.get('id') or 0)) or {}).get(ladder_rating_race) or {}
+            prepared['global_elo'] = int(row.get('current_elo') or 1000)
+            prepared['current_elo'] = int(race_rating.get('current_elo') or 1000)
+            prepared['current_elo_display'] = str(prepared['current_elo'])
+            prepared['ladder_rating_race'] = ladder_rating_race
+            prepared['leaderboard_rating_label'] = f"{_normalize_race_label(ladder_rating_race)} ELO"
 
-        if normalized_search and normalized_search not in _normalize_player_name(prepared.get('name')).casefold():
-            continue
+        if normalized_search:
+            searchable_names = [_normalize_player_name(prepared.get('name')).casefold()]
+            searchable_names.extend(
+                _normalize_player_name(alias.get('alias_name')).casefold()
+                for alias in prepared.get('public_aliases') or []
+            )
+            if not any(normalized_search in name for name in searchable_names if name):
+                continue
         if include_active and not include_inactive and not prepared['is_active']:
             continue
         if include_inactive and not include_active and prepared['is_active']:
@@ -2911,7 +3510,7 @@ def fetch_leaderboard(
 
 def _fetch_player_match_rows(player_id: int, *, limit: int | None = None, order_desc: bool = True) -> list[dict]:
     query: dict[str, Any] = {
-        'select': 'id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,is_ranked,game_type,mission_name,comment,result_type',
+        'select': 'id,played_at,player1_id,player2_id,winner_player_id,player1_race,player2_race,player1_rating_scope,player1_rating_race,player2_rating_scope,player2_rating_race,is_ranked,game_type,mission_name,comment,result_type',
         'or': f'(player1_id.eq.{int(player_id)},player2_id.eq.{int(player_id)})',
         'order': 'played_at.desc,id.desc' if order_desc else 'played_at.asc,id.asc',
     }
@@ -2927,7 +3526,11 @@ def _fetch_players_by_ids(player_ids: list[int]) -> dict[int, dict]:
     cached = _fetch_players_by_ids_cached(unique_ids)
     if cached:
         return cached
-    rows = _rest_select('players', select='id,name', filters=[('id', 'in', unique_ids)])
+    rows = _rest_select(
+        'players',
+        select='id,name,priority_race,country_code,country_name,current_elo',
+        filters=[('id', 'in', unique_ids)],
+    )
     return {int(row['id']): dict(row) for row in rows}
 
 
@@ -3121,6 +3724,12 @@ def _fetch_game_reports_page_uncached(search: str = '', page: int = 1, per_page:
 
         match_league_id = _coerce_positive_int(match.get('league_id'))
         is_friendly_null_match = match_league_id is None and bool(match.get('is_ranked')) is False
+        winner_player = player1 if winner_id == player1_id else player2
+        loser_player = player2 if loser_id == player2_id else player1
+        winner_priority_race = _normalize_race_label((winner_player or {}).get('priority_race'))
+        loser_priority_race = _normalize_race_label((loser_player or {}).get('priority_race'))
+        winner_race_label = _normalize_race_label(winner_race)
+        loser_race_label = _normalize_race_label(loser_race)
 
         item = {
             'id': int(match['id']),
@@ -3131,6 +3740,8 @@ def _fetch_game_reports_page_uncached(search: str = '', page: int = 1, per_page:
             'loser_name': loser_name,
             'winner_race': winner_race,
             'loser_race': loser_race,
+            'winner_is_offrace': bool(winner_priority_race and winner_race_label and winner_priority_race != winner_race_label),
+            'loser_is_offrace': bool(loser_priority_race and loser_race_label and loser_priority_race != loser_race_label),
             'winner_score': winner_score,
             'loser_score': loser_score,
             'is_ranked': bool(match.get('is_ranked')),
@@ -3616,6 +4227,41 @@ def _fetch_rating_history_for_player_cached(player_id: int) -> list[dict]:
     return rows
 
 
+
+def _infer_player_rating_scope_by_match_id(
+    player: dict,
+    player_id: int,
+    matches: list[dict],
+    history_rows: list[dict],
+) -> dict[int, dict[str, str]]:
+    target_id = int(player_id)
+    rating_scope_by_match_id: dict[int, dict[str, str]] = {}
+    history_match_ids = {
+        _coerce_positive_int(row.get('match_id'))
+        for row in history_rows
+        if _coerce_positive_int(row.get('match_id'))
+    }
+
+    for match in matches:
+        match_id = _coerce_positive_int(match.get('id'))
+        if not match_id or (history_match_ids and match_id not in history_match_ids):
+            continue
+        player1_id = _coerce_positive_int(match.get('player1_id'))
+        player2_id = _coerce_positive_int(match.get('player2_id'))
+        if target_id not in {player1_id, player2_id}:
+            continue
+
+        rating_snapshot = _get_match_rating_snapshot_for_player(match, target_id)
+        rating_scope_by_match_id[match_id] = {
+            'scope': rating_snapshot.get('scope') or MATCH_RATING_SCOPE_GLOBAL,
+            'race': rating_snapshot.get('race_label') or '',
+            'race_slug': rating_snapshot.get('race_slug') or 'global',
+            'label': rating_snapshot.get('label') or 'Global ELO',
+        }
+
+    return rating_scope_by_match_id
+
+
 def _summarize_player_record_from_matches(player_id: int, matches: list[dict]) -> dict[str, Any]:
     target_id = int(player_id)
     stats: dict[str, Any] = {
@@ -3686,6 +4332,46 @@ def _fetch_player_profile_uncached(player_id: int, recent_matches_limit: int = 2
     player['rank_position'] = _compute_player_rank_position(int(player_id))
     player = decorate_player_with_current_league_awards(player)
     player['badges'] = fetch_player_badges(int(player_id))
+    player['public_aliases'] = _fetch_public_aliases_by_player_ids([int(player_id)]).get(int(player_id), [])
+
+    race_ratings = (_fetch_race_ratings_by_player_ids([int(player_id)]).get(int(player_id)) or {})
+    profile_elo_choices = [
+        {
+            'key': 'global',
+            'label': 'Global ELO',
+            'value': _normalize_elo_value(player.get('current_elo')),
+            'race_slug': 'global',
+            'enabled': True,
+        }
+    ]
+    for race_slug in ('terran', 'zerg', 'protoss'):
+        if not player.get(f'offrace_{race_slug}_enabled'):
+            continue
+        race_db_label = RACE_DB_LABEL_BY_SLUG[race_slug]
+        race_label = RACE_DISPLAY_LABEL_BY_SLUG[race_slug]
+        race_rating = race_ratings.get(race_db_label) or {}
+        profile_elo_choices.append(
+            {
+                'key': race_slug,
+                'label': f'{race_label} ELO',
+                'value': _normalize_elo_value(race_rating.get('current_elo') or 1000),
+                'race_slug': race_slug,
+                'enabled': True,
+            }
+        )
+    def profile_elo_sort_value(choice: dict) -> int:
+        try:
+            return int(choice.get('value') or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    best_profile_elo_choice = max(profile_elo_choices, key=profile_elo_sort_value)
+    player['profile_current_elo_key'] = best_profile_elo_choice.get('key') or 'global'
+    player['profile_current_elo_label'] = best_profile_elo_choice.get('label') or 'Global ELO'
+    player['profile_current_elo_display'] = best_profile_elo_choice.get('value') or player.get('current_elo_display')
+    player['profile_current_elo_race_slug'] = best_profile_elo_choice.get('race_slug') or 'global'
+    player['profile_elo_choices'] = profile_elo_choices
+    player['profile_elo_switchable'] = len(profile_elo_choices) > 1
 
     match_ids = [int(match['id']) for match in matches]
     opponent_ids = [
@@ -3696,6 +4382,7 @@ def _fetch_player_profile_uncached(player_id: int, recent_matches_limit: int = 2
 
     history_rows = _fetch_rating_history_for_player_cached(int(player_id))
     history_by_match_id = {int(row['match_id']): dict(row) for row in history_rows}
+    rating_scope_by_match_id = _infer_player_rating_scope_by_match_id(player, int(player_id), matches, history_rows)
 
     recent_matches = []
     for match in matches[:safe_recent_matches_limit]:
@@ -3720,6 +4407,8 @@ def _fetch_player_profile_uncached(player_id: int, recent_matches_limit: int = 2
         score_details = _extract_match_score_details(match)
         player_score = score_details['player1_score'] if player1_id == int(player_id) else score_details['player2_score']
         opponent_score = score_details['player2_score'] if player1_id == int(player_id) else score_details['player1_score']
+        player_roster_id = score_details['player1_roster_id'] if player1_id == int(player_id) else score_details['player2_roster_id']
+        opponent_roster_id = score_details['player2_roster_id'] if player1_id == int(player_id) else score_details['player1_roster_id']
 
         prepared = {
             'id': match_id,
@@ -3739,14 +4428,34 @@ def _fetch_player_profile_uncached(player_id: int, recent_matches_limit: int = 2
             'new_elo': history_row.get('new_elo') if history_row else None,
             'elo_delta': history_row.get('elo_delta') if history_row else None,
             'opponent_profile_url': f"/players/{opponent_id}",
+            'player_roster_id': player_roster_id,
+            'opponent_roster_id': opponent_roster_id,
         }
         prepared['played_at_label'] = _format_match_date(prepared.get('played_at'))
         prepared['player_race'] = _normalize_race_label(prepared.get('player_race'))
         prepared['opponent_race'] = _normalize_race_label(prepared.get('opponent_race'))
+        rating_scope = rating_scope_by_match_id.get(match_id) or {}
+        prepared['rating_scope'] = rating_scope.get('scope') or 'global'
+        prepared['rating_race'] = rating_scope.get('race') or ''
+        prepared['rating_race_slug'] = rating_scope.get('race_slug') or ''
+        prepared['rating_scope_label'] = rating_scope.get('label') or 'Global ELO'
+        prepared['is_offrace'] = bool(
+            player.get('priority_race')
+            and prepared['player_race']
+            and prepared['player_race'] != player.get('priority_race')
+        )
         prepared['old_elo_display'] = _normalize_elo_value(prepared.get('old_elo'))
         prepared['new_elo_display'] = _normalize_elo_value(prepared.get('new_elo'))
         prepared['elo_delta_display'] = _format_delta(prepared.get('elo_delta'))
         recent_matches.append(prepared)
+
+    offrace_matches = [match for match in recent_matches if match.get('is_offrace')]
+    offrace_wins = sum(1 for match in offrace_matches if match.get('is_win'))
+    player['offrace_recent_count'] = len(offrace_matches)
+    player['offrace_recent_wins'] = offrace_wins
+    player['offrace_recent_win_rate_display'] = _format_percent(
+        round((offrace_wins / len(offrace_matches)) * 100, 1) if offrace_matches else 0
+    )
 
     matches_by_id = {int(match['id']): match for match in matches}
     rating_chart_rows = []
@@ -3767,6 +4476,12 @@ def _fetch_player_profile_uncached(player_id: int, recent_matches_limit: int = 2
     player['member_since_label'] = _format_match_datetime(player_row.get('created_at'))
     rating_chart = _build_rating_chart(player.get('current_elo'), rating_chart_rows)
     priority_matchup_report = _race_matchup_report_from_matches(player_id, player.get('priority_race'), matches)
+    race_matchup_reports: dict[str, dict] = {}
+    for race_label, race_slug in RACE_SLUG_BY_DISPLAY_LABEL.items():
+        report = _race_matchup_report_from_matches(player_id, race_label, matches)
+        report['race_label'] = race_label
+        report['race_slug'] = race_slug
+        race_matchup_reports[race_slug] = report
     head_to_head_report = _build_player_head_to_head_report(
         int(player_id),
         player,
@@ -3780,6 +4495,7 @@ def _fetch_player_profile_uncached(player_id: int, recent_matches_limit: int = 2
         'recent_matches': recent_matches,
         'rating_chart': rating_chart,
         'priority_matchup_report': priority_matchup_report,
+        'race_matchup_reports': race_matchup_reports,
         'head_to_head_report': head_to_head_report,
     }
 
@@ -3840,6 +4556,16 @@ def _get_or_create_player(player_name: str) -> dict:
         existing = dict(existing)
         existing['created'] = False
         return existing
+
+    alias_row = _rest_get_player_alias_by_key(normalized_key)
+    alias_player_id = _coerce_positive_int((alias_row or {}).get('player_id'))
+    if alias_player_id:
+        existing = _rest_get_player_by_id(alias_player_id)
+        if existing:
+            existing = dict(existing)
+            existing['created'] = False
+            existing['matched_alias'] = normalized_name
+            return existing
 
     try:
         rows = _rest_insert(
@@ -4221,13 +4947,16 @@ def submit_match_result(
                 )
             return duplicate_result
 
-        player1_old_elo = int(player1.get('current_elo') or 1000)
-        player2_old_elo = int(player2.get('current_elo') or 1000)
-
+        player1_rating_context = _build_submit_rating_context(player1, clean_player1_race, ranked_match=ranked_match)
+        player2_rating_context = _build_submit_rating_context(player2, clean_player2_race, ranked_match=ranked_match)
+        player1_rating_snapshot = _build_match_rating_snapshot(player1_rating_context, clean_player1_race)
+        player2_rating_snapshot = _build_match_rating_snapshot(player2_rating_context, clean_player2_race)
+        player1_old_elo = int(player1_rating_context['old_elo'])
+        player2_old_elo = int(player2_rating_context['old_elo'])
         player1_matches_before_match = int(player1.get('matches_count') or 0)
         player2_matches_before_match = int(player2.get('matches_count') or 0)
-        player1_ranked_matches_before_match = _count_player_ranked_matches_before_submit(int(player1['id']))
-        player2_ranked_matches_before_match = _count_player_ranked_matches_before_submit(int(player2['id']))
+        player1_ranked_matches_before_match = int(player1_rating_context.get('ranked_matches_count') or 0)
+        player2_ranked_matches_before_match = int(player2_rating_context.get('ranked_matches_count') or 0)
         elo_multiplier = _resolve_ranked_elo_multiplier(clean_game_type)
 
         if ranked_match:
@@ -4308,6 +5037,8 @@ def submit_match_result(
             'result_type': clean_result_type,
             'winner_player_id': None if clean_result_type == 'draw' else player1['id'],
             'league_id': match_league_id,
+            **_rating_snapshot_update_payload('player1', player1_rating_snapshot),
+            **_rating_snapshot_update_payload('player2', player2_rating_snapshot),
         }
 
         match_rows = _rest_insert('matches', match_payload)
@@ -4317,19 +5048,21 @@ def submit_match_result(
         player2_matches_after_match = player2_matches_before_match + 1
 
         player1_updates = {
-            'current_elo': player1_new_elo,
             'matches_count': player1_matches_after_match,
             'last_match_at': played_at,
             'is_active': _is_player_active_by_last_match(played_at),
             'updated_at': datetime.utcnow().isoformat(),
         }
         player2_updates = {
-            'current_elo': player2_new_elo,
             'matches_count': player2_matches_after_match,
             'last_match_at': played_at,
             'is_active': _is_player_active_by_last_match(played_at),
             'updated_at': datetime.utcnow().isoformat(),
         }
+        if not player1_rating_context.get('uses_race_rating'):
+            player1_updates['current_elo'] = player1_new_elo
+        if not player2_rating_context.get('uses_race_rating'):
+            player2_updates['current_elo'] = player2_new_elo
 
         if clean_result_type == 'draw':
             player1_updates['draws'] = int(player1.get('draws') or 0) + 1
@@ -4340,6 +5073,29 @@ def submit_match_result(
 
         _rest_update('players', player1_updates, filters=[('id', 'eq', player1['id'])])
         _rest_update('players', player2_updates, filters=[('id', 'eq', player2['id'])])
+
+        if ranked_match and player1_rating_context.get('uses_race_rating'):
+            _save_player_race_rating_state(
+                player_id=int(player1['id']),
+                race=player1_rating_context['race'],
+                current_elo=player1_new_elo,
+                matches_count=int(player1_rating_context.get('matches_count') or 0) + 1,
+                wins=int(player1_rating_context.get('wins') or 0) + (0 if clean_result_type == 'draw' else 1),
+                losses=int(player1_rating_context.get('losses') or 0),
+                draws=int(player1_rating_context.get('draws') or 0) + (1 if clean_result_type == 'draw' else 0),
+                last_match_at=played_at,
+            )
+        if ranked_match and player2_rating_context.get('uses_race_rating'):
+            _save_player_race_rating_state(
+                player_id=int(player2['id']),
+                race=player2_rating_context['race'],
+                current_elo=player2_new_elo,
+                matches_count=int(player2_rating_context.get('matches_count') or 0) + 1,
+                wins=int(player2_rating_context.get('wins') or 0),
+                losses=int(player2_rating_context.get('losses') or 0) + (0 if clean_result_type == 'draw' else 1),
+                draws=int(player2_rating_context.get('draws') or 0) + (1 if clean_result_type == 'draw' else 0),
+                last_match_at=played_at,
+            )
 
         if ranked_match:
             _rest_insert(
@@ -4509,6 +5265,300 @@ def submit_admin_feedback_message(
         return _prepare_feedback_message_row(rows[0])
     return _prepare_feedback_message_row(payload)
 
+
+def _user_profile_storage_error(exc: Exception) -> Exception:
+    if _is_missing_user_profile_table_error(exc):
+        return RuntimeError(
+            'User profile storage is not ready yet. Run Tools/add_user_accounts_profile_features.sql in Supabase first.'
+        )
+    return exc
+
+
+def _prepare_user_account_row(row: dict | None) -> dict | None:
+    if not row:
+        return None
+
+    account = dict(row)
+    account['id'] = int(account.get('id') or 0)
+    account['player_id'] = _coerce_positive_int(account.get('player_id'))
+    account['email'] = _normalize_text(account.get('email'))
+    account['display_name'] = _normalize_text(account.get('display_name')) or account['email']
+    account['avatar_url'] = _normalize_text(account.get('avatar_url'))
+    account['is_active'] = _coerce_ladder_visibility(account.get('is_active'), default=True)
+    account['created_at_label'] = _format_match_datetime(account.get('created_at'))
+    account['last_login_at_label'] = _format_match_datetime(account.get('last_login_at'))
+    return account
+
+
+def get_or_create_user_account_from_google(profile: dict) -> dict:
+    google_sub = _normalize_text(profile.get('sub'))
+    email = _normalize_text(profile.get('email')).casefold()
+    display_name = _normalize_text(profile.get('name') or profile.get('given_name') or email)
+    avatar_url = _normalize_text(profile.get('picture'))
+
+    if not google_sub:
+        raise ValueError('Google profile did not include a user id.')
+    if not email:
+        raise ValueError('Google profile did not include an email.')
+    email_verified = profile.get('email_verified')
+    if email_verified is not True and _normalize_text(email_verified).lower() not in {'1', 'true', 'yes'}:
+        raise ValueError('Google email is not verified.')
+
+    now_value = datetime.utcnow().isoformat()
+    try:
+        existing = _rest_select(
+            USER_ACCOUNTS_TABLE_NAME,
+            filters=[('google_sub', 'eq', google_sub)],
+            single=True,
+        )
+        if not existing:
+            existing = _rest_select(
+                USER_ACCOUNTS_TABLE_NAME,
+                filters=[('email', 'eq', email)],
+                single=True,
+            )
+
+        payload = {
+            'google_sub': google_sub,
+            'email': email,
+            'display_name': display_name,
+            'avatar_url': avatar_url or None,
+            'updated_at': now_value,
+            'last_login_at': now_value,
+        }
+
+        if existing:
+            rows = _rest_update(
+                USER_ACCOUNTS_TABLE_NAME,
+                payload,
+                filters=[('id', 'eq', int(existing['id']))],
+            )
+            account = rows[0] if isinstance(rows, list) and rows else dict(existing, **payload)
+        else:
+            rows = _rest_insert(
+                USER_ACCOUNTS_TABLE_NAME,
+                dict(payload, created_at=now_value, is_active=True),
+            )
+            account = rows[0] if isinstance(rows, list) and rows else rows
+    except Exception as exc:
+        raise _user_profile_storage_error(exc) from None
+
+    prepared = _prepare_user_account_row(account)
+    if not prepared or not prepared.get('is_active', True):
+        raise ValueError('This account is disabled.')
+    return prepared
+
+
+def fetch_user_account(account_id: int) -> dict | None:
+    clean_account_id = _coerce_positive_int(account_id)
+    if not clean_account_id:
+        return None
+
+    try:
+        account = _rest_select(
+            USER_ACCOUNTS_TABLE_NAME,
+            filters=[('id', 'eq', int(clean_account_id))],
+            single=True,
+        )
+    except Exception as exc:
+        raise _user_profile_storage_error(exc) from None
+
+    prepared = _prepare_user_account_row(account)
+    if not prepared:
+        return None
+
+    player_id = _coerce_positive_int(prepared.get('player_id'))
+    prepared['player'] = None
+    prepared['aliases'] = []
+    if player_id:
+        player_row = _rest_get_player_by_id(player_id)
+        if player_row:
+            player = _prepare_player_row(player_row)
+            race_ratings = (_fetch_race_ratings_by_player_ids([player_id]).get(player_id) or {})
+            player['race_ratings'] = {
+                _race_slug_from_value(race): rating
+                for race, rating in race_ratings.items()
+            }
+            player['badges'] = fetch_player_badges(player_id)
+            aliases = _fetch_public_aliases_by_player_ids([player_id]).get(player_id, [])
+            player['public_aliases'] = aliases
+            prepared['player'] = player
+            prepared['aliases'] = aliases
+    return prepared
+
+
+def link_user_account_to_player(*, account_id: int, player_name: str) -> dict:
+    clean_account_id = _coerce_positive_int(account_id)
+    clean_player_name = _normalize_player_name(player_name)
+    if not clean_account_id:
+        raise ValueError('Sign in again.')
+    if not clean_player_name:
+        raise ValueError('Enter your player name.')
+
+    account = fetch_user_account(clean_account_id)
+    if not account:
+        raise ValueError('Account not found.')
+
+    player = _get_or_create_player(clean_player_name)
+    player_id = int(player['id'])
+
+    try:
+        existing_owner = _rest_select(
+            USER_ACCOUNTS_TABLE_NAME,
+            select='id,email,display_name',
+            filters=[('player_id', 'eq', player_id)],
+            single=True,
+        )
+        if existing_owner and int(existing_owner.get('id') or 0) != int(clean_account_id):
+            raise ValueError('This player is already linked to another account.')
+
+        rows = _rest_update(
+            USER_ACCOUNTS_TABLE_NAME,
+            {'player_id': player_id, 'updated_at': datetime.utcnow().isoformat()},
+            filters=[('id', 'eq', int(clean_account_id))],
+        )
+    except Exception as exc:
+        if isinstance(exc, ValueError):
+            raise
+        raise _user_profile_storage_error(exc) from None
+
+    if not rows:
+        raise ValueError('Account not found.')
+
+    invalidate_application_cache()
+    return fetch_user_account(clean_account_id) or {}
+
+
+def _replace_account_player_aliases(*, account_id: int, player_id: int, aliases: list[str]) -> None:
+    try:
+        payload = []
+        if aliases:
+            existing_player_keys = {
+                _normalize_player_key(row.get('name')): int(row.get('id') or 0)
+                for row in _fetch_all_players_raw(force_refresh=True)
+            }
+            for alias in aliases:
+                alias_key = _normalize_player_key(alias)
+                owner_player_id = existing_player_keys.get(alias_key)
+                if owner_player_id and owner_player_id != int(player_id):
+                    raise ValueError(f'Alias "{alias}" is already used by another player.')
+
+                existing_alias = _rest_get_player_alias_by_key(alias_key)
+                if existing_alias and int(existing_alias.get('player_id') or 0) != int(player_id):
+                    raise ValueError(f'Alias "{alias}" is already linked to another player.')
+                if existing_alias and int(existing_alias.get('created_by_account_id') or 0) != int(account_id):
+                    continue
+
+                payload.append(
+                    {
+                        'player_id': int(player_id),
+                        'alias_name': alias,
+                        'alias_name_normalized': alias_key,
+                        'created_by_account_id': int(account_id),
+                        'is_public': True,
+                    }
+                )
+
+        _rest_delete(
+            PLAYER_ALIASES_TABLE_NAME,
+            filters=[('player_id', 'eq', int(player_id)), ('created_by_account_id', 'eq', int(account_id))],
+        )
+        if payload:
+            _rest_insert(PLAYER_ALIASES_TABLE_NAME, payload)
+    except Exception as exc:
+        if isinstance(exc, ValueError):
+            raise
+        raise _user_profile_storage_error(exc) from None
+
+
+def update_user_profile_settings(
+    *,
+    account_id: int,
+    country_code: str,
+    discord_url: str,
+    priority_race: str,
+    name_color: str,
+    ladder_show_flag,
+    ladder_show_aliases,
+    ladder_show_badges,
+    offrace_terran_enabled,
+    offrace_protoss_enabled,
+    offrace_zerg_enabled,
+    ladder_rating_race: str,
+    aliases,
+) -> dict:
+    clean_account_id = _coerce_positive_int(account_id)
+    if not clean_account_id:
+        raise ValueError('Sign in again.')
+
+    account = fetch_user_account(clean_account_id)
+    if not account or not account.get('player_id'):
+        raise ValueError('Link your account to a player first.')
+
+    player_id = int(account['player_id'])
+    clean_country_code = _resolve_country_code(country_code)
+    clean_discord_url = _normalize_text(discord_url)
+    clean_priority_race = _normalize_race_db_label(priority_race)
+    clean_name_color = _normalize_profile_color(name_color)
+    clean_ladder_rating_race = _normalize_ladder_rating_race(ladder_rating_race)
+    clean_aliases = _parse_alias_names(aliases)
+
+    if clean_priority_race and clean_priority_race not in RACE_OPTIONS:
+        raise ValueError('Choose a valid priority race.')
+
+    offrace_enabled_by_slug = {
+        'terran': _coerce_ladder_visibility(offrace_terran_enabled, default=False),
+        'protoss': _coerce_ladder_visibility(offrace_protoss_enabled, default=False),
+        'zerg': _coerce_ladder_visibility(offrace_zerg_enabled, default=False),
+    }
+    ladder_rating_slug = _race_slug_from_value(clean_ladder_rating_race)
+    if ladder_rating_slug and not offrace_enabled_by_slug.get(ladder_rating_slug):
+        clean_ladder_rating_race = ''
+        ladder_rating_slug = ''
+
+    update_payload = {
+        'country_code': clean_country_code or None,
+        'discord_url': clean_discord_url or None,
+        'priority_race': clean_priority_race or None,
+        'name_color': clean_name_color or None,
+        'ladder_show_flag': _coerce_ladder_visibility(ladder_show_flag, default=False),
+        'ladder_show_aliases': _coerce_ladder_visibility(ladder_show_aliases, default=False),
+        'ladder_show_badges': _coerce_ladder_visibility(ladder_show_badges, default=False),
+        'offrace_terran_enabled': offrace_enabled_by_slug['terran'],
+        'offrace_protoss_enabled': offrace_enabled_by_slug['protoss'],
+        'offrace_zerg_enabled': offrace_enabled_by_slug['zerg'],
+        'ladder_rating_race': clean_ladder_rating_race or None,
+        'updated_at': datetime.utcnow().isoformat(),
+    }
+
+    try:
+        rows = _rest_update('players', update_payload, filters=[('id', 'eq', player_id)])
+        if not rows:
+            raise ValueError('Player not found.')
+        for race_slug, enabled in offrace_enabled_by_slug.items():
+            if not enabled:
+                continue
+            race = RACE_DB_LABEL_BY_SLUG[race_slug]
+            existing_rating = _rest_get_player_race_rating(player_id, race) or {}
+            _save_player_race_rating_state(
+                player_id=player_id,
+                race=race,
+                current_elo=int(existing_rating.get('current_elo') or 1000),
+                matches_count=int(existing_rating.get('matches_count') or 0),
+                wins=int(existing_rating.get('wins') or 0),
+                losses=int(existing_rating.get('losses') or 0),
+                draws=int(existing_rating.get('draws') or 0),
+                last_match_at=existing_rating.get('last_match_at'),
+            )
+        _replace_account_player_aliases(account_id=clean_account_id, player_id=player_id, aliases=clean_aliases)
+    except Exception as exc:
+        if isinstance(exc, ValueError):
+            raise
+        raise _user_profile_storage_error(exc) from None
+
+    invalidate_application_cache()
+    return fetch_user_account(clean_account_id) or {}
+
 def fetch_player_admin(player_id: int) -> dict | None:
     row = _rest_get_player_by_id(player_id)
     if not row:
@@ -4537,6 +5587,7 @@ def update_player_admin(
     clean_country_name = _normalize_text(country_name)
     clean_country_code = _resolve_country_code(country_code, clean_country_name)
     clean_discord_url = _normalize_text(discord_url)
+    clean_priority_race = _normalize_race_db_label(priority_race)
 
     if not clean_name:
         raise ValueError('Enter the player name.')
@@ -4562,6 +5613,7 @@ def update_player_admin(
             'current_elo': clean_current_elo,
             'country_code': clean_country_code or None,
             'discord_url': clean_discord_url or None,
+            'priority_race': clean_priority_race or None,
             'is_active': _is_player_active_by_last_match(current_player.get('last_match_at')),
             'updated_at': datetime.utcnow().isoformat(),
         },
@@ -4619,24 +5671,66 @@ def fetch_match_admin(match_id: int) -> dict | None:
     return match
 
 
+def _new_rebuild_rating_state() -> dict:
+    return {
+        'elo': 1000,
+        'matches_count': 0,
+        'ranked_matches_count': 0,
+        'wins': 0,
+        'losses': 0,
+        'draws': 0,
+        'last_match_at': None,
+    }
+
+
+def _apply_rebuild_record_result(state: dict, result: str, played_at) -> None:
+    state['matches_count'] = int(state.get('matches_count') or 0) + 1
+    if result == 'draw':
+        state['draws'] = int(state.get('draws') or 0) + 1
+    elif result == 'win':
+        state['wins'] = int(state.get('wins') or 0) + 1
+    elif result == 'loss':
+        state['losses'] = int(state.get('losses') or 0) + 1
+    state['last_match_at'] = played_at
+
+
+def _apply_rebuild_rating_result(
+    state: dict,
+    *,
+    new_elo: int,
+    result: str,
+    played_at,
+    separate_race_rating: bool,
+) -> None:
+    state['elo'] = int(new_elo)
+    state['ranked_matches_count'] = int(state.get('ranked_matches_count') or 0) + 1
+    if separate_race_rating:
+        _apply_rebuild_record_result(state, result, played_at)
+
+
 def _rebuild_ratings_and_player_stats() -> None:
     players = _fetch_all_players_raw(force_refresh=True)
     matches = _fetch_all_matches_raw(force_refresh=True)
 
     _rest_delete('rating_history', filters=[('id', 'gt', 0)])
+    race_ratings_table_available = True
+    try:
+        _rest_delete(PLAYER_RACE_RATINGS_TABLE_NAME, filters=[('id', 'gt', 0)])
+    except Exception as exc:
+        if _is_missing_user_profile_table_error(exc):
+            race_ratings_table_available = False
+        else:
+            raise
 
-    player_state: dict[int, dict] = {
-        int(player['id']): {
-            'elo': 1000,
-            'matches_count': 0,
-            'ranked_matches_count': 0,
-            'wins': 0,
-            'losses': 0,
-            'draws': 0,
-            'last_match_at': None,
-        }
-        for player in players
-    }
+    players_by_id = {int(player['id']): dict(player) for player in players}
+    player_state: dict[int, dict] = {int(player['id']): _new_rebuild_rating_state() for player in players}
+    race_rating_state: dict[tuple[int, str], dict] = {}
+    enabled_race_rating_keys: set[tuple[int, str]] = set()
+    for player in players:
+        player_id = int(player['id'])
+        for race in RACE_DB_LABEL_BY_SLUG.values():
+            if _player_uses_separate_race_rating(player, race):
+                enabled_race_rating_keys.add((player_id, race))
 
     rating_rows = []
     touched_players: set[int] = set()
@@ -4654,11 +5748,30 @@ def _rebuild_ratings_and_player_stats() -> None:
         player1_state = player_state.setdefault(player1_id, {'elo': 1000, 'matches_count': 0, 'ranked_matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
         player2_state = player_state.setdefault(player2_id, {'elo': 1000, 'matches_count': 0, 'ranked_matches_count': 0, 'wins': 0, 'losses': 0, 'draws': 0, 'last_match_at': None})
 
-        player1_old_elo = int(player1_state['elo'])
-        player2_old_elo = int(player2_state['elo'])
+        player1_race = _normalize_ladder_rating_race(match.get('player1_race'))
+        player2_race = _normalize_ladder_rating_race(match.get('player2_race'))
+        player1_rating_snapshot = _get_match_side_rating_snapshot(match, 'player1')
+        player2_rating_snapshot = _get_match_side_rating_snapshot(match, 'player2')
+        player1_uses_race_rating = bool(ranked_match and player1_rating_snapshot.get('uses_race_rating'))
+        player2_uses_race_rating = bool(ranked_match and player2_rating_snapshot.get('uses_race_rating'))
+        player1_rating_race = player1_rating_snapshot.get('race') or player1_race
+        player2_rating_race = player2_rating_snapshot.get('race') or player2_race
+        player1_rating_state = (
+            race_rating_state.setdefault((player1_id, player1_rating_race), _new_rebuild_rating_state())
+            if player1_uses_race_rating
+            else player1_state
+        )
+        player2_rating_state = (
+            race_rating_state.setdefault((player2_id, player2_rating_race), _new_rebuild_rating_state())
+            if player2_uses_race_rating
+            else player2_state
+        )
 
-        player1_ranked_matches_before_match = int(player1_state.get('ranked_matches_count') or 0)
-        player2_ranked_matches_before_match = int(player2_state.get('ranked_matches_count') or 0)
+        player1_old_elo = int(player1_rating_state['elo'])
+        player2_old_elo = int(player2_rating_state['elo'])
+
+        player1_ranked_matches_before_match = int(player1_rating_state.get('ranked_matches_count') or 0)
+        player2_ranked_matches_before_match = int(player2_rating_state.get('ranked_matches_count') or 0)
 
         elo_multiplier = _resolve_ranked_elo_multiplier(match.get('game_type'))
 
@@ -4701,19 +5814,23 @@ def _rebuild_ratings_and_player_stats() -> None:
                 player1_new_elo = player1_old_elo
                 player2_new_elo = player2_old_elo
 
-            player1_state['elo'] = player1_new_elo
-            player1_state['matches_count'] += 1
+            _apply_rebuild_record_result(player1_state, 'draw', played_at)
+            _apply_rebuild_record_result(player2_state, 'draw', played_at)
             if ranked_match:
-                player1_state['ranked_matches_count'] = int(player1_state.get('ranked_matches_count') or 0) + 1
-            player1_state['draws'] += 1
-            player1_state['last_match_at'] = played_at
-
-            player2_state['elo'] = player2_new_elo
-            player2_state['matches_count'] += 1
-            if ranked_match:
-                player2_state['ranked_matches_count'] = int(player2_state.get('ranked_matches_count') or 0) + 1
-            player2_state['draws'] += 1
-            player2_state['last_match_at'] = played_at
+                _apply_rebuild_rating_result(
+                    player1_rating_state,
+                    new_elo=player1_new_elo,
+                    result='draw',
+                    played_at=played_at,
+                    separate_race_rating=player1_uses_race_rating,
+                )
+                _apply_rebuild_rating_result(
+                    player2_rating_state,
+                    new_elo=player2_new_elo,
+                    result='draw',
+                    played_at=played_at,
+                    separate_race_rating=player2_uses_race_rating,
+                )
 
             touched_players.add(player1_id)
             touched_players.add(player2_id)
@@ -4726,12 +5843,16 @@ def _rebuild_ratings_and_player_stats() -> None:
         loser_id = player2_id if winner_id == player1_id else player1_id
         winner_state = player1_state if winner_id == player1_id else player2_state
         loser_state = player2_state if loser_id == player2_id else player1_state
+        winner_rating_state = player1_rating_state if winner_id == player1_id else player2_rating_state
+        loser_rating_state = player2_rating_state if loser_id == player2_id else player1_rating_state
+        winner_uses_race_rating = player1_uses_race_rating if winner_id == player1_id else player2_uses_race_rating
+        loser_uses_race_rating = player2_uses_race_rating if loser_id == player2_id else player1_uses_race_rating
 
-        winner_old_elo = int(winner_state['elo'])
-        loser_old_elo = int(loser_state['elo'])
+        winner_old_elo = int(winner_rating_state['elo'])
+        loser_old_elo = int(loser_rating_state['elo'])
 
-        winner_ranked_matches_before_match = int(winner_state.get('ranked_matches_count') or 0)
-        loser_ranked_matches_before_match = int(loser_state.get('ranked_matches_count') or 0)
+        winner_ranked_matches_before_match = int(winner_rating_state.get('ranked_matches_count') or 0)
+        loser_ranked_matches_before_match = int(loser_rating_state.get('ranked_matches_count') or 0)
 
         if ranked_match:
             elo_result = _calculate_elo_result(
@@ -4777,25 +5898,54 @@ def _rebuild_ratings_and_player_stats() -> None:
             winner_new_elo = winner_old_elo
             loser_new_elo = loser_old_elo
 
-        winner_state['elo'] = winner_new_elo
-        winner_state['matches_count'] += 1
+        _apply_rebuild_record_result(winner_state, 'win', played_at)
+        _apply_rebuild_record_result(loser_state, 'loss', played_at)
         if ranked_match:
-            winner_state['ranked_matches_count'] = int(winner_state.get('ranked_matches_count') or 0) + 1
-        winner_state['wins'] += 1
-        winner_state['last_match_at'] = played_at
-
-        loser_state['elo'] = loser_new_elo
-        loser_state['matches_count'] += 1
-        if ranked_match:
-            loser_state['ranked_matches_count'] = int(loser_state.get('ranked_matches_count') or 0) + 1
-        loser_state['losses'] += 1
-        loser_state['last_match_at'] = played_at
+            _apply_rebuild_rating_result(
+                winner_rating_state,
+                new_elo=winner_new_elo,
+                result='win',
+                played_at=played_at,
+                separate_race_rating=winner_uses_race_rating,
+            )
+            _apply_rebuild_rating_result(
+                loser_rating_state,
+                new_elo=loser_new_elo,
+                result='loss',
+                played_at=played_at,
+                separate_race_rating=loser_uses_race_rating,
+            )
 
         touched_players.add(winner_id)
         touched_players.add(loser_id)
 
     if rating_rows:
         _rest_insert('rating_history', rating_rows)
+
+    if race_ratings_table_available:
+        for key in enabled_race_rating_keys:
+            race_rating_state.setdefault(key, _new_rebuild_rating_state())
+        race_rating_rows = []
+        for (player_id, race), state in sorted(race_rating_state.items(), key=lambda item: (item[0][0], item[0][1])):
+            if not race:
+                continue
+            if int(state.get('matches_count') or 0) <= 0 and (player_id, race) not in enabled_race_rating_keys:
+                continue
+            race_rating_rows.append(
+                {
+                    'player_id': int(player_id),
+                    'race': race,
+                    'current_elo': int(state.get('elo') or 1000),
+                    'matches_count': int(state.get('matches_count') or 0),
+                    'wins': int(state.get('wins') or 0),
+                    'losses': int(state.get('losses') or 0),
+                    'draws': int(state.get('draws') or 0),
+                    'last_match_at': state.get('last_match_at'),
+                    'updated_at': datetime.utcnow().isoformat(),
+                }
+            )
+        if race_rating_rows:
+            _rest_insert(PLAYER_RACE_RATINGS_TABLE_NAME, race_rating_rows)
 
     for player in players:
         player_id = int(player['id'])
@@ -4894,6 +6044,23 @@ def update_match_admin(
     player2 = _get_or_create_player(clean_player2_name)
     winner_player_id = None if clean_result_type == 'draw' else (player1['id'] if clean_winner_side == 'player1' else player2['id'])
 
+    existing_player1_rating_snapshot = _get_match_side_rating_snapshot(existing, 'player1')
+    existing_player2_rating_snapshot = _get_match_side_rating_snapshot(existing, 'player2')
+    player1_rating_snapshot = _build_match_rating_snapshot(
+        {
+            'uses_race_rating': bool(ranked_match and existing_player1_rating_snapshot.get('uses_race_rating')),
+            'race': clean_player1_race,
+        },
+        clean_player1_race,
+    )
+    player2_rating_snapshot = _build_match_rating_snapshot(
+        {
+            'uses_race_rating': bool(ranked_match and existing_player2_rating_snapshot.get('uses_race_rating')),
+            'race': clean_player2_race,
+        },
+        clean_player2_race,
+    )
+
     rows = _rest_update(
         'matches',
         {
@@ -4911,6 +6078,8 @@ def update_match_admin(
             'player1_roster_id': clean_player1_roster_id or None,
             'player2_roster_id': clean_player2_roster_id or None,
             'league_id': match_league_id,
+            **_rating_snapshot_update_payload('player1', player1_rating_snapshot),
+            **_rating_snapshot_update_payload('player2', player2_rating_snapshot),
         },
         filters=[('id', 'eq', match_id)],
     )
@@ -4934,3 +6103,13 @@ def delete_match_admin(match_id: int) -> None:
     _rest_delete('matches', filters=[('id', 'eq', match_id)])
     invalidate_application_cache()
     _rebuild_ratings_and_player_stats()
+
+
+def rebuild_ratings_admin() -> dict:
+    _rebuild_ratings_and_player_stats()
+    snapshot = refresh_application_cache(force_refresh=True)
+    return {
+        'players_count': len(snapshot.get('players') or []),
+        'matches_count': len(snapshot.get('matches') or []),
+        'rating_history_count': len(snapshot.get('rating_history') or []),
+    }

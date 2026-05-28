@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from io import BytesIO
-
-from flask import Blueprint, Response, abort, jsonify, make_response, redirect, render_template, request, send_file
+from flask import Blueprint, abort, jsonify, make_response, redirect, render_template, request
 
 from app.database import (
     fetch_current_league,
@@ -14,7 +12,7 @@ from app.database import (
 from app.modules.context import base_context
 from app.modules.forms import _render_submit_page
 from app.modules.payloads import _parse_leaderboard_filters
-from app.modules.roster import _build_beta_roster_pdf_url, _clean_roster_id, _download_roster_pdf_via_browser
+from app.modules.roster import _build_beta_roster_pdf_url, _clean_roster_id
 from app.modules.visual_backgrounds import resolve_player_visual_background
 
 bp = Blueprint('public', __name__)
@@ -69,18 +67,7 @@ def roster_pdf(roster_id: str):
     if direct_pdf_url:
         return redirect(direct_pdf_url, code=302)
 
-    try:
-        pdf_bytes, filename = _download_roster_pdf_via_browser(clean_roster_id)
-    except Exception as exc:
-        return Response(str(exc), status=502, mimetype='text/plain; charset=utf-8')
-
-    return send_file(
-        BytesIO(pdf_bytes),
-        mimetype='application/pdf',
-        as_attachment=False,
-        download_name=filename or f'roster-{clean_roster_id}.pdf',
-        max_age=0,
-    )
+    return redirect(f'/roster-pdf-test?seed={clean_roster_id}&autostart=1', code=302)
 
 @bp.route('/reports')
 @bp.route('/players')
@@ -137,6 +124,7 @@ def player_profile(player_id: int):
             canonical_path=f'/players/{player_id}',
         )
         context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'priority_matchup_report': None,
+                        'race_matchup_reports': {},
                         'head_to_head_report': None, 'db_error': db_error})
         return make_response(render_template('player_profile.html', **context), 500)
 
@@ -149,6 +137,7 @@ def player_profile(player_id: int):
             meta_robots='noindex,follow',
         )
         context.update({'player': None, 'recent_matches': [], 'rating_chart': None, 'priority_matchup_report': None,
+                        'race_matchup_reports': {},
                         'head_to_head_report': None, 'db_error': None})
         return make_response(render_template('player_profile.html', **context), 404)
 
@@ -171,6 +160,7 @@ def player_profile(player_id: int):
             'recent_matches': profile['recent_matches'],
             'rating_chart': profile.get('rating_chart'),
             'priority_matchup_report': profile.get('priority_matchup_report'),
+            'race_matchup_reports': profile.get('race_matchup_reports') or {},
             'head_to_head_report': profile.get('head_to_head_report'),
             'profile_background': resolve_player_visual_background(profile['player']),
             'db_error': None,

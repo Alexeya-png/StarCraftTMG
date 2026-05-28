@@ -241,12 +241,29 @@
                         </div>
                         <div class="toolbar-field">
                             <label for="mission_name">Mission</label>
-                            <select id="mission_name" name="mission_name" required>
-                                <option value="">Choose mission</option>
-                                {% for mission in mission_options %}
-                                <option value="{{ mission }}" {% if form_state.mission_name == mission %}selected{% endif %}>{{ mission }}</option>
-                                {% endfor %}
-                            </select>
+                            {% set selected_mission_label = form_state.mission_name if form_state.mission_name else 'Choose mission' %}
+                            <div class="profile-custom-select submit-custom-select" data-submit-custom-select>
+                                <select id="mission_name" class="profile-native-select-source" name="mission_name" required aria-hidden="true" tabindex="-1" data-submit-native-select>
+                                    <option value="">Choose mission</option>
+                                    {% for mission in mission_options %}
+                                    <option value="{{ mission }}" {% if form_state.mission_name == mission %}selected{% endif %}>{{ mission }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="profile-custom-select-trigger" type="button" data-submit-custom-select-trigger aria-haspopup="listbox" aria-expanded="false">
+                                    <span data-submit-custom-select-label>{{ selected_mission_label }}</span>
+                                    <span class="profile-custom-select-arrow" aria-hidden="true"></span>
+                                </button>
+                                <div class="profile-custom-select-menu profile-custom-select-menu-scroll submit-custom-select-menu" data-submit-custom-select-menu role="listbox" hidden>
+                                    <button class="profile-custom-select-option{% if not form_state.mission_name %} is-selected{% endif %}" type="button" data-submit-custom-select-option data-submit-custom-select-value="" role="option" aria-selected="{{ 'true' if not form_state.mission_name else 'false' }}">
+                                        Choose mission
+                                    </button>
+                                    {% for mission in mission_options %}
+                                    <button class="profile-custom-select-option{% if form_state.mission_name == mission %} is-selected{% endif %}" type="button" data-submit-custom-select-option data-submit-custom-select-value="{{ mission }}" role="option" aria-selected="{{ 'true' if form_state.mission_name == mission else 'false' }}">
+                                        {{ mission }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
                         </div>
                         <div class="score-pair-grid">
                             <div class="toolbar-field">
@@ -353,6 +370,102 @@
         input.addEventListener('blur', function () {
             updateWarning(input);
         });
+    });
+})();
+</script>
+
+<script>
+(function () {
+    const customSelects = Array.from(document.querySelectorAll('[data-submit-custom-select]'));
+
+    function closeSelect(customSelect) {
+        const trigger = customSelect.querySelector('[data-submit-custom-select-trigger]');
+        const menu = customSelect.querySelector('[data-submit-custom-select-menu]');
+        if (!trigger || !menu) {
+            return;
+        }
+        menu.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+        customSelect.classList.remove('is-open');
+    }
+
+    function closeAllExcept(activeSelect) {
+        customSelects.forEach(function (customSelect) {
+            if (customSelect !== activeSelect) {
+                closeSelect(customSelect);
+            }
+        });
+    }
+
+    function syncSelect(customSelect) {
+        const select = customSelect.querySelector('[data-submit-native-select]');
+        const label = customSelect.querySelector('[data-submit-custom-select-label]');
+        const options = Array.from(customSelect.querySelectorAll('[data-submit-custom-select-option]'));
+        if (!select || !label) {
+            return;
+        }
+
+        const selectedValue = String(select.value || '');
+        const selectedOption = select.options[select.selectedIndex];
+        label.textContent = selectedOption ? (selectedOption.textContent || '').trim() : 'Choose option';
+        customSelect.classList.toggle('is-invalid', Boolean(select.validationMessage));
+        options.forEach(function (option) {
+            const isSelected = String(option.dataset.submitCustomSelectValue || '') === selectedValue;
+            option.classList.toggle('is-selected', isSelected);
+            option.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        });
+    }
+
+    customSelects.forEach(function (customSelect) {
+        const select = customSelect.querySelector('[data-submit-native-select]');
+        const trigger = customSelect.querySelector('[data-submit-custom-select-trigger]');
+        const menu = customSelect.querySelector('[data-submit-custom-select-menu]');
+        const options = Array.from(customSelect.querySelectorAll('[data-submit-custom-select-option]'));
+
+        if (!select || !trigger || !menu) {
+            return;
+        }
+
+        trigger.addEventListener('click', function () {
+            const nextOpen = menu.hidden;
+            closeAllExcept(customSelect);
+            menu.hidden = !nextOpen;
+            trigger.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+            customSelect.classList.toggle('is-open', nextOpen);
+        });
+
+        options.forEach(function (option) {
+            option.addEventListener('click', function () {
+                select.value = option.dataset.submitCustomSelectValue || '';
+                select.setCustomValidity('');
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                closeSelect(customSelect);
+            });
+        });
+
+        select.addEventListener('change', function () {
+            syncSelect(customSelect);
+        });
+
+        select.addEventListener('invalid', function () {
+            customSelect.classList.add('is-invalid');
+        });
+
+        syncSelect(customSelect);
+    });
+
+    document.addEventListener('click', function (event) {
+        customSelects.forEach(function (customSelect) {
+            if (!customSelect.contains(event.target)) {
+                closeSelect(customSelect);
+            }
+        });
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            customSelects.forEach(closeSelect);
+        }
     });
 })();
 </script>

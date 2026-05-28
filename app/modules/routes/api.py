@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from app.database import MatchSubmissionRateLimitError, fetch_league_results_overview, submit_tts_match_result
+from app.database import MatchSubmissionRateLimitError, fetch_league_results_overview, rebuild_ratings_admin, submit_tts_match_result
 from app.modules.auth import is_admin
 from app.modules.cache import is_valid_supabase_webhook_request, run_cache_refresh, run_cache_refresh_background
 from app.modules.config import CACHE_REFRESH_BACKGROUND
@@ -22,6 +22,18 @@ def admin_cache_refresh():
         return jsonify({'ok': False, 'error': str(exc)}), 500
 
     return jsonify({'ok': True, 'cache': result})
+
+@bp.route('/admin/ratings/rebuild', methods=['POST'])
+def admin_ratings_rebuild():
+    if not is_admin():
+        return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+
+    try:
+        result = rebuild_ratings_admin()
+    except Exception as exc:
+        return jsonify({'ok': False, 'error': str(exc)}), 500
+
+    return jsonify({'ok': True, 'rebuild': result})
 
 @bp.route('/api/supabase/cache-webhook', methods=['POST'])
 def supabase_cache_webhook():

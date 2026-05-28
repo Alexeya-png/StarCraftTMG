@@ -28,6 +28,12 @@
                 <a class="button button-secondary" href="/feedback">Open messages</a>
             </article>
             <article class="card">
+                <h3>Rating rebuild</h3>
+                <p>Recalculate all ELO values from saved match rating scopes after migrations or direct database edits.</p>
+                <button class="button button-secondary" type="button" data-rating-rebuild-button>Rebuild ratings</button>
+                <p class="page-text" data-rating-rebuild-status hidden></p>
+            </article>
+            <article class="card">
                 <h3>Cache</h3>
                 <p>Reload leaderboard, reports and league data from Supabase after deploy or direct database edits.</p>
                 <button class="button button-secondary" type="button" data-cache-refresh-button>Refresh cache</button>
@@ -39,56 +45,85 @@
 
 <script>
 (function () {
-    var button = document.querySelector('[data-cache-refresh-button]');
-    var statusNode = document.querySelector('[data-cache-refresh-status]');
+    function bindAdminAction(options) {
+        var button = document.querySelector(options.buttonSelector);
+        var statusNode = document.querySelector(options.statusSelector);
 
-    if (!button || !statusNode) {
-        return;
-    }
+        if (!button || !statusNode) {
+            return;
+        }
 
-    function setStatus(message) {
-        statusNode.hidden = false;
-        statusNode.textContent = message;
-    }
+        function setStatus(message) {
+            statusNode.hidden = false;
+            statusNode.textContent = message;
+        }
 
-    button.addEventListener('click', function () {
-        button.disabled = true;
-        setStatus('Refreshing cache...');
+        button.addEventListener('click', function () {
+            button.disabled = true;
+            setStatus(options.loadingText);
 
-        fetch('/admin/cache/refresh', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Accept': 'application/json'
-            }
-        })
-            .then(function (response) {
-                return response.json().catch(function () {
-                    return { ok: false, error: 'Could not parse server response.' };
-                }).then(function (payload) {
-                    return { response: response, payload: payload };
-                });
-            })
-            .then(function (result) {
-                if (!result.response.ok || !result.payload.ok) {
-                    throw new Error(result.payload.error || 'Cache refresh failed.');
+            fetch(options.url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json'
                 }
+            })
+                .then(function (response) {
+                    return response.json().catch(function () {
+                        return { ok: false, error: 'Could not parse server response.' };
+                    }).then(function (payload) {
+                        return { response: response, payload: payload };
+                    });
+                })
+                .then(function (result) {
+                    if (!result.response.ok || !result.payload.ok) {
+                        throw new Error(result.payload.error || options.errorText);
+                    }
 
-                var cache = result.payload.cache || {};
-                setStatus(
-                    'Done: '
-                    + String(cache.players_count || 0)
-                    + ' players, '
-                    + String(cache.matches_count || 0)
-                    + ' matches.'
-                );
-            })
-            .catch(function (error) {
-                setStatus(error.message || 'Cache refresh failed.');
-            })
-            .finally(function () {
-                button.disabled = false;
-            });
+                    setStatus(options.successText(result.payload));
+                })
+                .catch(function (error) {
+                    setStatus(error.message || options.errorText);
+                })
+                .finally(function () {
+                    button.disabled = false;
+                });
+        });
+    }
+
+    bindAdminAction({
+        buttonSelector: '[data-rating-rebuild-button]',
+        statusSelector: '[data-rating-rebuild-status]',
+        url: '/admin/ratings/rebuild',
+        loadingText: 'Rebuilding ratings...',
+        errorText: 'Rating rebuild failed.',
+        successText: function (payload) {
+            var rebuild = payload.rebuild || {};
+            return 'Done: '
+                + String(rebuild.players_count || 0)
+                + ' players, '
+                + String(rebuild.matches_count || 0)
+                + ' matches, '
+                + String(rebuild.rating_history_count || 0)
+                + ' rating rows.';
+        }
+    });
+
+    bindAdminAction({
+        buttonSelector: '[data-cache-refresh-button]',
+        statusSelector: '[data-cache-refresh-status]',
+        url: '/admin/cache/refresh',
+        loadingText: 'Refreshing cache...',
+        errorText: 'Cache refresh failed.',
+        successText: function (payload) {
+            var cache = payload.cache || {};
+            return 'Done: '
+                + String(cache.players_count || 0)
+                + ' players, '
+                + String(cache.matches_count || 0)
+                + ' matches.';
+        }
     });
 }());
 </script>

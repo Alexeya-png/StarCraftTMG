@@ -4,7 +4,7 @@ import os
 
 from flask import request
 
-from .auth import is_admin
+from .auth import current_user_session, is_admin
 
 
 def get_site_url() -> str:
@@ -39,6 +39,7 @@ def base_context(
         'page_title': page_title,
         'active_page': active_page,
         'is_admin': is_admin(),
+        'current_user': current_user_session(),
         'meta_description': (meta_description or default_meta_description()).strip(),
         'canonical_url': canonical_url(canonical_path),
         'meta_robots': meta_robots,

@@ -32,13 +32,14 @@
             </div>
         </div>
 
-        <div class="leaderboard-shell leaderboard-shell-polished leaderboard-shell-scrollable game-reports-shell">
+        <div class="leaderboard-shell leaderboard-shell-polished leaderboard-shell-scrollable game-reports-shell" data-reports-shell>
             <div class="leaderboard-table-wrap leaderboard-table-wrap-vertical polished-table-wrap game-reports-table-wrap" data-reports-content>
                 <div class="table-loader-card" data-loading-state>
                     <div class="table-loader-spinner" aria-hidden="true"></div>
                     <div class="table-loader-text">Loading data...</div>
                 </div>
             </div>
+            <div class="game-reports-pagination-bar" data-reports-pagination hidden></div>
         </div>
     </div>
 </section>
@@ -69,6 +70,8 @@ const rosterPdfCache = {
 
 document.addEventListener('DOMContentLoaded', function () {
     const content = document.querySelector('[data-reports-content]');
+    const reportsShell = document.querySelector('[data-reports-shell]');
+    const paginationNode = document.querySelector('[data-reports-pagination]');
     const countNode = document.querySelector('[data-reports-count]');
     const leagueNode = document.querySelector('[data-reports-league]');
     const leagueSeparatorNode = document.querySelector('[data-reports-separator]');
@@ -102,29 +105,113 @@ document.addEventListener('DOMContentLoaded', function () {
         return params.toString();
     }
 
+    function clearPagination() {
+        if (!paginationNode) {
+            return;
+        }
+        paginationNode.innerHTML = '';
+        paginationNode.hidden = true;
+    }
+
     function renderLoading() {
         content.innerHTML = '<div class="table-loader-card"><div class="table-loader-spinner" aria-hidden="true"></div><div class="table-loader-text">Loading data...</div></div>';
         countNode.textContent = 'Loading data...';
+        clearPagination();
     }
 
     function renderState(title, text, isError) {
         content.innerHTML = '<div class="state-card leaderboard-state-card' + (isError ? ' state-card-error' : '') + '"><h2>' + escapeHtml(title) + '</h2><p>' + escapeHtml(text) + '</p></div>';
+        clearPagination();
     }
 
-    function renderPagination(items) {
-        if (!Array.isArray(items) || !items.length) {
+    function buildPaginationItems(currentPage, totalPages) {
+        const lastPage = Math.max(1, Number(totalPages || 1));
+        const current = Math.min(Math.max(1, Number(currentPage || 1)), lastPage);
+
+        if (lastPage <= 8) {
+            return Array.from({ length: lastPage }, function (_, index) {
+                return index + 1;
+            });
+        }
+
+        const items = [];
+
+        function addPage(pageNumber) {
+            if (pageNumber < 1 || pageNumber > lastPage) {
+                return;
+            }
+            if (items[items.length - 1] !== pageNumber) {
+                items.push(pageNumber);
+            }
+        }
+
+        function addEllipsis() {
+            if (items[items.length - 1] !== '...') {
+                items.push('...');
+            }
+        }
+
+        if (current <= 4) {
+            for (let pageNumber = 1; pageNumber <= Math.min(7, lastPage); pageNumber += 1) {
+                addPage(pageNumber);
+            }
+            addEllipsis();
+            addPage(lastPage);
+            return items;
+        }
+
+        if (current >= lastPage - 3) {
+            addPage(1);
+            addEllipsis();
+            for (let pageNumber = Math.max(2, lastPage - 6); pageNumber <= lastPage; pageNumber += 1) {
+                addPage(pageNumber);
+            }
+            return items;
+        }
+
+        addPage(1);
+        addEllipsis();
+        for (let pageNumber = current - 2; pageNumber <= current + 2; pageNumber += 1) {
+            addPage(pageNumber);
+        }
+        addEllipsis();
+        addPage(lastPage);
+        return items;
+    }
+
+    function renderPagination(items, totalPages) {
+        const currentPage = Number(state.page || 1);
+        const lastPage = Math.max(1, Number(totalPages || 1));
+
+        if (lastPage <= 1) {
             return '';
         }
-        return '<div class="table-footer-pagination">' + items.map(function (item) {
+
+        const paginationItems = buildPaginationItems(currentPage, lastPage);
+        const html = [];
+
+        if (currentPage > 1) {
+            html.push('<a class="pagination-link pagination-link-step" href="#" data-page-link="' + (currentPage - 1) + '" aria-label="Previous page">‹</a>');
+        }
+
+        paginationItems.forEach(function (item) {
             if (item === '...') {
-                return '<span class="pagination-ellipsis">...</span>';
+                html.push('<span class="pagination-ellipsis">...</span>');
+                return;
             }
             const pageNumber = Number(item || 1);
-            if (pageNumber === Number(state.page || 1)) {
-                return '<span class="pagination-link is-active">' + pageNumber + '</span>';
+            if (pageNumber === currentPage) {
+                html.push('<span class="pagination-link is-active">' + pageNumber + '</span>');
+                return;
             }
-            return '<a class="pagination-link" href="#" data-page-link="' + pageNumber + '">' + pageNumber + '</a>';
-        }).join('') + '</div>';
+            html.push('<a class="pagination-link" href="#" data-page-link="' + pageNumber + '">' + pageNumber + '</a>');
+        });
+
+        if (currentPage < lastPage) {
+            html.push('<a class="pagination-link pagination-link-step" href="#" data-page-link="' + (currentPage + 1) + '" aria-label="Next page">›</a>');
+        }
+
+        return '<div class="table-footer-pagination">' + html.join('') + '</div>';
     }
 
     function normalizeSeed(value) {
@@ -272,8 +359,13 @@ document.addEventListener('DOMContentLoaded', function () {
             + (isAdmin ? '<th class="col-admin-actions">Admin</th>' : '')
             + '  </tr></thead>'
             + '  <tbody>' + rows + '</tbody>'
-            + '</table>'
-            + renderPagination(payload.pagination_numbers);
+            + '</table>';
+
+        if (paginationNode) {
+            const paginationHtml = renderPagination(payload.pagination_numbers, payload.total_pages);
+            paginationNode.innerHTML = paginationHtml;
+            paginationNode.hidden = !paginationHtml;
+        }
     }
 
     async function loadScript(src) {
@@ -622,11 +714,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function syncStateFromLocation() {
+        const params = new URLSearchParams(window.location.search || '');
+        state.page = Math.max(1, Number(params.get('page') || 1));
+        state.perPage = Math.max(1, Math.min(Number(params.get('per_page') || 25), 100));
+        state.search = params.get('search') || '';
+        state.rankedOnly = params.get('ranked_only') === '1';
+    }
+
+    function resetReportScroll() {
+        content.scrollTop = 0;
+        content.scrollLeft = 0;
+    }
+
     function fetchReports(pushHistory) {
         renderLoading();
-        const queryString = buildQueryString();
-        const apiUrl = '/api/reports?' + queryString;
-        const pageUrl = '/reports?' + queryString;
+        const apiUrl = '/api/reports?' + buildQueryString();
 
         fetch(apiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function (response) {
@@ -641,7 +744,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 renderReports(payload);
                 if (pushHistory) {
-                    window.history.replaceState({}, '', pageUrl);
+                    window.history.pushState({}, '', '/reports?' + buildQueryString());
+                    resetReportScroll();
                 }
             })
             .catch(function () {
@@ -650,7 +754,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    content.addEventListener('click', function (event) {
+    (reportsShell || content).addEventListener('click', function (event) {
         const paginationLink = event.target.closest('[data-page-link]');
         if (paginationLink) {
             event.preventDefault();
@@ -680,6 +784,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert(error.message || 'Failed to generate PDF.');
             });
         }
+    });
+
+    window.addEventListener('popstate', function () {
+        syncStateFromLocation();
+        fetchReports(false);
     });
 
     fetchReports(false);

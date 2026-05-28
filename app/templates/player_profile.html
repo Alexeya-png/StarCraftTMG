@@ -130,7 +130,7 @@
                         {% if race_slug in ['terran', 'protoss', 'zerg'] %}
                         <img class="profile-race-icon" src="/static/Race/{{ race_slug }}.svg" alt="{{ player.priority_race }} icon">
                         {% endif %}
-                        <h1 class="profile-player-name ">{{ player.name }}</h1>
+                        <h1 class="profile-player-name{% if player.name_color %} is-custom-name-color{% endif %}"{% if player.name_color %} style="--player-name-color: {{ player.name_color }}; color: {{ player.name_color }}"{% endif %}>{{ player.name }}</h1>
                         {% if player.badges %}
                         <div class="profile-name-badges" aria-label="Player achievements">
                             {% for badge in player.badges %}
@@ -164,10 +164,25 @@
                 </div>
 
 
-                <div class="profile-elo-card">
+                <div
+                    class="profile-elo-card profile-elo-card-scope-{{ player.profile_current_elo_race_slug or 'global' }}{% if player.profile_elo_switchable %} profile-elo-card-switchable{% endif %}"
+                    {% if player.profile_elo_switchable %}data-profile-elo-card data-profile-elo-current-key="{{ player.profile_current_elo_key or 'global' }}" role="button" tabindex="0" aria-label="Switch displayed ELO"{% endif %}
+                >
                     <span class="profile-elo-label">Current ELO</span>
-                    <strong class="profile-elo-value">{{ player.current_elo_display }}</strong>
-                    <span class="profile-last-played">Last played {{ player.last_played_label }}</span>
+                    <strong class="profile-elo-value profile-elo-value-{{ player.profile_current_elo_race_slug or 'global' }}" data-profile-elo-value>{{ player.profile_current_elo_display or player.current_elo_display }}</strong>
+                    <span class="profile-elo-scope" data-profile-elo-label>{{ player.profile_current_elo_label or 'Global ELO' }}</span>
+                    {% if player.profile_elo_switchable %}
+                    <div class="profile-elo-choices" hidden>
+                        {% for choice in player.profile_elo_choices %}
+                        <span
+                            data-elo-key="{{ choice.key }}"
+                            data-elo-label="{{ choice.label }}"
+                            data-elo-value="{{ choice.value }}"
+                            data-elo-race="{{ choice.race_slug }}"
+                        ></span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -206,6 +221,14 @@
                 <span class="profile-meta-label">Member since</span>
                 <strong class="profile-meta-value">{{ player.member_since_label }}</strong>
             </article>
+            <article class="profile-meta-card">
+                <span class="profile-meta-label">Additional names</span>
+                {% if player.public_aliases %}
+                <span class="profile-alias-inline">{% for alias in player.public_aliases %}{{ alias.alias_name }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                {% else %}
+                <span class="profile-meta-empty">Not added yet</span>
+                {% endif %}
+            </article>
         </div>
 
         {% if has_head_to_head %}
@@ -216,13 +239,34 @@
                 </div>
                 <label class="profile-h2h-select-label">
                     <span>Opponent</span>
-                    <select class="profile-h2h-select" data-h2h-select>
-                        {% for opponent in head_to_head_report.opponents %}
-                        <option value="{{ opponent.opponent_id }}">
-                            {{ opponent.opponent_name }} - {{ opponent.current_league.score_display if opponent.current_league else opponent.score_display }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                    {% set selected_h2h_label = namespace(value='Choose opponent') %}
+                    {% for opponent in head_to_head_report.opponents %}
+                        {% if loop.first %}
+                            {% set selected_h2h_label.value = opponent.opponent_name ~ ' - ' ~ (opponent.current_league.score_display if opponent.current_league else opponent.score_display) %}
+                        {% endif %}
+                    {% endfor %}
+                    <div class="profile-custom-select profile-h2h-custom-select" data-h2h-custom-select>
+                        <select class="profile-h2h-select profile-native-select-source" data-h2h-select aria-hidden="true" tabindex="-1">
+                            {% for opponent in head_to_head_report.opponents %}
+                            {% set opponent_label = opponent.opponent_name ~ ' - ' ~ (opponent.current_league.score_display if opponent.current_league else opponent.score_display) %}
+                            <option value="{{ opponent.opponent_id }}">
+                                {{ opponent_label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button class="profile-custom-select-trigger" type="button" data-h2h-custom-select-trigger aria-haspopup="listbox" aria-expanded="false">
+                            <span data-h2h-custom-select-label>{{ selected_h2h_label.value }}</span>
+                            <span class="profile-custom-select-arrow" aria-hidden="true"></span>
+                        </button>
+                        <div class="profile-custom-select-menu profile-custom-select-menu-scroll" data-h2h-custom-select-menu role="listbox" hidden>
+                            {% for opponent in head_to_head_report.opponents %}
+                            {% set opponent_label = opponent.opponent_name ~ ' - ' ~ (opponent.current_league.score_display if opponent.current_league else opponent.score_display) %}
+                            <button class="profile-custom-select-option{% if loop.first %} is-selected{% endif %}" type="button" data-h2h-custom-select-option data-h2h-custom-select-value="{{ opponent.opponent_id }}" role="option" aria-selected="{{ 'true' if loop.first else 'false' }}">
+                                {{ opponent_label }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </label>
             </div>
 
@@ -383,18 +427,49 @@
             {% endif %}
         </div>
 
-        {% if race_slug in ['terran', 'protoss', 'zerg'] and priority_matchup_report is defined and priority_matchup_report and priority_matchup_report['cards'] %}
+        {% if race_slug in ['terran', 'protoss', 'zerg'] and race_matchup_reports is defined and race_matchup_reports %}
         <div class="profile-section-card profile-matchup-report-section">
-            <div class="profile-section-head">
-                <h2>Priority race report</h2>
-                <p>Win rate by enemy faction when this player uses {{ player.priority_race }}.</p>
+            <div class="profile-section-head profile-section-head-with-control">
+                <div>
+                    <h2>Priority race report</h2>
+                    <p>Win rate by enemy faction when this player uses <span data-matchup-race-label>{{ player.priority_race }}</span>.</p>
+                </div>
+                <div class="profile-race-report-select-label">
+                    <span>Offrace race</span>
+                    {% set selected_report_label = namespace(value=player.priority_race or 'Choose race') %}
+                    {% for report_slug, report in race_matchup_reports.items() %}
+                        {% if report_slug == race_slug %}
+                            {% set selected_report_label.value = report.race_label %}
+                        {% endif %}
+                    {% endfor %}
+                    <div class="profile-custom-select" data-custom-race-select>
+                        <select class="profile-race-report-select profile-native-select-source" data-matchup-race-select aria-hidden="true" tabindex="-1">
+                            {% for report_slug, report in race_matchup_reports.items() %}
+                            <option value="{{ report_slug }}" {% if report_slug == race_slug %}selected{% endif %}>{{ report.race_label }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="profile-custom-select-trigger" type="button" data-custom-select-trigger aria-haspopup="listbox" aria-expanded="false">
+                            <span data-custom-select-label>{{ selected_report_label.value }}</span>
+                            <span class="profile-custom-select-arrow" aria-hidden="true"></span>
+                        </button>
+                        <div class="profile-custom-select-menu" data-custom-select-menu role="listbox" hidden>
+                            {% for report_slug, report in race_matchup_reports.items() %}
+                            <button class="profile-custom-select-option{% if report_slug == race_slug %} is-selected{% endif %}" type="button" data-custom-select-option data-custom-select-value="{{ report_slug }}" role="option" aria-selected="{{ 'true' if report_slug == race_slug else 'false' }}">
+                                {{ report.race_label }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="profile-matchup-report-grid">
-                {% for matchup_card in priority_matchup_report['cards'] %}
+            {% for report_slug, report in race_matchup_reports.items() %}
+            <div class="profile-matchup-report-grid" data-matchup-race-report="{{ report_slug }}" {% if report_slug != race_slug %}hidden{% endif %}>
+                {% for matchup_card in report['cards'] %}
                 {{ render_matchup_card(matchup_card.matchup_code, matchup_card.opponent_race, matchup_card.opponent_slug, matchup_card.wins, matchup_card.losses) }}
                 {% endfor %}
             </div>
+            {% endfor %}
 
             <div class="matchup-report-tooltip" data-matchup-tooltip hidden>
                 <div class="matchup-report-tooltip-title" data-matchup-tooltip-title></div>
@@ -404,9 +479,19 @@
         {% endif %}
 
         <div class="profile-section-card">
-            <div class="profile-section-head">
-                <h2>Recent matches</h2>
-                <p>Latest {{ recent_matches|length }} games with result and rating change.</p>
+            <div class="profile-section-head profile-section-head-with-control">
+                <div>
+                    <h2>Recent matches</h2>
+                    <p>Latest {{ recent_matches|length }} games with result and rating change.</p>
+                </div>
+                {% if recent_matches %}
+                <div class="profile-race-filter-bar" data-recent-race-filter>
+                    <button type="button" class="profile-race-filter-button is-active" data-race-filter="all">All</button>
+                    <button type="button" class="profile-race-filter-button" data-race-filter="terran">Terran</button>
+                    <button type="button" class="profile-race-filter-button" data-race-filter="protoss">Protoss</button>
+                    <button type="button" class="profile-race-filter-button" data-race-filter="zerg">Zerg</button>
+                </div>
+                {% endif %}
             </div>
 
             {% if recent_matches %}
@@ -431,17 +516,30 @@
                             <th>Opponent race</th>
                             <th>Score</th>
                             <th>Delta</th>
-                            <th>ELO</th>
+                            <th class="profile-elo-column-help" title="Cell color shows whether that match used separate race ELO or Global ELO.">ELO</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for match in recent_matches %}
                         {% set player_race_slug = match.player_race|lower if match.player_race else '' %}
                         {% set opponent_race_slug = match.opponent_race|lower if match.opponent_race else '' %}
-                        <tr>
+                        {% set rating_race_slug = match.rating_race_slug if match.rating_race_slug else 'global' %}
+                        <tr data-player-race="{{ player_race_slug }}" data-rating-race="{{ rating_race_slug }}">
                             <td>{{ match.played_at_label }}</td>
-                            <td>
-                                <a class="player-profile-link inline-link" href="{{ match.opponent_profile_url }}">{{ match.opponent_name }}</a>
+                            <td class="value-player">
+                                <div class="game-report-player-cell">
+                                    <div class="game-report-player-meta">
+                                        <div class="game-report-player-main">
+                                            {% if opponent_race_slug in ['terran', 'protoss', 'zerg'] %}
+                                            <img class="race-inline-icon" src="/static/Race/{{ opponent_race_slug }}.svg" alt="{{ match.opponent_race }} icon">
+                                            {% endif %}
+                                            <a class="game-report-player-name-link player-profile-link" href="{{ match.opponent_profile_url }}"><span class="player-name sc2-player-name">{{ match.opponent_name }}</span></a>
+                                        </div>
+                                        {% if match.opponent_roster_id %}
+                                        <a class="game-report-seed-link" href="/roster-pdf-test?seed={{ match.opponent_roster_id }}&autostart=1" data-roster-download="{{ match.opponent_roster_id }}" title="Download roster PDF">[{{ match.opponent_roster_id }}]</a>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </td>
                             <td>
                                 <span class="match-result-badge {% if match.is_tie %}match-result-tie{% elif match.is_win %}match-result-win{% else %}match-result-loss{% endif %}">
@@ -465,8 +563,11 @@
                                 </span>
                             </td>
                             <td>{{ match.score_display }}</td>
-                            <td class="{% if match.is_tie %}delta-tie{% elif match.is_win %}delta-win{% else %}delta-loss{% endif %}">{{ match.elo_delta_display }}</td>
-                            <td>{{ match.old_elo_display }} → {{ match.new_elo_display }}</td>
+                            <td
+                                class="rating-race-value rating-race-{{ rating_race_slug }}"
+                                title="{{ match.rating_scope_label }}"
+                            >{{ match.elo_delta_display }}</td>
+                            <td class="rating-race-value rating-race-{{ rating_race_slug }}" title="{{ match.rating_scope_label }}">{% if match.old_elo is not none and match.new_elo is not none %}{{ match.old_elo_display }} → {{ match.new_elo_display }}{% endif %}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -482,6 +583,59 @@
         {% endif %}
     </div>
 </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const card = document.querySelector('[data-profile-elo-card]');
+    if (!card) {
+        return;
+    }
+
+    const valueNode = card.querySelector('[data-profile-elo-value]');
+    const labelNode = card.querySelector('[data-profile-elo-label]');
+    const options = Array.from(card.querySelectorAll('[data-elo-key]'));
+    const scopes = ['global', 'terran', 'protoss', 'zerg'];
+    let currentIndex = options.findIndex(function (option) {
+        return option.dataset.eloKey === (card.dataset.profileEloCurrentKey || 'global');
+    });
+    if (currentIndex < 0) {
+        currentIndex = 0;
+    }
+
+    if (!valueNode || !labelNode || options.length <= 1) {
+        return;
+    }
+
+    function setScope(option) {
+        const scope = option.dataset.eloRace || 'global';
+        valueNode.textContent = option.dataset.eloValue || '';
+        labelNode.textContent = option.dataset.eloLabel || 'Global ELO';
+
+        scopes.forEach(function (name) {
+            valueNode.classList.toggle('profile-elo-value-' + name, name === scope);
+            card.classList.toggle('profile-elo-card-scope-' + name, name === scope);
+        });
+    }
+
+    function switchToNextScope() {
+        currentIndex = (currentIndex + 1) % options.length;
+        setScope(options[currentIndex]);
+    }
+
+    setScope(options[currentIndex]);
+
+    card.addEventListener('click', function () {
+        switchToNextScope();
+    });
+
+    card.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            switchToNextScope();
+        }
+    });
+});
+</script>
 
 {% if rating_chart %}
 <script>
@@ -842,6 +996,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const select = root.querySelector('[data-h2h-select]');
     const tbody = root.querySelector('[data-h2h-matches]');
     const openButton = document.querySelector('[data-h2h-open]');
+    const customSelect = root.querySelector('[data-h2h-custom-select]');
+    const customTrigger = customSelect ? customSelect.querySelector('[data-h2h-custom-select-trigger]') : null;
+    const customLabel = customSelect ? customSelect.querySelector('[data-h2h-custom-select-label]') : null;
+    const customMenu = customSelect ? customSelect.querySelector('[data-h2h-custom-select-menu]') : null;
+    const customOptions = customSelect ? Array.from(customSelect.querySelectorAll('[data-h2h-custom-select-option]')) : [];
 
     const setText = function (selector, value) {
         const node = root.querySelector(selector);
@@ -967,9 +1126,67 @@ document.addEventListener('DOMContentLoaded', function () {
         }) || opponents[0] || null;
     };
 
+    const closeCustomSelect = function () {
+        if (!customSelect || !customTrigger || !customMenu) {
+            return;
+        }
+        customMenu.hidden = true;
+        customTrigger.setAttribute('aria-expanded', 'false');
+        customSelect.classList.remove('is-open');
+    };
+
+    const syncCustomSelect = function () {
+        if (!select || !customLabel) {
+            return;
+        }
+        const selectedValue = String(select.value || '');
+        const selectedOption = select.options[select.selectedIndex];
+        customLabel.textContent = selectedOption ? (selectedOption.textContent || '').trim() : 'Choose opponent';
+        customOptions.forEach(function (option) {
+            const isSelected = String(option.dataset.h2hCustomSelectValue || '') === selectedValue;
+            option.classList.toggle('is-selected', isSelected);
+            option.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        });
+    };
+
+    if (customTrigger && customMenu) {
+        customTrigger.addEventListener('click', function () {
+            const nextOpen = customMenu.hidden;
+            customMenu.hidden = !nextOpen;
+            customTrigger.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+            if (customSelect) {
+                customSelect.classList.toggle('is-open', nextOpen);
+            }
+        });
+
+        customOptions.forEach(function (option) {
+            option.addEventListener('click', function () {
+                if (!select) {
+                    return;
+                }
+                select.value = option.dataset.h2hCustomSelectValue || '';
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                closeCustomSelect();
+            });
+        });
+
+        document.addEventListener('click', function (event) {
+            if (customSelect && !customSelect.contains(event.target)) {
+                closeCustomSelect();
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                closeCustomSelect();
+            }
+        });
+    }
+
     if (select) {
         select.addEventListener('change', function () {
             renderOpponent(findOpponent(select.value));
+            syncCustomSelect();
         });
     }
 
@@ -996,9 +1213,122 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     renderOpponent(findOpponent(select ? select.value : null));
+    syncCustomSelect();
 });
 </script>
 {% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const raceReportSelect = document.querySelector('[data-matchup-race-select]');
+    const raceReportLabel = document.querySelector('[data-matchup-race-label]');
+    const raceReports = Array.from(document.querySelectorAll('[data-matchup-race-report]'));
+    const customRaceSelect = document.querySelector('[data-custom-race-select]');
+    const customRaceTrigger = customRaceSelect ? customRaceSelect.querySelector('[data-custom-select-trigger]') : null;
+    const customRaceLabel = customRaceSelect ? customRaceSelect.querySelector('[data-custom-select-label]') : null;
+    const customRaceMenu = customRaceSelect ? customRaceSelect.querySelector('[data-custom-select-menu]') : null;
+    const customRaceOptions = customRaceSelect ? Array.from(customRaceSelect.querySelectorAll('[data-custom-select-option]')) : [];
+
+    const closeCustomRaceSelect = function () {
+        if (!customRaceMenu || !customRaceTrigger || !customRaceSelect) {
+            return;
+        }
+        customRaceMenu.hidden = true;
+        customRaceTrigger.setAttribute('aria-expanded', 'false');
+        customRaceSelect.classList.remove('is-open');
+    };
+
+    const syncCustomRaceSelect = function () {
+        if (!raceReportSelect || !customRaceLabel) {
+            return;
+        }
+        const selectedValue = String(raceReportSelect.value || '').toLowerCase();
+        const selectedOption = raceReportSelect.options[raceReportSelect.selectedIndex];
+        customRaceLabel.textContent = selectedOption ? (selectedOption.textContent || '').trim() : 'Choose race';
+        customRaceOptions.forEach(function (option) {
+            const isSelected = String(option.dataset.customSelectValue || '').toLowerCase() === selectedValue;
+            option.classList.toggle('is-selected', isSelected);
+            option.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        });
+    };
+
+    if (customRaceTrigger && customRaceMenu) {
+        customRaceTrigger.addEventListener('click', function () {
+            const nextOpen = customRaceMenu.hidden;
+            customRaceMenu.hidden = !nextOpen;
+            customRaceTrigger.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+            if (customRaceSelect) {
+                customRaceSelect.classList.toggle('is-open', nextOpen);
+            }
+        });
+
+        customRaceOptions.forEach(function (option) {
+            option.addEventListener('click', function () {
+                if (!raceReportSelect) {
+                    return;
+                }
+                raceReportSelect.value = option.dataset.customSelectValue || '';
+                raceReportSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                closeCustomRaceSelect();
+            });
+        });
+
+        document.addEventListener('click', function (event) {
+            if (customRaceSelect && !customRaceSelect.contains(event.target)) {
+                closeCustomRaceSelect();
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                closeCustomRaceSelect();
+            }
+        });
+    }
+
+    if (raceReportSelect && raceReports.length) {
+        const syncRaceReport = function () {
+            const selectedRace = String(raceReportSelect.value || '').toLowerCase();
+            const selectedOption = raceReportSelect.options[raceReportSelect.selectedIndex];
+            raceReports.forEach(function (report) {
+                report.hidden = report.dataset.matchupRaceReport !== selectedRace;
+            });
+            if (raceReportLabel && selectedOption) {
+                raceReportLabel.textContent = (selectedOption.textContent || 'this race').trim();
+            }
+            syncCustomRaceSelect();
+        };
+
+        raceReportSelect.addEventListener('change', syncRaceReport);
+        syncRaceReport();
+    }
+
+    const raceFilter = document.querySelector('[data-recent-race-filter]');
+    if (raceFilter) {
+        const filterButtons = Array.from(raceFilter.querySelectorAll('[data-race-filter]'));
+        const matchRows = Array.from(document.querySelectorAll('.profile-history-table tbody tr[data-player-race]'));
+
+        const applyRecentFilter = function (race) {
+            const selectedRace = String(race || 'all').toLowerCase();
+            filterButtons.forEach(function (button) {
+                button.classList.toggle('is-active', button.dataset.raceFilter === selectedRace);
+            });
+            matchRows.forEach(function (row) {
+                const rowRace = String(row.dataset.playerRace || '').toLowerCase();
+                row.hidden = selectedRace !== 'all' && rowRace !== selectedRace;
+            });
+        };
+
+        raceFilter.addEventListener('click', function (event) {
+            const button = event.target.closest('[data-race-filter]');
+            if (!button) {
+                return;
+            }
+            applyRecentFilter(button.dataset.raceFilter || 'all');
+        });
+    }
+});
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -1066,5 +1396,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+
+{% if recent_matches %}
+<script type="module" src="{{ url_for('static', filename='roster_pdf_client.js') }}?v=20260528"></script>
+{% endif %}
 
 {% endblock %}

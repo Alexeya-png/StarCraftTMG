@@ -5,3 +5,4 @@ Tools/.env
 __pycache__/
 *.pyc
 app/.cache/
+Tools/backups/

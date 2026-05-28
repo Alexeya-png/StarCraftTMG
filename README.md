@@ -50,6 +50,21 @@ Supabase setup:
 2. Run `Tools/supabase_cache_webhook.sql` in Supabase SQL editor after replacing `REPLACE_WITH_SUPABASE_WEBHOOK_SECRET`.
 3. Test with `POST https://tmg-stats.org/api/supabase/cache-webhook` and the same Authorization header.
 
+## Player accounts and Google login
+
+Run `Tools/add_user_accounts_profile_features.sql` in Supabase before enabling player registration.
+It adds Google-backed user accounts, player aliases, nickname color choices, ladder display preferences, and per-race offrace ELO storage.
+
+Required env:
+
+```dotenv
+GOOGLE_CLIENT_ID=your_google_oauth_client_id
+GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
+GOOGLE_REDIRECT_URI=https://tmg-stats.org/auth/google/callback
+```
+
+Add the same redirect URI in Google Cloud Console. After login, users open `/account`, link their Google account to a player, then manage flag, nickname color, public aliases, offrace ELO, and ladder visibility.
+
 ## Firebase app auth
 
 The site can authenticate against Firebase Auth and read roles from Firestore `users/{firebase_uid}` documents.

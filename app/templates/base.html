@@ -44,12 +44,13 @@
                 <a class="{% if active_page == 'reports' %}is-active{% endif %}" href="/reports">Game Reports</a>
                 <a class="{% if active_page == 'leagues' %}is-active{% endif %}" href="/leagues">Leagues</a>
                 <a class="{% if active_page == 'feedback' %}is-active{% endif %}" href="/feedback">Contact Admin</a>
-                <a class="{% if active_page == 'admin' %}is-active{% endif %}" href="/admin">Admin</a>
+                <a class="{% if active_page == 'account' %}is-active{% endif %}" href="{{ '/account' if current_user else '/login' }}">{{ 'Dashboard' if current_user else 'Login' }}</a>
+                {% if is_admin %}<a class="{% if active_page == 'admin' %}is-active{% endif %}" href="/admin">Admin</a>{% endif %}
             </nav>
-            {% if is_admin %}
-            <div class="admin-header-box">
-                <span class="admin-badge">Admin mode</span>
-                <form method="post" action="/admin/logout">
+            {% if current_user %}
+            <div class="admin-header-box user-header-box">
+                <span class="admin-badge">{{ current_user.display_name }}</span>
+                <form method="post" action="/logout">
                     <button class="button button-secondary button-small" type="submit">Logout</button>
                 </form>
             </div>
