@@ -1,0 +1,22 @@
+{
+  "generated_at": "2026-05-14",
+  "asset_groups": {
+    "profile_banners": [
+      {
+        "filename": "profile_back_protoss.webp",
+        "url": "/static/art/profile-banners/profile_back_protoss.webp",
+        "size_bytes": 34756
+      },
+      {
+        "filename": "profile_back_terran.webp",
+        "url": "/static/art/profile-banners/profile_back_terran.webp",
+        "size_bytes": 63206
+      },
+      {
+        "filename": "profile_back_zerg.webp",
+        "url": "/static/art/profile-banners/profile_back_zerg.webp",
+        "size_bytes": 55692
+      }
+    ]
+  }
+}

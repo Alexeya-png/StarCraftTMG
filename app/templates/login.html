@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section admin-auth-section account-auth-section">
+    <div class="container admin-auth-container">
+        <div class="admin-auth-card account-auth-card">
+            <div class="form-section-head">
+                <span class="eyebrow">Account</span>
+                <h1>Login</h1>
+            </div>
+
+            {% if login_error %}
+            <div class="submit-alert submit-alert-error admin-inline-alert">
+                <strong>Could not sign in.</strong>
+                <span>{{ login_error }}</span>
+            </div>
+            {% endif %}
+
+            {% if google_oauth_enabled %}
+            <a class="button button-primary google-login-button" href="/auth/google/start">Continue with Google</a>
+            {% else %}
+            <div class="submit-alert submit-alert-error admin-inline-alert">
+                <strong>Google login is not configured.</strong>
+                <span>Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server environment.</span>
+            </div>
+            <p class="account-muted-note">Callback URL to add in Google Console: {{ google_redirect_uri }}</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

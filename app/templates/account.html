@@ -1,0 +1,611 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="section admin-editor-section account-section">
+    <div class="container">
+        <div class="page-head">
+            <div>
+                <span class="eyebrow">Dashboard</span>
+                <h1>{{ account.display_name }}</h1>
+            </div>
+            <div class="page-actions">
+                {% if player %}
+                <a class="button button-secondary" href="{{ player.profile_url }}">Open profile</a>
+                {% endif %}
+                <form method="post" action="/logout">
+                    <button class="button button-secondary" type="submit">Logout</button>
+                </form>
+            </div>
+        </div>
+
+        {% if error_message %}
+        <div class="submit-alert submit-alert-error admin-inline-alert">
+            <strong>Could not save profile.</strong>
+            <span>{{ error_message }}</span>
+        </div>
+        {% endif %}
+
+        {% if success_message %}
+        <div class="submit-alert submit-alert-success admin-inline-alert">
+            <strong>{{ success_message }}</strong>
+        </div>
+        {% endif %}
+
+        {% if not player %}
+        <div class="leaderboard-shell admin-editor-shell account-editor-shell">
+            <form class="admin-form-grid" method="post" action="/account">
+                <input type="hidden" name="action" value="link_player">
+                <div class="form-section-head">
+                    <h2>Link your player</h2>
+                    <p>Choose an existing ladder name or type a new one.</p>
+                </div>
+                <div class="toolbar-field">
+                    <label for="account_player_name">Player name</label>
+                    <input id="account_player_name" name="player_name" type="text" list="player-name-suggestions" value="{{ form_state.player_name }}" autocomplete="off" required>
+                </div>
+                <div class="admin-form-actions">
+                    <button class="button button-primary" type="submit">Link player</button>
+                </div>
+            </form>
+        </div>
+        {% else %}
+        <div class="leaderboard-shell admin-editor-shell account-editor-shell">
+            <form class="admin-form-grid" method="post" action="/account">
+                <input type="hidden" name="action" value="save_profile">
+
+                <div class="account-summary">
+                    <div class="account-avatar-wrap">
+                        {% if account.avatar_url %}
+                        <img class="account-avatar" src="{{ account.avatar_url }}" alt="">
+                        {% else %}
+                        <div class="account-avatar account-avatar-empty">{{ account.display_name[:1] }}</div>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="account-summary-label">Linked player</div>
+                        <strong class="account-summary-player"{% if player.name_color %} style="color: {{ player.name_color }}"{% endif %}>{{ player.name }}</strong>
+                        <div class="account-muted-note">{{ account.email }}</div>
+                    </div>
+                </div>
+
+                <div class="admin-form-two-col">
+                    {% set selected_flag = namespace(url='', label='', code=form_state.country_code|lower) %}
+                    {% for flag in flag_options %}
+                        {% if flag.code == form_state.country_code|lower %}
+                            {% set selected_flag.url = flag.flag_url %}
+                            {% set selected_flag.label = flag.label %}
+                        {% endif %}
+                    {% endfor %}
+                    <div class="toolbar-field toolbar-field--flag">
+                        <label>Flag</label>
+                        <input id="account_country_code" name="country_code" type="hidden" value="{{ form_state.country_code }}">
+                        <div class="account-flag-picker" data-flag-picker>
+                            <button class="account-flag-trigger" type="button" data-flag-trigger aria-expanded="false">
+                                <span class="account-flag-preview account-flag-trigger-preview" data-flag-preview>
+                                    {% if selected_flag.url %}
+                                    <img src="{{ selected_flag.url }}" alt="">
+                                    {% else %}
+                                    <span>--</span>
+                                    {% endif %}
+                                </span>
+                                <span class="account-flag-trigger-text">
+                                    <strong data-flag-label>{{ selected_flag.label or 'Choose flag' }}</strong>
+                                    <small data-flag-code>{{ form_state.country_code|upper if form_state.country_code else 'Not set' }}</small>
+                                </span>
+                                <span class="account-flag-trigger-arrow" aria-hidden="true">⌄</span>
+                            </button>
+                            <div class="account-flag-menu" data-flag-menu hidden>
+                                <input class="account-flag-search" type="search" placeholder="Search by code or country" data-flag-search>
+                                <div class="account-flag-grid" data-flag-grid>
+                                    {% for flag in flag_options %}
+                                    <button class="account-flag-option{% if flag.code == form_state.country_code|lower %} is-selected{% endif %}" type="button" data-flag-code="{{ flag.code }}" data-flag-url="{{ flag.flag_url }}" data-flag-label="{{ flag.label }}">
+                                        <img src="{{ flag.flag_url }}" alt="">
+                                        <span class="account-flag-text">
+                                            <strong>{{ flag.label }}</strong>
+                                            <small>{{ flag.code|upper }}</small>
+                                        </span>
+                                        <span class="account-flag-check" aria-hidden="true">✓</span>
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="toolbar-field toolbar-field--color">
+                        <label class="field-help-label" title="Changes the nickname color on the player profile and in leagues.">Nickname color</label>
+                        {% set selected_color = namespace(option=profile_color_options[0]) %}
+                        {% for color in profile_color_options %}
+                            {% if form_state.name_color|upper == color.value %}
+                                {% set selected_color.option = color %}
+                            {% endif %}
+                        {% endfor %}
+                        <div class="account-color-picker" data-color-picker>
+                            <button class="account-color-trigger{% if selected_color.option.is_default %} is-default{% endif %}" type="button" data-color-trigger aria-expanded="false" style="--account-player-color: {{ selected_color.option.swatch or selected_color.option.value or '#18B1FF' }}">
+                                <span class="account-color-swatch account-color-trigger-swatch{% if selected_color.option.is_default %} is-default{% endif %}" data-color-trigger-swatch style="--account-player-color: {{ selected_color.option.swatch or selected_color.option.value or '#18B1FF' }}"></span>
+                                <span class="account-color-trigger-text">
+                                    <strong data-color-trigger-label>{{ selected_color.option.terran_label }}</strong>
+                                    <small data-color-trigger-meta>{{ selected_color.option.meta_label or (selected_color.option.label ~ ' · ' ~ selected_color.option.value) }}</small>
+                                </span>
+                                <span class="account-color-trigger-arrow" aria-hidden="true">⌄</span>
+                            </button>
+                            <div class="account-color-menu" data-color-menu hidden>
+                                {% for color in profile_color_options %}
+                                <label class="account-color-option{% if form_state.name_color|upper == color.value %} is-selected{% endif %}{% if color.is_default %} is-default{% endif %}"
+                                       data-color-option
+                                       data-color-value="{{ color.value }}"
+                                       data-color-swatch="{{ color.swatch or color.value or '#18B1FF' }}"
+                                       data-color-label="{{ color.label }}"
+                                       data-color-meta="{{ color.meta_label or '' }}"
+                                       data-color-default="{% if color.is_default %}1{% else %}0{% endif %}"
+                                       data-label-terran="{{ color.terran_label }}"
+                                       data-label-zerg="{{ color.zerg_label }}"
+                                       data-label-protoss="{{ color.protoss_label }}"
+                                       style="--account-player-color: {{ color.swatch or color.value or '#18B1FF' }}">
+                                    <input type="radio" name="name_color" value="{{ color.value }}" {% if form_state.name_color|upper == color.value %}checked{% endif %}>
+                                    <span class="account-color-swatch{% if color.is_default %} is-default{% endif %}" style="--account-player-color: {{ color.swatch or color.value or '#18B1FF' }}"></span>
+                                    <span class="account-color-text">
+                                        <strong data-color-faction-label>{{ color.terran_label }}</strong>
+                                        <small data-color-base-label>{{ color.meta_label or (color.label ~ ' · ' ~ color.value) }}</small>
+                                    </span>
+                                    <span class="account-color-check" aria-hidden="true">✓</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="toolbar-field toolbar-field--priority-race">
+                        <label for="account_priority_race">Priority race</label>
+                        {% set selected_priority_race_label = namespace(value='Auto / not set') %}
+                        {% for race in race_options %}
+                            {% if form_state.priority_race == race %}
+                                {% set selected_priority_race_label.value = race %}
+                            {% endif %}
+                        {% endfor %}
+                        <div class="profile-custom-select account-priority-select" data-account-priority-select>
+                            <select id="account_priority_race" class="profile-native-select-source" name="priority_race" data-account-priority-native aria-hidden="true" tabindex="-1">
+                                <option value="">Auto / not set</option>
+                                {% for race in race_options %}
+                                <option value="{{ race }}" {% if form_state.priority_race == race %}selected{% endif %}>{{ race }}</option>
+                                {% endfor %}
+                            </select>
+                            <button class="profile-custom-select-trigger" type="button" data-account-priority-trigger aria-haspopup="listbox" aria-expanded="false">
+                                <span data-account-priority-label>{{ selected_priority_race_label.value }}</span>
+                                <span class="profile-custom-select-arrow" aria-hidden="true"></span>
+                            </button>
+                            <div class="profile-custom-select-menu account-priority-menu" data-account-priority-menu role="listbox" hidden>
+                                <button class="profile-custom-select-option{% if not form_state.priority_race %} is-selected{% endif %}" type="button" data-account-priority-option data-account-priority-value="" role="option" aria-selected="{{ 'true' if not form_state.priority_race else 'false' }}">Auto / not set</button>
+                                {% for race in race_options %}
+                                <button class="profile-custom-select-option{% if form_state.priority_race == race %} is-selected{% endif %}" type="button" data-account-priority-option data-account-priority-value="{{ race }}" role="option" aria-selected="{{ 'true' if form_state.priority_race == race else 'false' }}">{{ race }}</button>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="account_discord_url">Discord or link</label>
+                        <input id="account_discord_url" name="discord_url" type="text" value="{{ form_state.discord_url }}" placeholder="discord.gg/... or https://...">
+                    </div>
+                </div>
+
+                <div class="account-offrace-panel">
+                    <div class="form-section-head">
+                        <h2>Offrace ELO</h2>
+                        <p>Pick factions that should use their own rating, then choose which rating appears in leaderboards.</p>
+                    </div>
+                    <div class="account-offrace-grid">
+                        {% for race in race_options %}
+                        {% set race_slug = race|lower %}
+                        {% set enabled_key = 'offrace_' ~ race_slug ~ '_enabled' %}
+                        <div class="account-offrace-card" data-offrace-card="{{ race_slug }}">
+                            <div class="account-offrace-title">
+                                <img class="race-inline-icon" src="/static/Race/{{ race_slug }}.svg" alt="">
+                                <strong>{{ race }}</strong>
+                            </div>
+                            <label class="account-offrace-toggle">
+                                <input type="checkbox" name="{{ enabled_key }}" data-offrace-enabled="{{ race_slug }}" {% if form_state[enabled_key] == 'on' %}checked{% endif %}>
+                                <span class="account-control-mark" aria-hidden="true"></span>
+                                <span>Separate ELO</span>
+                            </label>
+                            <label class="account-ladder-choice">
+                                <input type="radio" name="ladder_rating_race" value="{{ race }}" data-ladder-race="{{ race_slug }}" {% if form_state.ladder_rating_race == race %}checked{% endif %} {% if form_state[enabled_key] != 'on' %}disabled{% endif %}>
+                                <span class="account-control-mark" aria-hidden="true"></span>
+                                <span>Show this in ladder</span>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <label class="account-ladder-choice account-ladder-global">
+                        <input type="radio" name="ladder_rating_race" value="" {% if not form_state.ladder_rating_race %}checked{% endif %}>
+                        <span class="account-control-mark" aria-hidden="true"></span>
+                        <span>Use global ELO in ladder</span>
+                    </label>
+                </div>
+
+                <div class="toolbar-field">
+                    <label for="account_aliases">Additional names</label>
+                    <textarea id="account_aliases" name="aliases" rows="5" placeholder="One name per line">{{ form_state.aliases }}</textarea>
+                </div>
+
+                <div class="account-toggle-grid">
+                    <label class="account-offrace-toggle account-toggle-row">
+                        <input type="checkbox" name="ladder_show_flag" {% if form_state.ladder_show_flag == 'on' %}checked{% endif %}>
+                        <span class="account-control-mark" aria-hidden="true"></span>
+                        <span>Show flag in ladder</span>
+                    </label>
+                    <label class="account-offrace-toggle account-toggle-row">
+                        <input type="checkbox" name="ladder_show_badges" {% if form_state.ladder_show_badges == 'on' %}checked{% endif %}>
+                        <span class="account-control-mark" aria-hidden="true"></span>
+                        <span>Show badges in ladder</span>
+                    </label>
+                </div>
+
+                <div class="admin-form-actions">
+                    <button class="button button-primary" type="submit">Save profile</button>
+                </div>
+            </form>
+        </div>
+
+        {% endif %}
+    </div>
+</section>
+
+<datalist id="player-name-suggestions">
+    {% for player_name in name_suggestions %}
+    <option value="{{ player_name }}"></option>
+    {% endfor %}
+</datalist>
+
+<script>
+(function () {
+    const flagPicker = document.querySelector('[data-flag-picker]');
+    const flagTrigger = flagPicker ? flagPicker.querySelector('[data-flag-trigger]') : null;
+    const flagMenu = flagPicker ? flagPicker.querySelector('[data-flag-menu]') : null;
+    const searchInput = flagPicker ? flagPicker.querySelector('[data-flag-search]') : null;
+    const grid = flagPicker ? flagPicker.querySelector('[data-flag-grid]') : null;
+    const codeInput = document.getElementById('account_country_code');
+    const preview = flagPicker ? flagPicker.querySelector('[data-flag-preview]') : null;
+    const label = flagPicker ? flagPicker.querySelector('[data-flag-label]') : null;
+    const codeLabel = flagPicker ? flagPicker.querySelector('[data-flag-code]') : null;
+
+    if (!flagPicker || !flagTrigger || !flagMenu || !grid || !codeInput) {
+        return;
+    }
+
+    function filterFlags(query) {
+        const needle = String(query || '').trim().toLowerCase();
+        grid.querySelectorAll('[data-flag-code]').forEach(function (button) {
+            const haystack = ((button.dataset.flagCode || '') + ' ' + (button.dataset.flagLabel || '')).toLowerCase();
+            button.hidden = Boolean(needle && !haystack.includes(needle));
+        });
+    }
+
+    function closeFlagMenu() {
+        flagMenu.hidden = true;
+        flagTrigger.setAttribute('aria-expanded', 'false');
+        flagPicker.classList.remove('is-open');
+    }
+
+    function openFlagMenu() {
+        flagMenu.hidden = false;
+        flagTrigger.setAttribute('aria-expanded', 'true');
+        flagPicker.classList.add('is-open');
+        if (searchInput) {
+            searchInput.value = '';
+            filterFlags('');
+            window.setTimeout(function () {
+                searchInput.focus();
+            }, 0);
+        }
+    }
+
+    function toggleFlagMenu() {
+        if (flagMenu.hidden) {
+            openFlagMenu();
+        } else {
+            closeFlagMenu();
+        }
+    }
+
+    flagTrigger.addEventListener('click', function () {
+        toggleFlagMenu();
+    });
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            filterFlags(searchInput.value);
+        });
+    }
+
+    grid.addEventListener('click', function (event) {
+        const button = event.target.closest('[data-flag-code]');
+        if (!button) {
+            return;
+        }
+        const nextCode = button.dataset.flagCode || '';
+        const nextUrl = button.dataset.flagUrl || '';
+        const nextLabel = button.dataset.flagLabel || 'Choose flag';
+
+        codeInput.value = nextCode;
+        if (preview) {
+            preview.innerHTML = nextUrl ? '<img src="' + nextUrl + '" alt="">' : '<span>--</span>';
+        }
+        if (label) {
+            label.textContent = nextLabel;
+        }
+        if (codeLabel) {
+            codeLabel.textContent = nextCode ? nextCode.toUpperCase() : 'Not set';
+        }
+        grid.querySelectorAll('[data-flag-code]').forEach(function (option) {
+            option.classList.toggle('is-selected', option === button);
+        });
+        closeFlagMenu();
+    });
+
+    document.addEventListener('click', function (event) {
+        if (!flagPicker.contains(event.target)) {
+            closeFlagMenu();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closeFlagMenu();
+        }
+    });
+})();
+</script>
+
+<script>
+(function () {
+    const priorityCustomSelect = document.querySelector('[data-account-priority-select]');
+    const priorityRaceSelect = priorityCustomSelect ? priorityCustomSelect.querySelector('[data-account-priority-native]') : null;
+    const priorityTrigger = priorityCustomSelect ? priorityCustomSelect.querySelector('[data-account-priority-trigger]') : null;
+    const priorityLabel = priorityCustomSelect ? priorityCustomSelect.querySelector('[data-account-priority-label]') : null;
+    const priorityMenu = priorityCustomSelect ? priorityCustomSelect.querySelector('[data-account-priority-menu]') : null;
+    const priorityOptions = priorityCustomSelect ? Array.from(priorityCustomSelect.querySelectorAll('[data-account-priority-option]')) : [];
+
+    if (!priorityCustomSelect || !priorityRaceSelect || !priorityTrigger || !priorityMenu || !priorityLabel) {
+        return;
+    }
+
+    function closePriorityMenu() {
+        priorityMenu.hidden = true;
+        priorityTrigger.setAttribute('aria-expanded', 'false');
+        priorityCustomSelect.classList.remove('is-open');
+    }
+
+    function syncPrioritySelect() {
+        const selectedValue = String(priorityRaceSelect.value || '');
+        const selectedOption = priorityRaceSelect.options[priorityRaceSelect.selectedIndex];
+        priorityLabel.textContent = selectedOption ? (selectedOption.textContent || '').trim() : 'Auto / not set';
+        priorityOptions.forEach(function (option) {
+            const isSelected = String(option.dataset.accountPriorityValue || '') === selectedValue;
+            option.classList.toggle('is-selected', isSelected);
+            option.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        });
+    }
+
+    priorityTrigger.addEventListener('click', function () {
+        const nextOpen = priorityMenu.hidden;
+        priorityMenu.hidden = !nextOpen;
+        priorityTrigger.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+        priorityCustomSelect.classList.toggle('is-open', nextOpen);
+    });
+
+    priorityOptions.forEach(function (option) {
+        option.addEventListener('click', function () {
+            priorityRaceSelect.value = option.dataset.accountPriorityValue || '';
+            priorityRaceSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            syncPrioritySelect();
+            closePriorityMenu();
+        });
+    });
+
+    priorityRaceSelect.addEventListener('change', syncPrioritySelect);
+
+    document.addEventListener('click', function (event) {
+        if (!priorityCustomSelect.contains(event.target)) {
+            closePriorityMenu();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closePriorityMenu();
+        }
+    });
+
+    syncPrioritySelect();
+})();
+</script>
+
+<script>
+(function () {
+    const colorPicker = document.querySelector('[data-color-picker]');
+    const colorTrigger = colorPicker ? colorPicker.querySelector('[data-color-trigger]') : null;
+    const colorMenu = colorPicker ? colorPicker.querySelector('[data-color-menu]') : null;
+    const colorTriggerSwatch = colorPicker ? colorPicker.querySelector('[data-color-trigger-swatch]') : null;
+    const colorTriggerLabel = colorPicker ? colorPicker.querySelector('[data-color-trigger-label]') : null;
+    const colorTriggerMeta = colorPicker ? colorPicker.querySelector('[data-color-trigger-meta]') : null;
+    const priorityRaceSelect = document.getElementById('account_priority_race');
+
+    function colorRaceKey(value) {
+        const clean = String(value || '').trim().toLowerCase();
+        if (clean === 'terran' || clean === 'терран') {
+            return 'terran';
+        }
+        if (clean === 'zerg' || clean === 'зерг') {
+            return 'zerg';
+        }
+        if (clean === 'protoss' || clean === 'протосс') {
+            return 'protoss';
+        }
+        return '';
+    }
+
+    function colorDatasetKey(key) {
+        return 'label' + key.charAt(0).toUpperCase() + key.slice(1);
+    }
+
+    function getColorDisplay(option, key) {
+        const baseColorLabel = option ? option.dataset.colorLabel || '' : '';
+        const customMeta = option ? option.dataset.colorMeta || '' : '';
+        const colorValue = option ? option.dataset.colorValue || '' : '';
+        const factionColorLabel = key && option ? option.dataset[colorDatasetKey(key)] || baseColorLabel : baseColorLabel;
+        return {
+            title: factionColorLabel || baseColorLabel,
+            meta: customMeta || [key ? baseColorLabel : '', colorValue].filter(Boolean).join(' · '),
+        };
+    }
+
+    function closeColorMenu() {
+        if (!colorMenu || !colorTrigger) {
+            return;
+        }
+        colorMenu.hidden = true;
+        colorTrigger.setAttribute('aria-expanded', 'false');
+        if (colorPicker) {
+            colorPicker.classList.remove('is-open');
+        }
+    }
+
+    function toggleColorMenu() {
+        if (!colorMenu || !colorTrigger) {
+            return;
+        }
+        const nextOpen = colorMenu.hidden;
+        colorMenu.hidden = !nextOpen;
+        colorTrigger.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+        if (colorPicker) {
+            colorPicker.classList.toggle('is-open', nextOpen);
+        }
+    }
+
+    function syncSelectedColor() {
+        const key = colorRaceKey(priorityRaceSelect ? priorityRaceSelect.value : '');
+        const checked = document.querySelector('input[name="name_color"]:checked');
+        const selectedOption = checked ? checked.closest('[data-color-option]') : document.querySelector('[data-color-option]');
+        const display = getColorDisplay(selectedOption, key);
+
+        document.querySelectorAll('[data-color-option]').forEach(function (option) {
+            const radio = option.querySelector('input[name="name_color"]');
+            option.classList.toggle('is-selected', Boolean(radio && radio.checked));
+        });
+
+        const swatchColor = selectedOption ? selectedOption.dataset.colorSwatch || selectedOption.dataset.colorValue || '#18B1FF' : '#18B1FF';
+        const isDefault = Boolean(selectedOption && selectedOption.dataset.colorDefault === '1');
+        if (colorTrigger) {
+            colorTrigger.style.setProperty('--account-player-color', swatchColor);
+            colorTrigger.classList.toggle('is-default', isDefault);
+        }
+        if (colorTriggerSwatch) {
+            colorTriggerSwatch.style.setProperty('--account-player-color', swatchColor);
+            colorTriggerSwatch.classList.toggle('is-default', isDefault);
+        }
+        if (colorTriggerLabel) {
+            colorTriggerLabel.textContent = display.title || 'Choose color';
+        }
+        if (colorTriggerMeta) {
+            colorTriggerMeta.textContent = display.meta || '';
+        }
+    }
+
+    function syncColorLabels() {
+        const key = colorRaceKey(priorityRaceSelect ? priorityRaceSelect.value : '');
+        document.querySelectorAll('[data-color-option]').forEach(function (option) {
+            const factionLabel = option.querySelector('[data-color-faction-label]');
+            const baseLabel = option.querySelector('[data-color-base-label]');
+            const display = getColorDisplay(option, key);
+            if (factionLabel) {
+                factionLabel.textContent = display.title;
+            }
+            if (baseLabel) {
+                baseLabel.textContent = display.meta;
+            }
+        });
+        syncSelectedColor();
+    }
+
+    if (colorTrigger) {
+        colorTrigger.addEventListener('click', function () {
+            toggleColorMenu();
+        });
+    }
+
+    document.querySelectorAll('input[name="name_color"]').forEach(function (input) {
+        input.addEventListener('change', function () {
+            syncSelectedColor();
+            closeColorMenu();
+        });
+    });
+
+    document.addEventListener('click', function (event) {
+        if (colorPicker && !colorPicker.contains(event.target)) {
+            closeColorMenu();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closeColorMenu();
+        }
+    });
+
+    if (priorityRaceSelect) {
+        priorityRaceSelect.addEventListener('change', syncColorLabels);
+    }
+    syncColorLabels();
+
+    const globalLadderInput = document.querySelector('input[name="ladder_rating_race"][value=""]');
+
+    function syncOffraceLadderControls(changedRaceSlug) {
+        document.querySelectorAll('[data-ladder-race]').forEach(function (ladderInput) {
+            const raceSlug = ladderInput.dataset.ladderRace || '';
+            const separateInput = document.querySelector('[data-offrace-enabled="' + raceSlug + '"]');
+            const enabled = Boolean(separateInput && separateInput.checked);
+            ladderInput.disabled = !enabled;
+            const label = ladderInput.closest('.account-ladder-choice');
+            if (label) {
+                label.classList.toggle('is-disabled', !enabled);
+            }
+            if (!enabled && ladderInput.checked && globalLadderInput) {
+                globalLadderInput.checked = true;
+            }
+        });
+
+        if (changedRaceSlug) {
+            const changedSeparate = document.querySelector('[data-offrace-enabled="' + changedRaceSlug + '"]');
+            const changedLadder = document.querySelector('[data-ladder-race="' + changedRaceSlug + '"]');
+            if (changedSeparate && changedSeparate.checked && changedLadder && !changedLadder.disabled) {
+                changedLadder.checked = true;
+            }
+        }
+    }
+
+    document.querySelectorAll('[data-offrace-enabled]').forEach(function (input) {
+        input.addEventListener('change', function () {
+            syncOffraceLadderControls(input.dataset.offraceEnabled || '');
+        });
+    });
+
+    document.querySelectorAll('[data-ladder-race]').forEach(function (input) {
+        input.addEventListener('change', function () {
+            if (input.disabled) {
+                if (globalLadderInput) {
+                    globalLadderInput.checked = true;
+                }
+                return;
+            }
+            const separateInput = document.querySelector('[data-offrace-enabled="' + (input.dataset.ladderRace || '') + '"]');
+            if (!separateInput || !separateInput.checked) {
+                input.checked = false;
+                if (globalLadderInput) {
+                    globalLadderInput.checked = true;
+                }
+            }
+        });
+    });
+
+    syncOffraceLadderControls('');
+})();
+</script>
+{% endblock %}

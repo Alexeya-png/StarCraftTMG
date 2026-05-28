@@ -1,0 +1,49 @@
+{
+  "version": 3,
+  "note": "Profile banner mapping only.",
+  "backgrounds": {
+    "profile_back_protoss": {
+      "name": "Protoss profile banner",
+      "race": "protoss",
+      "url": "/static/art/profile-banners/profile_back_protoss.webp",
+      "position": "center 50%"
+    },
+    "profile_back_terran": {
+      "name": "Terran profile banner",
+      "race": "terran",
+      "url": "/static/art/profile-banners/profile_back_terran.webp",
+      "position": "center 50%"
+    },
+    "profile_back_zerg": {
+      "name": "Zerg profile banner",
+      "race": "zerg",
+      "url": "/static/art/profile-banners/profile_back_zerg.webp",
+      "position": "center 50%"
+    }
+  },
+  "race_variants": {
+    "protoss": [
+      "profile_back_protoss"
+    ],
+    "terran": [
+      "profile_back_terran"
+    ],
+    "zerg": [
+      "profile_back_zerg"
+    ]
+  },
+  "race_defaults": {
+    "protoss": "profile_back_protoss",
+    "terran": "profile_back_terran",
+    "zerg": "profile_back_zerg"
+  },
+  "players": {
+    "246": "profile_back_protoss",
+    "242": "profile_back_protoss",
+    "195": "profile_back_terran",
+    "192": "profile_back_zerg",
+    "249": "profile_back_zerg",
+    "252": "profile_back_zerg",
+    "196": "profile_back_zerg"
+  }
+}

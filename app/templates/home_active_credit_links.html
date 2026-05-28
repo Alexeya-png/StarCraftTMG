@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="hero home-hero">
+    <div class="container hero-grid home-hero-grid">
+        <div>
+            <span class="eyebrow">Unofficial fan project</span>
+            <h1>TMG Stats</h1>
+            <p class="lead">
+                Fan-made rating site for StarCraft<sup>®</sup> TMG.
+            </p>
+
+            <div class="hero-actions home-main-actions">
+                <a class="button button-primary" href="/submit">Submit Game Report</a>
+                <a class="button button-secondary" href="/reports">Open Game Reports</a>
+                <a class="button button-secondary" href="/leaderboard">Open Ratings</a>
+            </div>
+        </div>
+
+        <div class="panel home-guidelines-card">
+            <span class="eyebrow">Ranked Games</span>
+            <h2 style="margin-bottom: 12px;">Ranked game guidelines</h2>
+            <p class="lead" style="margin-bottom: 0;">
+                There is no separate strict ruleset for ranked games at the moment. The main idea is simple &ndash; respect your opponent and play as fairly as you would in a regular friendly game.
+            </p>
+        </div>
+    </div>
+</section>
+
+<section class="section home-section-tight">
+    <div class="container">
+        <div class="panel">
+            <div class="home-section-head">
+                <span class="eyebrow">Ranked Games</span>
+                <h2>How ranked match reporting works</h2>
+            </div>
+
+            <div class="home-rules-grid">
+                <div class="home-rule-card">
+                    <p class="home-rule-title"><strong>Roster format</strong></p>
+                    <p>
+                        Open or closed roster is up to both players. Open roster is recommended because it is easier to review your opponent’s army before the game starts and catch possible roster mistakes in advance.
+                    </p>
+                </div>
+
+                <div class="home-rule-card">
+                    <p class="home-rule-title"><strong>Submitting results</strong></p>
+                    <p>
+                        After the match, please use the <a class="inline-link" href="https://steamcommunity.com/sharedfiles/filedetails/?id=3696316354" target="_blank" rel="noopener noreferrer">TTS module</a> to submit the result whenever possible. If that is not available, the winner must submit the match <a class="inline-link" href="https://tmg-stats.org/submit" target="_blank" rel="noopener noreferrer">manually</a>.
+                    </p>
+                </div>
+
+                <div class="home-rule-card">
+                    <p class="home-rule-title"><strong>Player names and aliases</strong></p>
+                    <p class="home-rule-copy-spaced">
+                        Use the same player names as on the Koprulu Sector Discord server when submitting a match.
+                    </p>
+                    <p>
+                        If your Steam name is different, send it through the <a class="inline-link" href="/feedback">Contact Admin form</a>. The site supports alternate names, so Steam nicknames can still be linked to your main Discord profile.
+                    </p>
+                </div>
+
+                <div class="home-rule-card home-rule-card-accent">
+                    <p class="home-rule-title"><strong>Questions and profile setup</strong></p>
+                    <p class="home-rule-copy-spaced">
+                        For any ranked-related questions, <a class="inline-link" href="https://discord.com/users/603163733912453121" target="_blank" rel="noopener noreferrer">contact Alexey'a</a>.
+                    </p>
+                    <p>
+                        You can ask to personalize your profile, for example by adding a country flag or a Discord link.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="panel home-news-panel">
+            <span class="eyebrow">News</span>
+            <h2>From developer</h2>
+            <div class="home-news-list">
+                <div class="home-news-item">- The project is currently in a testing phase. Ranked results may be reset before release, while unranked matches will remain recorded in player statistics.</div>
+                <div class="home-news-item">- Added Leagues.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="panel">
+            <span class="eyebrow">Tabletop Simulator</span>
+            <h2>Ranked TTS module</h2>
+            <p class="lead">
+                Submit ranked matches directly from TTS to TMG Stats. Player names are recorded automatically through Steam.
+            </p>
+
+            <div class="home-news-list">
+                <div class="home-news-item">- Open StarCraft TMG beta and use the ranked submit module inside that mod.</div>
+                <div class="home-news-item">- Put the mission card on the submit board.</div>
+                <div class="home-news-item">- Set the final score and enable Ranked only for ranked games.</div>
+                <div class="home-news-item">- Press Submit to send the result.</div>
+            </div>
+
+            <div class="home-link-list" style="margin-top: 1rem;">
+                <a class="inline-link" href="https://steamcommunity.com/sharedfiles/filedetails/?id=3696316354" target="_blank" rel="noopener noreferrer">Open the ranked submit module</a>
+                <a class="inline-link" href="https://steamcommunity.com/sharedfiles/filedetails/?id=3662791369" target="_blank" rel="noopener noreferrer">Open StarCraft TMG beta</a>
+                <span class="home-muted-line">The submit module works only inside StarCraft TMG beta.</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container two-col home-two-col">
+        <div class="panel">
+            <span class="eyebrow">Community Resources</span>
+            <h2>Discord servers</h2>
+            <div class="home-link-list">
+                <a class="inline-link" href="https://discord.gg/hp7fhfgVaJ" target="_blank" rel="noopener noreferrer">Koprulu Sector Discord</a>
+                <a class="inline-link" href="https://discord.gg/SvqhUEvQQz" target="_blank" rel="noopener noreferrer">Archon Studio Discord</a>
+            </div>
+        </div>
+
+        <div class="panel">
+            <span class="eyebrow">Project</span>
+            <h2>Links and contact</h2>
+            <div class="home-link-list">
+                <a class="inline-link" href="https://starcrafttmgbeta.web.app/" target="_blank" rel="noopener noreferrer">WebApp application</a>
+                <a class="inline-link" href="https://github.com/Alexeya-png/StarCraftTMG" target="_blank" rel="noopener noreferrer">Git link</a>
+                <span class="home-muted-line">Developer contact - <a class="inline-link" href="https://discord.com/users/603163733912453121" target="_blank" rel="noopener noreferrer">Alexey'a</a></span>
+            </div>
+        </div>
+    </div>
+</section>
+<footer class="site-footer">
+    <div class="container">
+        <p class="legal-note">
+            TMG Stats is an unofficial fan-made community project. It is not affiliated with, endorsed by, sponsored by, or approved by Blizzard Entertainment, Inc. or Archon Studio.
+            StarCraft® and related names, logos, characters, images, and trademarks are trademarks or registered trademarks of Blizzard Entertainment, Inc. in the U.S. and/or other countries. All rights belong to their respective owners.
+        </p>
+        <p class="footer-credits">
+            <span class="footer-credit-title">Miniature painting and photography credits:</span>
+            <a class="inline-link" href="https://www.instagram.com/BruceGreen1978" target="_blank" rel="noopener noreferrer">Bruce Green</a>,
+            <a class="inline-link" href="https://www.reddit.com/user/EsperWatkins/" target="_blank" rel="noopener noreferrer">EsperWatkins</a>,
+            <a class="inline-link" href="https://discord.com/users/730599769453363331" target="_blank" rel="noopener noreferrer" title="Discord: 730599769453363331">Fartanis</a>,
+            <a class="inline-link" href="https://discord.com/users/520831452066349058" target="_blank" rel="noopener noreferrer" title="Discord: 520831452066349058">ViperLily,</a>
+            <a class="inline-link" href="https://discord.com/users/172580964013178880" target="_blank" rel="noopener noreferrer" title="Discord: 172580964013178880">The God of Cakes</a>.
+        </p>
+    </div>
+</footer>
+{% endblock %}
