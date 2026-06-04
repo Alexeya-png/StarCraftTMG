@@ -15,9 +15,7 @@ from typing import Any
 START_ELO = 1000
 BASE_RATING_K_FACTOR = 32
 ESTABLISHED_PLAYER_K_FACTOR = 24
-STABLE_PLAYER_K_FACTOR = 16
 ESTABLISHED_PLAYER_RANKED_MATCHES_THRESHOLD = 15
-STABLE_PLAYER_RANKED_MATCHES_THRESHOLD = 40
 RANKED_1K_ELO_MULTIPLIER = 0.35
 
 GAME_TYPES = ("1к", "2к", "Grand Offensive")
@@ -106,8 +104,6 @@ def expected_score(player_elo: int, opponent_elo: int) -> float:
 
 def determine_k_factor(ranked_matches_before: int) -> int:
     ranked_matches = int_value(ranked_matches_before)
-    if ranked_matches >= STABLE_PLAYER_RANKED_MATCHES_THRESHOLD:
-        return STABLE_PLAYER_K_FACTOR
     if ranked_matches >= ESTABLISHED_PLAYER_RANKED_MATCHES_THRESHOLD:
         return ESTABLISHED_PLAYER_K_FACTOR
     return BASE_RATING_K_FACTOR

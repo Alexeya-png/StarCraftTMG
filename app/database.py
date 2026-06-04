@@ -184,9 +184,7 @@ GAME_TYPE_DB_LABELS = {
 DEFAULT_K_FACTOR = 32
 BASE_RATING_K_FACTOR = 32
 ESTABLISHED_PLAYER_K_FACTOR = 24
-STABLE_PLAYER_K_FACTOR = 16
 ESTABLISHED_PLAYER_RANKED_MATCHES_THRESHOLD = 15
-STABLE_PLAYER_RANKED_MATCHES_THRESHOLD = 40
 RANKED_1K_ELO_MULTIPLIER = 0.35
 WINNER_SEED_ELO_BONUS_MULTIPLIER = 1.0
 ACTIVE_PLAYER_DAYS_WINDOW = 365
@@ -1045,8 +1043,6 @@ def _calculate_expected_score(player_elo: int, opponent_elo: int) -> float:
 
 def _determine_k_factor(current_elo: int, ranked_matches_played_before_match: int) -> int:
     ranked_matches_count = int(ranked_matches_played_before_match or 0)
-    if ranked_matches_count >= STABLE_PLAYER_RANKED_MATCHES_THRESHOLD:
-        return STABLE_PLAYER_K_FACTOR
     if ranked_matches_count >= ESTABLISHED_PLAYER_RANKED_MATCHES_THRESHOLD:
         return ESTABLISHED_PLAYER_K_FACTOR
     return BASE_RATING_K_FACTOR
