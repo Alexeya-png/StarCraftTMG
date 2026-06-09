@@ -1,0 +1,24 @@
+Hello Archon Studio team,
+
+My name is Alexey'a, and I made TMG Stats for the StarCraft: The Miniatures Game community.
+
+The site is already online. Players can submit match results, view rankings and profiles, check statistics, and run leagues. Matches can also be submitted directly from Tabletop Simulator.
+
+TMG Stats is not meant to replace your Command Center. I made it as an extra tool for players who want to track their games and take part in ranked play.
+
+I would like to ask whether Archon Studio might be interested in using TMG Stats as an official community or ranked-play tool.
+
+I am happy to change the site to match your requirements and work with your team on how it should be managed.
+
+Live platform: https://tmg-stats.org
+Project source: https://github.com/Alexeya-png/StarCraftTMG
+
+If this sounds useful, I would be glad to talk about it. You can also forward this email to the person responsible for StarCraft TMG or community projects.
+
+Thank you for your time.
+
+Best regards,
+Alexey'a
+Creator of TMG Stats
+customersupport@tmg-stats.org
+https://tmg-stats.org
