@@ -492,11 +492,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         let unitsHtml = '';
         (state.roster || []).forEach((unit) => {
-            const displayUnitName =
-                String(unit.name || '').trim().toLowerCase() === 'marine' &&
-                String(unit.size || '').trim().toLowerCase() === 'large'
-                    ? 'Special Forces'
-                    : (unit.name || 'Unknown Unit');
+            const displayUnitName = unit.name || 'Unknown Unit';
 
             let upgradeCost = 0;
             const upgradesList = [];
@@ -727,8 +723,10 @@ document.addEventListener('DOMContentLoaded', function () {
         content.scrollLeft = 0;
     }
 
-    function fetchReports(pushHistory) {
-        renderLoading();
+    function fetchReports(pushHistory, showLoader) {
+        if (showLoader !== false) {
+            renderLoading();
+        }
         const apiUrl = '/api/reports?' + buildQueryString();
 
         fetch(apiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -792,6 +790,11 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     fetchReports(false);
+    window.setInterval(function () {
+        if (document.visibilityState === 'visible' && !rosterPdfCache.activeSeed) {
+            fetchReports(false, false);
+        }
+    }, 5000);
 });
 </script>
 {% endblock %}

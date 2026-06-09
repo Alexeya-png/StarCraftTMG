@@ -197,6 +197,13 @@ SUPABASE_HTTP_TIMEOUT_SECONDS = max(1, int(os.getenv('SUPABASE_HTTP_TIMEOUT_SECO
 USE_DISK_CACHE_ON_MISS = (os.getenv('APP_USE_DISK_CACHE_ON_MISS') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
 BLOCKING_CACHE_LOAD_ON_MISS = (os.getenv('APP_BLOCKING_CACHE_LOAD_ON_MISS') or '1').strip().lower() not in {'0', 'false', 'no', 'off'}
 ALLOW_EMPTY_CACHE_ON_MISS = (os.getenv('APP_ALLOW_EMPTY_CACHE_ON_MISS') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
+SHARED_CACHE_SYNC_INTERVAL_SECONDS = max(
+    0.0,
+    float(os.getenv('APP_SHARED_CACHE_SYNC_INTERVAL_SECONDS', '5') or '5'),
+)
+CACHE_REFRESH_AFTER_WRITE_BACKGROUND = (
+    os.getenv('APP_CACHE_REFRESH_AFTER_WRITE_BACKGROUND') or '0'
+).strip().lower() not in {'0', 'false', 'no', 'off'}
 HEALTH_CHECK_DATABASE = (os.getenv('APP_HEALTH_CHECK_DB') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
 TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS = max(0, int(os.getenv('TTS_PLAYER_SUBMIT_COOLDOWN_SECONDS', '3600') or '3600'))
 FEEDBACK_MESSAGE_MAX_LENGTH = 300
@@ -351,6 +358,9 @@ _DATA_CACHE_LOCK = threading.RLock()
 _SUBMIT_MATCH_LOCK = threading.RLock()
 _DATA_CACHE_REFRESH_LOCK = threading.Lock()
 _DATA_CACHE_REFRESH_IN_PROGRESS = False
+_SHARED_CACHE_SYNC_LOCK = threading.Lock()
+_SHARED_CACHE_LAST_CHECKED_AT = 0.0
+_SHARED_CACHE_LAST_MTIME_NS = 0
 _DATA_CACHE: dict[str, Any] = {
     'players': None,
     'matches': None,
@@ -2685,8 +2695,8 @@ def _apply_cache_snapshot(snapshot: dict[str, Any], *, increment_version: bool =
     return result
 
 
-def _read_disk_cache_snapshot() -> dict[str, Any] | None:
-    if not USE_DISK_CACHE_ON_MISS:
+def _read_disk_cache_snapshot(*, allow_when_disabled: bool = False) -> dict[str, Any] | None:
+    if not allow_when_disabled and not USE_DISK_CACHE_ON_MISS:
         return None
     if DISK_CACHE_MAX_AGE_SECONDS <= 0:
         return None
@@ -2705,20 +2715,67 @@ def _read_disk_cache_snapshot() -> dict[str, Any] | None:
 
 
 def _write_disk_cache_snapshot(snapshot: dict[str, Any]) -> None:
+    global _SHARED_CACHE_LAST_MTIME_NS
     try:
         DISK_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = DISK_CACHE_PATH.with_suffix(f'{DISK_CACHE_PATH.suffix}.tmp')
+        temp_path = DISK_CACHE_PATH.with_suffix(
+            f'{DISK_CACHE_PATH.suffix}.{os.getpid()}.{threading.get_ident()}.tmp'
+        )
         temp_path.write_text(json.dumps(snapshot, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
         temp_path.replace(DISK_CACHE_PATH)
+        _SHARED_CACHE_LAST_MTIME_NS = DISK_CACHE_PATH.stat().st_mtime_ns
     except OSError:
         return
 
 
-def _refresh_application_cache_background() -> None:
+def sync_application_cache_from_shared_snapshot(*, force: bool = False) -> bool:
+    global _SHARED_CACHE_LAST_CHECKED_AT, _SHARED_CACHE_LAST_MTIME_NS
+
+    if SHARED_CACHE_SYNC_INTERVAL_SECONDS <= 0 and not force:
+        return False
+
+    now = time.monotonic()
+    with _SHARED_CACHE_SYNC_LOCK:
+        if (
+            not force
+            and _SHARED_CACHE_LAST_CHECKED_AT > 0
+            and (now - _SHARED_CACHE_LAST_CHECKED_AT) < SHARED_CACHE_SYNC_INTERVAL_SECONDS
+        ):
+            return False
+        _SHARED_CACHE_LAST_CHECKED_AT = now
+
+        try:
+            disk_mtime_ns = DISK_CACHE_PATH.stat().st_mtime_ns
+        except OSError:
+            return False
+
+        if not force and disk_mtime_ns <= _SHARED_CACHE_LAST_MTIME_NS:
+            return False
+
+        snapshot = _read_disk_cache_snapshot(allow_when_disabled=True)
+        if not snapshot:
+            _SHARED_CACHE_LAST_MTIME_NS = disk_mtime_ns
+            return False
+
+        with _DATA_CACHE_LOCK:
+            memory_loaded_at = float(_DATA_CACHE.get('loaded_at') or 0.0)
+        snapshot_loaded_at = float(snapshot.get('loaded_at') or 0.0)
+        _SHARED_CACHE_LAST_MTIME_NS = disk_mtime_ns
+        if not force and snapshot_loaded_at <= memory_loaded_at:
+            return False
+
+        with _LEAGUE_SUMMARY_CACHE_LOCK:
+            _LEAGUE_SUMMARY_CACHE.clear()
+        invalidate_page_cache()
+        _apply_cache_snapshot(snapshot, increment_version=True)
+        return True
+
+
+def schedule_application_cache_refresh(reason: str = 'background') -> bool:
     global _DATA_CACHE_REFRESH_IN_PROGRESS
     with _DATA_CACHE_REFRESH_LOCK:
         if _DATA_CACHE_REFRESH_IN_PROGRESS:
-            return
+            return False
         _DATA_CACHE_REFRESH_IN_PROGRESS = True
 
     def worker() -> None:
@@ -2726,12 +2783,27 @@ def _refresh_application_cache_background() -> None:
         try:
             refresh_application_cache(force_refresh=True)
         except Exception:
-            logging.getLogger(__name__).exception('Background application cache refresh failed')
+            logging.getLogger(__name__).exception(
+                'Background application cache refresh failed: %s',
+                reason,
+            )
         finally:
             with _DATA_CACHE_REFRESH_LOCK:
                 _DATA_CACHE_REFRESH_IN_PROGRESS = False
 
     threading.Thread(target=worker, daemon=True).start()
+    return True
+
+
+def _refresh_application_cache_background() -> None:
+    schedule_application_cache_refresh('stale_cache')
+
+
+def refresh_application_cache_after_write(reason: str = 'write') -> dict[str, Any] | None:
+    if CACHE_REFRESH_AFTER_WRITE_BACKGROUND:
+        schedule_application_cache_refresh(reason)
+        return None
+    return refresh_application_cache(force_refresh=True)
 
 
 def invalidate_application_cache() -> None:
@@ -5165,13 +5237,13 @@ def submit_match_result(
                 ],
             )
 
-        invalidate_application_cache()
         awarded_badges = []
         if ranked_match and match_league_id:
             awarded_badges = _sync_league_badges_after_ranked_match(
                 league_id=match_league_id,
                 match_id=match_row.get('id'),
             )
+        refresh_application_cache_after_write('submit_match')
 
         return {
             'match_id': match_row['id'],
@@ -5473,7 +5545,7 @@ def link_user_account_to_player(*, account_id: int, player_name: str) -> dict:
     if not rows:
         raise ValueError('Account not found.')
 
-    invalidate_application_cache()
+    refresh_application_cache_after_write('link_player_account')
     return fetch_user_account(clean_account_id, include_player_extras=False) or {}
 
 
@@ -5610,7 +5682,7 @@ def update_user_profile_settings(
             raise
         raise _user_profile_storage_error(exc) from None
 
-    invalidate_application_cache()
+    refresh_application_cache_after_write('update_user_profile')
     return fetch_user_account(clean_account_id, include_player_extras=False) or {}
 
 def fetch_player_admin(player_id: int) -> dict | None:
@@ -5681,7 +5753,7 @@ def update_player_admin(
     if not rows:
         raise ValueError('Player not found.')
 
-    invalidate_application_cache()
+    refresh_application_cache_after_write('update_player_admin')
     updated = fetch_player_admin(player_id)
     if not updated:
         raise ValueError('Player not found after update.')
@@ -6024,9 +6096,8 @@ def _rebuild_ratings_and_player_stats() -> None:
             filters=[('id', 'eq', player_id)],
         )
 
-    invalidate_application_cache()
     _sync_all_current_league_badges()
-    invalidate_page_cache()
+    refresh_application_cache_after_write('rebuild_ratings')
 
 
 def update_match_admin(
@@ -6145,7 +6216,6 @@ def update_match_admin(
     if not rows:
         raise ValueError('Match not found.')
 
-    invalidate_application_cache()
     _rebuild_ratings_and_player_stats()
 
     updated = fetch_match_admin(match_id)
@@ -6160,13 +6230,12 @@ def delete_match_admin(match_id: int) -> None:
 
     _rest_delete('rating_history', filters=[('match_id', 'eq', match_id)])
     _rest_delete('matches', filters=[('id', 'eq', match_id)])
-    invalidate_application_cache()
     _rebuild_ratings_and_player_stats()
 
 
 def rebuild_ratings_admin() -> dict:
     _rebuild_ratings_and_player_stats()
-    snapshot = refresh_application_cache(force_refresh=True)
+    snapshot = _cache_snapshot(force_refresh=False)
     return {
         'players_count': len(snapshot.get('players') or []),
         'matches_count': len(snapshot.get('matches') or []),

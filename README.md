@@ -34,7 +34,7 @@ The app exposes `POST /api/supabase/cache-webhook` to refresh the in-memory, pag
 Server env required:
 
 - `SUPABASE_WEBHOOK_SECRET` - shared secret used by the webhook request.
-- `APP_CACHE_REFRESH_BACKGROUND=0` - refresh synchronously so the next page/API request sees fresh data. Set to `1` only if the webhook starts timing out.
+- `APP_CACHE_REFRESH_BACKGROUND=1` - coalesce bursts of Supabase webhook calls and refresh without making Supabase wait.
 - `APP_HEALTH_CHECK_DB=1` - make `/health` verify Supabase access instead of only checking that Flask is running.
 
 Recommended cache env:
@@ -42,6 +42,8 @@ Recommended cache env:
 - `APP_BLOCKING_CACHE_LOAD_ON_MISS=1` - load live data synchronously on a cold process instead of serving an empty first response.
 - `APP_ALLOW_EMPTY_CACHE_ON_MISS=0` - keep cold processes from returning empty pages while a background refresh is still running.
 - `APP_USE_DISK_CACHE_ON_MISS=0` - do not use `app/.cache/application_data.json` as a startup data source unless you explicitly want an offline fallback.
+- `APP_SHARED_CACHE_SYNC_INTERVAL_SECONDS=5` - each Namecheap worker checks the shared local snapshot at most once every five seconds.
+- `APP_CACHE_REFRESH_AFTER_WRITE_BACKGROUND=0` - finish rebuilding the shared snapshot before a successful write request returns.
 - `APP_DISPLAY_VERSION=v2` - optional label shown in the site header; use it to confirm every page is running the same deployed build.
 
 Supabase setup:
@@ -49,6 +51,8 @@ Supabase setup:
 1. Set the same secret in the app env and in the webhook Authorization header as `Bearer <secret>`.
 2. Run `Tools/supabase_cache_webhook.sql` in Supabase SQL editor after replacing `REPLACE_WITH_SUPABASE_WEBHOOK_SECRET`.
 3. Test with `POST https://tmg-stats.org/api/supabase/cache-webhook` and the same Authorization header.
+
+Leaderboard, reports, and league pages request their API again every five seconds while the browser tab is visible. Those requests read the Namecheap cache; they do not download the full database from Supabase every five seconds.
 
 ## Player accounts and Google login
 

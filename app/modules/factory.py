@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Flask, request
 
+from app.database import sync_application_cache_from_shared_snapshot
 from .cache import warmup_cache_on_startup
 from .config import APP_DISPLAY_VERSION, ASSET_VERSION, BASE_DIR
 from .routes import account, admin, api, interactions, public, seo
@@ -15,6 +16,15 @@ def create_app() -> Flask:
         static_url_path='/static',
     )
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
+
+    @app.before_request
+    def sync_shared_application_cache() -> None:
+        if request.path.startswith('/static'):
+            return
+        try:
+            sync_application_cache_from_shared_snapshot()
+        except Exception:
+            app.logger.exception('Shared application cache sync failed')
 
     @app.context_processor
     def inject_asset_version() -> dict:

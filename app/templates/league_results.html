@@ -663,16 +663,25 @@ document.addEventListener('DOMContentLoaded', function () {
         applyState('base');
     })();
 
-    fetch('/api/leagues', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(function (response) {
-            return response.json().catch(function () {
-                return { ok: false, error: 'Could not parse league results response.' };
+    function fetchLeagueResults() {
+        fetch('/api/leagues', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (response) {
+                return response.json().catch(function () {
+                    return { ok: false, error: 'Could not parse league results response.' };
+                });
+            })
+            .then(renderPayload)
+            .catch(function () {
+                renderState('League results are unavailable', 'Could not load league results.', true);
             });
-        })
-        .then(renderPayload)
-        .catch(function () {
-            renderState('League results are unavailable', 'Could not load league results.', true);
-        });
+    }
+
+    fetchLeagueResults();
+    window.setInterval(function () {
+        if (document.visibilityState === 'visible') {
+            fetchLeagueResults();
+        }
+    }, 5000);
 });
 </script>
 {% endblock %}

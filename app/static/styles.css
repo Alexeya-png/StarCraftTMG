@@ -3801,6 +3801,7 @@ select option:checked {
     background-image: var(--profile-header-bg);
 }
 
+
 .profile-header-card-terran::before {
     background-image: url('/static/art/profile-banners/profile_back_terran.webp');
 }

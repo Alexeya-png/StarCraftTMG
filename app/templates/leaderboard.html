@@ -300,6 +300,11 @@ function fetchLeaderboard(pushHistory, showLoader) {
         syncStatusToggleClasses();
         syncActiveRankedButton();
         fetchLeaderboard(false);
+        window.setInterval(function () {
+            if (document.visibilityState === 'visible') {
+                fetchLeaderboard(false, false);
+            }
+        }, 5000);
     });
 })();
 </script>

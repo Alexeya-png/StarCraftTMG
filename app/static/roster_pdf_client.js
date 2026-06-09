@@ -185,11 +185,7 @@ function generatePrintLayout(state, dbUnits, dbCards, dbGameCards, currentSeed) 
 
     let unitsHtml = '';
     (state.roster || []).forEach((unit) => {
-        const displayUnitName =
-            String(unit.name || '').trim().toLowerCase() === 'marine' &&
-            String(unit.size || '').trim().toLowerCase() === 'large'
-                ? 'Special Forces'
-                : (unit.name || 'Unknown Unit');
+        const displayUnitName = unit.name || 'Unknown Unit';
 
         let upgradeCost = 0;
         const upgradesList = [];

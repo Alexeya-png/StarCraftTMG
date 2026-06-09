@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import hmac
 import os
-import threading
 from datetime import datetime, timezone
 
 from flask import current_app, request
 
-from app.database import refresh_application_cache
+from app.database import refresh_application_cache, schedule_application_cache_refresh
 from .config import CACHE_WARMUP_ON_STARTUP
 
 
@@ -37,17 +36,9 @@ def run_cache_refresh(reason: str = 'manual') -> dict:
 
 
 def run_cache_refresh_background(reason: str) -> None:
-    app = current_app._get_current_object()
-
-    def worker() -> None:
-        with app.app_context():
-            try:
-                run_cache_refresh(reason)
-            except Exception:
-                app.logger.exception('Cache refresh failed: %s', reason)
-
-    thread = threading.Thread(target=worker, daemon=True)
-    thread.start()
+    scheduled = schedule_application_cache_refresh(reason)
+    if not scheduled:
+        current_app.logger.info('Cache refresh already in progress: %s', reason)
 
 
 def warmup_cache_on_startup() -> None:

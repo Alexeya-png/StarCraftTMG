@@ -39,7 +39,7 @@ SUBMIT_NAME_SUGGESTION_LIMIT = int(os.getenv('SUBMIT_NAME_SUGGESTION_LIMIT', '20
 FEEDBACK_MESSAGE_MAX_LENGTH = 300
 
 CACHE_WARMUP_ON_STARTUP = (os.getenv('APP_WARMUP_ON_STARTUP') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
-CACHE_REFRESH_BACKGROUND = (os.getenv('APP_CACHE_REFRESH_BACKGROUND') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
+CACHE_REFRESH_BACKGROUND = (os.getenv('APP_CACHE_REFRESH_BACKGROUND') or '1').strip().lower() not in {'0', 'false', 'no', 'off'}
 APP_DISPLAY_VERSION = (os.getenv('APP_DISPLAY_VERSION') or 'v2').strip() or 'v2'
 
 
