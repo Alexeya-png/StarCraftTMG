@@ -82,6 +82,11 @@ document.addEventListener('DOMContentLoaded', function () {
         search: {{ search|tojson }},
         rankedOnly: {{ 'true' if show_ranked_only else 'false' }}
     };
+    const refreshBaseDelay = 5000;
+    const refreshMaxDelay = 60000;
+    let refreshDelay = refreshBaseDelay;
+    let lastCacheToken = '';
+    let requestInFlight = false;
 
     function escapeHtml(value) {
         return String(value || '')
@@ -263,16 +268,20 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<a class="game-report-seed-link" href="#" data-roster-download="' + escapeHtml(cleanRosterId) + '" title="Download roster PDF">[' + escapeHtml(cleanRosterId) + ']</a>';
     }
 
-    function renderPlayerCell(playerName, profileUrl, raceLabel, rosterId, tieBadgeHtml, withResult) {
+    function renderPlayerCell(playerName, profileUrl, raceLabel, rosterId, tieBadgeHtml, withResult, isSupporter) {
         const raceHtml = renderRaceIcon(raceLabel || '');
         const seedHtml = renderRosterSeedInline(rosterId || '');
         const badgeHtml = withResult ? (tieBadgeHtml || '') : '';
+        const supporterHtml = isSupporter
+            ? '<img class="supporter-inline-badge" src="/static/art/supporter-badges/supporter-planet.svg" alt="" title="TMG Stats Supporter">'
+            : '';
 
         return '<div class="game-report-player-cell">'
             + '<div class="game-report-player-meta">'
             + '<div class="game-report-player-main">'
             + raceHtml
             + '<a class="player-profile-link" href="' + escapeHtml(profileUrl || '#') + '"><span class="player-name sc2-player-name">' + escapeHtml(playerName || '') + '</span></a>'
+            + supporterHtml
             + '</div>'
             + seedHtml
             + '</div>'
@@ -324,7 +333,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 match.winner_race || '',
                 match.winner_roster_id || '',
                 tieBadge,
-                true
+                true,
+                Boolean(match.winner_is_supporter)
             );
 
             const loserPlayerCell = renderPlayerCell(
@@ -333,7 +343,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 match.loser_race || '',
                 match.loser_roster_id || '',
                 '',
-                false
+                false,
+                Boolean(match.loser_is_supporter)
             );
 
             return '<tr' + rowClass + '>'
@@ -723,33 +734,68 @@ document.addEventListener('DOMContentLoaded', function () {
         content.scrollLeft = 0;
     }
 
-    function fetchReports(pushHistory, showLoader) {
+    function fetchReports(pushHistory, showLoader, checkOnly) {
+        if (requestInFlight) {
+            return Promise.resolve();
+        }
+        requestInFlight = true;
+
         if (showLoader !== false) {
             renderLoading();
         }
-        const apiUrl = '/api/reports?' + buildQueryString();
+        const apiParams = new URLSearchParams(buildQueryString());
+        if (checkOnly && lastCacheToken) {
+            apiParams.set('cache_token', lastCacheToken);
+        }
+        const apiUrl = '/api/reports?' + apiParams.toString();
 
-        fetch(apiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        return fetch(apiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function (response) {
                 return response.json().catch(function () {
                     return { ok: false, error: 'Could not parse reports response.' };
                 });
             })
             .then(function (payload) {
+                if (payload && payload.cache_token) {
+                    lastCacheToken = String(payload.cache_token);
+                }
+                if (payload && payload.unchanged) {
+                    refreshDelay = refreshBaseDelay;
+                    return;
+                }
                 if (payload && payload.ok) {
                     state.page = Number(payload.current_page || state.page || 1);
                     state.perPage = Number(payload.per_page || state.perPage || 25);
                 }
                 renderReports(payload);
+                refreshDelay = payload && payload.ok
+                    ? refreshBaseDelay
+                    : Math.min(refreshMaxDelay, refreshDelay * 2);
                 if (pushHistory) {
                     window.history.pushState({}, '', '/reports?' + buildQueryString());
                     resetReportScroll();
                 }
             })
             .catch(function () {
-                countNode.textContent = '0 matches shown';
-                renderState('Database connection error', 'Could not load match reports.', true);
+                refreshDelay = Math.min(refreshMaxDelay, refreshDelay * 2);
+                if (!checkOnly) {
+                    countNode.textContent = '0 matches shown';
+                    renderState('Database connection error', 'Could not load match reports.', true);
+                }
+            })
+            .finally(function () {
+                requestInFlight = false;
             });
+    }
+
+    function scheduleReportsRefresh() {
+        window.setTimeout(function () {
+            if (document.visibilityState !== 'visible' || rosterPdfCache.activeSeed) {
+                scheduleReportsRefresh();
+                return;
+            }
+            fetchReports(false, false, true).finally(scheduleReportsRefresh);
+        }, refreshDelay);
     }
 
     (reportsShell || content).addEventListener('click', function (event) {
@@ -789,12 +835,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fetchReports(false);
     });
 
-    fetchReports(false);
-    window.setInterval(function () {
-        if (document.visibilityState === 'visible' && !rosterPdfCache.activeSeed) {
-            fetchReports(false, false);
-        }
-    }, 5000);
+    fetchReports(false).finally(scheduleReportsRefresh);
 });
 </script>
 {% endblock %}

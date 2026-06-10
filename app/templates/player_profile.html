@@ -131,6 +131,9 @@
                         <img class="profile-race-icon" src="/static/Race/{{ race_slug }}.svg" alt="{{ player.priority_race }} icon">
                         {% endif %}
                         <h1 class="profile-player-name{% if player.name_color %} is-custom-name-color{% endif %}"{% if player.name_color %} style="--player-name-color: {{ player.name_color }}; color: {{ player.name_color }}"{% endif %}>{{ player.name }}</h1>
+                        {% if player.is_supporter %}
+                        <img class="supporter-inline-badge profile-supporter-badge" src="/static/art/supporter-badges/supporter-planet.svg" alt="" title="TMG Stats Supporter">
+                        {% endif %}
                         {% if player.badges %}
                         <div class="profile-name-badges" aria-label="Player achievements">
                             {% for badge in player.badges %}
@@ -534,6 +537,9 @@
                                             <img class="race-inline-icon" src="/static/Race/{{ opponent_race_slug }}.svg" alt="{{ match.opponent_race }} icon">
                                             {% endif %}
                                             <a class="game-report-player-name-link player-profile-link" href="{{ match.opponent_profile_url }}"><span class="player-name sc2-player-name">{{ match.opponent_name }}</span></a>
+                                            {% if match.opponent_is_supporter %}
+                                            <img class="supporter-inline-badge" src="/static/art/supporter-badges/supporter-planet.svg" alt="" title="TMG Stats Supporter">
+                                            {% endif %}
                                         </div>
                                         {% if match.opponent_roster_id %}
                                         <a class="game-report-seed-link" href="/roster-pdf-test?seed={{ match.opponent_roster_id }}&autostart=1" data-roster-download="{{ match.opponent_roster_id }}" title="Download roster PDF">[{{ match.opponent_roster_id }}]</a>

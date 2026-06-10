@@ -53,6 +53,46 @@ Supabase setup:
 3. Test with `POST https://tmg-stats.org/api/supabase/cache-webhook` and the same Authorization header.
 
 Leaderboard, reports, and league pages request their API again every five seconds while the browser tab is visible. Those requests read the Namecheap cache; they do not download the full database from Supabase every five seconds.
+The browser sends the current cache token, so an unchanged response is very small. Requests never overlap, hidden tabs pause polling, and failures progressively back off to one request per minute.
+
+Default application rate limits:
+
+- `APP_LIVE_API_RATE_LIMIT_PER_MINUTE=600` - about 50 polling tabs behind one public IP at the five-second interval.
+- `APP_MATCH_SUBMIT_RATE_LIMIT_PER_HOUR=20`
+- `APP_TTS_SUBMIT_RATE_LIMIT_PER_HOUR=120`
+- `APP_FEEDBACK_RATE_LIMIT_PER_HOUR=10`
+- `APP_SUPPORT_CHECKOUT_RATE_LIMIT_PER_MINUTE=20`
+- `APP_WEBHOOK_RATE_LIMIT_PER_MINUTE=120`
+- `APP_AUTH_RATE_LIMIT_PER_TEN_MINUTES=30`
+- `APP_PROTECTED_WRITE_RATE_LIMIT_PER_FIVE_MINUTES=60`
+
+These in-process limits protect against accidental bursts and basic abuse. Put Cloudflare or another edge WAF in front of the shared hosting for DDoS protection and globally enforced limits.
+
+## Stripe project support
+
+The site exposes `/support` with one-time EUR support options and redirects payment details to Stripe Checkout.
+
+For the complete Stripe, Supabase, cPanel, and test-payment setup in Russian, see `STRIPE_SUPPORT_SETUP_RU.md`.
+
+Required server env:
+
+```dotenv
+STRIPE_SECRET_KEY=sk_live_replace_me
+STRIPE_WEBHOOK_SECRET=whsec_replace_me
+SITE_URL=https://tmg-stats.org
+```
+
+Supporter badge setup:
+
+1. Run `Tools/add_supporter_badges.sql` in the Supabase SQL editor.
+2. In Stripe Dashboard, add `https://tmg-stats.org/api/stripe/webhook` as a webhook endpoint.
+3. Subscribe it to `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
+4. Put the endpoint signing secret in `STRIPE_WEBHOOK_SECRET`.
+
+After a paid Checkout session, the selected existing player receives the planet supporter badge. If the donor is signed in with a Google account linked to a player, that linked player is selected automatically.
+The server must use `SUPABASE_SERVICE_ROLE_KEY`; the public anon key cannot call the badge-award database function.
+
+Configure payout bank details only in Stripe Dashboard. Never store the Stripe secret key or bank account details in the repository.
 
 ## Player accounts and Google login
 

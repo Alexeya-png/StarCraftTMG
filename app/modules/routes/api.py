@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from app.database import MatchSubmissionRateLimitError, fetch_league_results_overview, rebuild_ratings_admin, submit_tts_match_result
+from app.database import MatchSubmissionRateLimitError, fetch_league_results_overview, get_application_cache_token, rebuild_ratings_admin, submit_tts_match_result
 from app.modules.auth import is_admin
 from app.modules.cache import is_valid_supabase_webhook_request, run_cache_refresh, run_cache_refresh_background
 from app.modules.config import CACHE_REFRESH_BACKGROUND
@@ -10,6 +10,15 @@ from app.modules.payloads import _leaderboard_payload, _parse_leaderboard_filter
 from app.modules.tts import _coerce_tts_game_type, _parse_tts_request_payload, get_tts_submit_token
 
 bp = Blueprint('api', __name__)
+
+
+def _unchanged_cache_payload():
+    cache_token = get_application_cache_token()
+    known_token = str(request.args.get('cache_token') or '').strip()
+    if cache_token != '0' and known_token and known_token == cache_token:
+        return jsonify({'ok': True, 'unchanged': True, 'cache_token': cache_token})
+    return None
+
 
 @bp.route('/admin/cache/refresh', methods=['POST'])
 def admin_cache_refresh():
@@ -68,6 +77,10 @@ def supabase_cache_webhook():
 
 @bp.route('/api/leaderboard', methods=['GET'])
 def leaderboard_api():
+    unchanged_response = _unchanged_cache_payload()
+    if unchanged_response is not None:
+        return unchanged_response
+
     search, show_active, show_inactive, show_active_ranked, _ = _parse_leaderboard_filters()
     payload, db_error = _leaderboard_payload(
         search=search,
@@ -78,10 +91,15 @@ def leaderboard_api():
     status_code = 200 if payload.get('ok') else 500
     if db_error:
         payload['error'] = db_error
+    payload['cache_token'] = get_application_cache_token()
     return jsonify(payload), status_code
 
 @bp.route('/api/reports', methods=['GET'])
 def reports_api():
+    unchanged_response = _unchanged_cache_payload()
+    if unchanged_response is not None:
+        return unchanged_response
+
     current_page = max(1, request.args.get('page', 1, type=int) or 1)
     per_page = max(1, min(request.args.get('per_page', 25, type=int) or 25, 100))
     search = request.args.get('search', '')
@@ -95,13 +113,24 @@ def reports_api():
     status_code = 200 if payload.get('ok') else 500
     if db_error:
         payload['error'] = db_error
+    payload['cache_token'] = get_application_cache_token()
     return jsonify(payload), status_code
 
 @bp.route('/api/leagues', methods=['GET'])
 def league_results_api():
+    unchanged_response = _unchanged_cache_payload()
+    if unchanged_response is not None:
+        return unchanged_response
+
     try:
         league_sections = fetch_league_results_overview()
-        return jsonify({'ok': True, 'league_sections': league_sections})
+        return jsonify(
+            {
+                'ok': True,
+                'league_sections': league_sections,
+                'cache_token': get_application_cache_token(),
+            }
+        )
     except Exception as exc:
         return jsonify({'ok': False, 'league_sections': [], 'error': str(exc)}), 500
 

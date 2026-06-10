@@ -391,6 +391,11 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const content = document.querySelector('[data-leagues-content]');
+    const refreshBaseDelay = 5000;
+    const refreshMaxDelay = 60000;
+    let refreshDelay = refreshBaseDelay;
+    let lastCacheToken = '';
+    let requestInFlight = false;
 
     function escapeHtml(value) {
         return String(value || '')
@@ -432,11 +437,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const cleanNameColor = /^#[0-9A-Fa-f]{6}$/.test(String(player.name_color || '')) ? String(player.name_color) : '';
         const nameClass = cleanNameColor ? 'league-player-name is-custom-name-color' : 'league-player-name';
         const nameStyle = cleanNameColor ? ' style="--player-name-color:' + escapeHtml(cleanNameColor) + '; color:' + escapeHtml(cleanNameColor) + '"' : '';
+        const supporterHtml = player.is_supporter
+            ? '<img class="supporter-inline-badge" src="/static/art/supporter-badges/supporter-planet.svg" alt="" title="TMG Stats Supporter">'
+            : '';
 
         return '<span class="league-player-identity ' + escapeHtml(extraClass || '') + '">'
             + flagHtml
             + raceHtml
             + '<span class="' + nameClass + '"' + nameStyle + '>' + escapeHtml(player.name || '') + '</span>'
+            + supporterHtml
             + '</span>';
     }
 
@@ -663,25 +672,59 @@ document.addEventListener('DOMContentLoaded', function () {
         applyState('base');
     })();
 
-    function fetchLeagueResults() {
-        fetch('/api/leagues', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    function fetchLeagueResults(checkOnly) {
+        if (requestInFlight) {
+            return Promise.resolve();
+        }
+        requestInFlight = true;
+
+        const params = new URLSearchParams();
+        if (checkOnly && lastCacheToken) {
+            params.set('cache_token', lastCacheToken);
+        }
+        const apiUrl = '/api/leagues' + (params.toString() ? '?' + params.toString() : '');
+
+        return fetch(apiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function (response) {
                 return response.json().catch(function () {
                     return { ok: false, error: 'Could not parse league results response.' };
                 });
             })
-            .then(renderPayload)
+            .then(function (payload) {
+                if (payload && payload.cache_token) {
+                    lastCacheToken = String(payload.cache_token);
+                }
+                if (payload && payload.unchanged) {
+                    refreshDelay = refreshBaseDelay;
+                    return;
+                }
+                renderPayload(payload);
+                refreshDelay = payload && payload.ok
+                    ? refreshBaseDelay
+                    : Math.min(refreshMaxDelay, refreshDelay * 2);
+            })
             .catch(function () {
-                renderState('League results are unavailable', 'Could not load league results.', true);
+                refreshDelay = Math.min(refreshMaxDelay, refreshDelay * 2);
+                if (!checkOnly) {
+                    renderState('League results are unavailable', 'Could not load league results.', true);
+                }
+            })
+            .finally(function () {
+                requestInFlight = false;
             });
     }
 
-    fetchLeagueResults();
-    window.setInterval(function () {
-        if (document.visibilityState === 'visible') {
-            fetchLeagueResults();
-        }
-    }, 5000);
+    function scheduleLeagueRefresh() {
+        window.setTimeout(function () {
+            if (document.visibilityState !== 'visible') {
+                scheduleLeagueRefresh();
+                return;
+            }
+            fetchLeagueResults(true).finally(scheduleLeagueRefresh);
+        }, refreshDelay);
+    }
+
+    fetchLeagueResults(false).finally(scheduleLeagueRefresh);
 });
 </script>
 {% endblock %}

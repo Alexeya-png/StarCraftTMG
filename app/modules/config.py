@@ -41,6 +41,20 @@ FEEDBACK_MESSAGE_MAX_LENGTH = 300
 CACHE_WARMUP_ON_STARTUP = (os.getenv('APP_WARMUP_ON_STARTUP') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
 CACHE_REFRESH_BACKGROUND = (os.getenv('APP_CACHE_REFRESH_BACKGROUND') or '1').strip().lower() not in {'0', 'false', 'no', 'off'}
 APP_DISPLAY_VERSION = (os.getenv('APP_DISPLAY_VERSION') or 'v2').strip() or 'v2'
+LIVE_API_RATE_LIMIT_PER_MINUTE = max(0, int(os.getenv('APP_LIVE_API_RATE_LIMIT_PER_MINUTE', '600') or '600'))
+MATCH_SUBMIT_RATE_LIMIT_PER_HOUR = max(0, int(os.getenv('APP_MATCH_SUBMIT_RATE_LIMIT_PER_HOUR', '20') or '20'))
+TTS_SUBMIT_RATE_LIMIT_PER_HOUR = max(0, int(os.getenv('APP_TTS_SUBMIT_RATE_LIMIT_PER_HOUR', '120') or '120'))
+FEEDBACK_RATE_LIMIT_PER_HOUR = max(0, int(os.getenv('APP_FEEDBACK_RATE_LIMIT_PER_HOUR', '10') or '10'))
+SUPPORT_CHECKOUT_RATE_LIMIT_PER_MINUTE = max(
+    0,
+    int(os.getenv('APP_SUPPORT_CHECKOUT_RATE_LIMIT_PER_MINUTE', '20') or '20'),
+)
+WEBHOOK_RATE_LIMIT_PER_MINUTE = max(0, int(os.getenv('APP_WEBHOOK_RATE_LIMIT_PER_MINUTE', '120') or '120'))
+AUTH_RATE_LIMIT_PER_TEN_MINUTES = max(0, int(os.getenv('APP_AUTH_RATE_LIMIT_PER_TEN_MINUTES', '30') or '30'))
+PROTECTED_WRITE_RATE_LIMIT_PER_FIVE_MINUTES = max(
+    0,
+    int(os.getenv('APP_PROTECTED_WRITE_RATE_LIMIT_PER_FIVE_MINUTES', '60') or '60'),
+)
 
 
 def _build_asset_version() -> str:

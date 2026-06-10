@@ -10,6 +10,7 @@ from app.database import (
     fetch_player_name_suggestions,
 )
 from .auth import is_admin
+from .rate_limit import client_ip_address
 from .config import (
     ADMIN_MATCH_RACE_OPTIONS,
     DEFAULT_MISSION_OPTIONS,
@@ -122,10 +123,7 @@ def _build_feedback_form_state(raw_values: dict | None = None) -> dict:
     }
 
 def _client_ip_address() -> str:
-    forwarded_for = str(request.headers.get('X-Forwarded-For', '')).strip()
-    if forwarded_for:
-        return forwarded_for.split(',', 1)[0].strip()
-    return str(request.remote_addr or '').strip()
+    return client_ip_address()
 
 def _render_feedback_page(
         *,

@@ -50,6 +50,14 @@ def _google_oauth_enabled() -> bool:
     return bool(_google_client_id() and _google_client_secret())
 
 
+def _secure_cookie_enabled() -> bool:
+    configured = str(os.getenv('SESSION_COOKIE_SECURE') or '').strip().lower()
+    if configured:
+        return configured not in {'0', 'false', 'no', 'off'}
+    hostname = str(request.host or '').split(':', 1)[0].strip().lower()
+    return hostname not in {'localhost', '127.0.0.1', '::1'}
+
+
 def _oauth_error(message: str):
     return redirect('/login?error=' + urllib_parse.quote(message), code=303)
 
@@ -210,7 +218,7 @@ def google_auth_start():
         max_age=10 * 60,
         httponly=True,
         samesite='Lax',
-        secure=False,
+        secure=_secure_cookie_enabled(),
         path='/',
     )
     return response
@@ -247,7 +255,7 @@ def google_auth_callback():
         max_age=USER_SESSION_DAYS * 24 * 60 * 60,
         httponly=True,
         samesite='Lax',
-        secure=False,
+        secure=_secure_cookie_enabled(),
         path='/',
     )
     response.delete_cookie(GOOGLE_OAUTH_STATE_COOKIE_NAME, path='/')
@@ -339,7 +347,7 @@ def account_page_post():
         max_age=USER_SESSION_DAYS * 24 * 60 * 60,
         httponly=True,
         samesite='Lax',
-        secure=False,
+        secure=_secure_cookie_enabled(),
         path='/',
     )
     return response

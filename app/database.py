@@ -212,6 +212,7 @@ FEEDBACK_TABLE_NAME = 'admin_feedback_messages'
 USER_ACCOUNTS_TABLE_NAME = 'user_accounts'
 PLAYER_ALIASES_TABLE_NAME = 'player_aliases'
 PLAYER_RACE_RATINGS_TABLE_NAME = 'player_race_ratings'
+SUPPORTER_PAYMENTS_TABLE_NAME = 'supporter_payments'
 MATCH_RATING_SCOPE_GLOBAL = 'global'
 MATCH_RATING_SCOPE_RACE = 'race'
 MATCH_RATING_SCOPES = (MATCH_RATING_SCOPE_GLOBAL, MATCH_RATING_SCOPE_RACE)
@@ -395,6 +396,12 @@ MATCH_META_PATTERN = re.compile(r'^\[\[match_meta:(\{.*?\})\]\]\s*', re.DOTALL)
 def _get_data_cache_version() -> int:
     with _DATA_CACHE_LOCK:
         return int(_DATA_CACHE.get('version') or 0)
+
+
+def get_application_cache_token() -> str:
+    with _DATA_CACHE_LOCK:
+        loaded_at = float(_DATA_CACHE.get('loaded_at') or 0.0)
+    return str(max(0, int(loaded_at * 1000)))
 
 
 
@@ -984,6 +991,20 @@ def _is_missing_user_profile_table_error(exc: Exception) -> bool:
         or 'offrace_protoss_enabled' in message
         or 'offrace_zerg_enabled' in message
         or 'ladder_rating_race' in message
+    )
+
+
+def _is_missing_supporter_schema_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        'supporter_since' in message
+        or SUPPORTER_PAYMENTS_TABLE_NAME in message
+        or 'confirm_supporter_payment' in message
+    ) and (
+        'schema cache' in message
+        or 'could not find' in message
+        or 'does not exist' in message
+        or 'not found' in message
     )
 
 
@@ -1950,6 +1971,7 @@ def _prepare_league_player_card(row: dict | None) -> dict | None:
     prepared['points_display'] = _format_league_points(prepared.get('points'))
     prepared['win_rate_display'] = _format_percent(prepared.get('win_rate_numeric'))
     prepared['record_display'] = f"{int(prepared.get('wins') or 0)}-{int(prepared.get('losses') or 0)}"
+    prepared['is_supporter'] = bool(_normalize_text(prepared.get('supporter_since')))
     if int(prepared.get('draws') or 0) > 0:
         prepared['record_display'] += f"-{int(prepared.get('draws') or 0)}"
     prepared['matches_label'] = f"{int(prepared.get('matches_count') or 0)} match"
@@ -1997,6 +2019,7 @@ def _build_league_results_summary(league: dict) -> dict:
                 'country_code': _resolve_country_code(base_player.get('country_code'), base_player.get('country_name')),
                 'country_name': _resolve_country_name(base_player.get('country_code'), base_player.get('country_name')),
                 'name_color': _normalize_profile_color(base_player.get('name_color')),
+                'supporter_since': _normalize_text(base_player.get('supporter_since')),
                 'matches_count': 0,
                 'wins': 0,
                 'losses': 0,
@@ -2971,6 +2994,8 @@ def _prepare_player_row(row: dict) -> dict:
     player['ladder_show_flag'] = _coerce_ladder_visibility(player.get('ladder_show_flag'), default=True)
     player['ladder_show_aliases'] = _coerce_ladder_visibility(player.get('ladder_show_aliases'), default=False)
     player['ladder_show_badges'] = _coerce_ladder_visibility(player.get('ladder_show_badges'), default=True)
+    player['supporter_since'] = _normalize_text(player.get('supporter_since'))
+    player['is_supporter'] = bool(player['supporter_since'])
     for race_slug in RACE_DISPLAY_LABEL_BY_SLUG:
         player[f'offrace_{race_slug}_enabled'] = _coerce_ladder_visibility(
             player.get(f'offrace_{race_slug}_enabled'),
@@ -3641,7 +3666,7 @@ def _fetch_players_by_ids(player_ids: list[int]) -> dict[int, dict]:
         return cached
     rows = _rest_select(
         'players',
-        select='id,name,priority_race,country_code,country_name,current_elo',
+        select='id,name,priority_race,country_code,country_name,current_elo,supporter_since',
         filters=[('id', 'in', unique_ids)],
     )
     return {int(row['id']): dict(row) for row in rows}
@@ -3849,8 +3874,10 @@ def _fetch_game_reports_page_uncached(search: str = '', page: int = 1, per_page:
             'played_at': match.get('played_at'),
             'winner_id': winner_id,
             'winner_name': winner_name,
+            'winner_is_supporter': bool(_normalize_text((winner_player or {}).get('supporter_since'))),
             'loser_id': loser_id,
             'loser_name': loser_name,
+            'loser_is_supporter': bool(_normalize_text((loser_player or {}).get('supporter_since'))),
             'winner_race': winner_race,
             'loser_race': loser_race,
             'winner_is_offrace': bool(winner_priority_race and winner_race_label and winner_priority_race != winner_race_label),
@@ -4528,6 +4555,7 @@ def _fetch_player_profile_uncached(player_id: int, recent_matches_limit: int = 2
             'played_at': match.get('played_at'),
             'opponent_id': opponent_id,
             'opponent_name': _normalize_player_name(opponent.get('name')),
+            'opponent_is_supporter': bool(_normalize_text(opponent.get('supporter_since'))),
             'result_label': result_label,
             'is_win': is_win,
             'is_loss': is_loss,
@@ -4632,6 +4660,118 @@ def _rest_get_player_by_name_key(name_key: str) -> dict | None:
 
 def _rest_get_player_by_id(player_id: int) -> dict | None:
     return _rest_select('players', filters=[('id', 'eq', player_id)], single=True)
+
+
+def resolve_existing_player_for_support(player_name: str) -> dict:
+    clean_player_name = _normalize_player_name(player_name)
+    if not clean_player_name:
+        raise ValueError('Choose your player nickname.')
+
+    normalized_key = _normalize_player_key(clean_player_name)
+    player = _rest_get_player_by_name_key(normalized_key)
+    if not player:
+        alias = _rest_get_player_alias_by_key(normalized_key)
+        alias_player_id = _coerce_positive_int((alias or {}).get('player_id'))
+        if alias_player_id:
+            player = _rest_get_player_by_id(alias_player_id)
+
+    if not player:
+        raise ValueError('Choose an existing player from the list.')
+
+    return _prepare_player_row(player)
+
+
+def fetch_support_payment_by_session(checkout_session_id: str) -> dict | None:
+    clean_session_id = _normalize_text(checkout_session_id)
+    if not clean_session_id:
+        return None
+
+    try:
+        payment = _rest_select(
+            SUPPORTER_PAYMENTS_TABLE_NAME,
+            filters=[('stripe_checkout_session_id', 'eq', clean_session_id)],
+            single=True,
+        )
+    except Exception as exc:
+        if _is_missing_supporter_schema_error(exc):
+            raise RuntimeError(
+                'Supporter badge storage is not ready. Run Tools/add_supporter_badges.sql in Supabase.'
+            ) from None
+        raise
+
+    if not payment:
+        return None
+
+    prepared = dict(payment)
+    prepared['player_id'] = int(prepared.get('player_id') or 0)
+    prepared['account_id'] = _coerce_positive_int(prepared.get('account_id'))
+    prepared['amount_total'] = int(prepared.get('amount_total') or 0)
+    prepared['player'] = None
+    if prepared['player_id']:
+        player = _rest_get_player_by_id(prepared['player_id'])
+        if player:
+            prepared['player'] = _prepare_player_row(player)
+    return prepared
+
+
+def confirm_supporter_payment(
+    *,
+    checkout_session_id: str,
+    payment_intent_id: str,
+    player_id: int,
+    account_id: int | None,
+    amount_total: int,
+    currency: str,
+    customer_email: str,
+    confirmed_at: str,
+) -> dict:
+    clean_session_id = _normalize_text(checkout_session_id)
+    clean_player_id = _coerce_positive_int(player_id)
+    clean_currency = _normalize_text(currency).lower()
+    if not clean_session_id:
+        raise ValueError('Stripe checkout session id is required.')
+    if not clean_player_id:
+        raise ValueError('Selected player is invalid.')
+    if clean_currency != 'eur':
+        raise ValueError('Unexpected payment currency.')
+    if int(amount_total or 0) not in {200, 500, 1000}:
+        raise ValueError('Unexpected payment amount.')
+
+    payload = {
+        'p_checkout_session_id': clean_session_id,
+        'p_payment_intent_id': _normalize_text(payment_intent_id) or None,
+        'p_player_id': int(clean_player_id),
+        'p_account_id': _coerce_positive_int(account_id),
+        'p_amount_total': int(amount_total),
+        'p_currency': clean_currency,
+        'p_customer_email': _normalize_text(customer_email) or None,
+        'p_confirmed_at': _normalize_text(confirmed_at) or datetime.utcnow().isoformat(),
+    }
+
+    try:
+        rows = _supabase_request(
+            'POST',
+            '/rest/v1/rpc/confirm_supporter_payment',
+            payload=payload,
+        )
+    except Exception as exc:
+        if _is_missing_supporter_schema_error(exc):
+            raise RuntimeError(
+                'Supporter badge storage is not ready. Run Tools/add_supporter_badges.sql in Supabase.'
+            ) from None
+        raise
+
+    row = rows[0] if isinstance(rows, list) and rows else rows
+    if not isinstance(row, dict):
+        raise RuntimeError('Supporter badge confirmation returned no player.')
+
+    refresh_application_cache_after_write('supporter_badge_awarded')
+    return {
+        'player_id': int(row.get('awarded_player_id') or clean_player_id),
+        'player_name': _normalize_player_name(row.get('awarded_player_name')),
+        'supporter_since': _normalize_text(row.get('awarded_supporter_since')),
+        'already_recorded': bool(row.get('already_recorded')),
+    }
 
 
 def _compute_player_rank_position(player_id: int) -> int | str:

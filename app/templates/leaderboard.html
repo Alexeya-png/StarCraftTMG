@@ -87,6 +87,11 @@
         const noticeOk = document.getElementById('appNoticeOk');
         const noticeStorageKey = 'seen_leaderboard-profile-flag-notice-v1';
         const isAdmin = {{ 'true' if is_admin else 'false' }};
+        const refreshBaseDelay = 5000;
+        const refreshMaxDelay = 60000;
+        let refreshDelay = refreshBaseDelay;
+        let lastCacheToken = '';
+        let requestInFlight = false;
 
         function escapeHtml(value) {
             return String(value || '')
@@ -153,6 +158,9 @@
 
             const rows = players.map(function (player) {
                 const flagHtml = player.flag_url ? '<img class="country-flag-image player-flag" src="' + escapeHtml(player.flag_url) + '" alt="">' : '';
+                const supporterHtml = player.is_supporter
+                    ? '<img class="supporter-inline-badge" src="/static/art/supporter-badges/supporter-planet.svg" alt="" title="TMG Stats Supporter">'
+                    : '';
                 const raceSlug = String(player.leaderboard_race_slug || player.priority_race_slug || '').trim().toLowerCase();
                 const raceHtml = ['terran', 'protoss', 'zerg'].includes(raceSlug)
                     ? '<img class="race-inline-icon" src="/static/Race/' + raceSlug + '.svg" alt="' + escapeHtml(player.leaderboard_race || player.priority_race || '') + ' icon" title="' + escapeHtml(player.leaderboard_rating_label || '') + '">'
@@ -161,7 +169,7 @@
                 return '<tr class="leaderboard-row-link" data-href="' + escapeHtml(player.profile_url || '#') + '" tabindex="0" aria-label="Open ' + escapeHtml(player.name || 'player') + ' profile">'
                     + '<td class="value-rank">' + escapeHtml(player.rank_position) + '</td>'
                     + '<td class="value-elo">' + escapeHtml(player.current_elo_display || player.current_elo || '') + '</td>'
-                    + '<td class="value-player"><a class="player-profile-link" href="' + escapeHtml(player.profile_url || '#') + '"><div class="sc2-player-inline polished-player-inline">' + flagHtml + raceHtml + '<span class="player-name-stack"><span class="player-name sc2-player-name">' + escapeHtml(player.name || '') + '</span></span></div></a></td>'
+                    + '<td class="value-player"><a class="player-profile-link" href="' + escapeHtml(player.profile_url || '#') + '"><div class="sc2-player-inline polished-player-inline">' + flagHtml + raceHtml + '<span class="player-name-stack"><span class="player-name sc2-player-name">' + escapeHtml(player.name || '') + '</span></span>' + supporterHtml + '</div></a></td>'
                     + '<td class="value-games-all">' + escapeHtml(player.matches_count || 0) + '</td>'
                     + '<td class="value-winrate">' + escapeHtml(player.win_rate_display || player.win_rate || '') + '</td>'
                     + '<td class="value-wins col-divider-left">' + escapeHtml(player.wins || 0) + '</td>'
@@ -183,7 +191,12 @@
                 + '</table>';
         }
 
-function fetchLeaderboard(pushHistory, showLoader) {
+function fetchLeaderboard(pushHistory, showLoader, checkOnly) {
+    if (requestInFlight) {
+        return Promise.resolve();
+    }
+    requestInFlight = true;
+
     if (showLoader !== false) {
         renderLoading();
     }
@@ -191,25 +204,56 @@ function fetchLeaderboard(pushHistory, showLoader) {
                 syncStatusToggleClasses();
                 syncActiveRankedButton();
                 const queryString = buildQueryString();
-                const apiUrl = '/api/leaderboard' + (queryString ? '?' + queryString : '');
+                const apiParams = new URLSearchParams(queryString);
+                if (checkOnly && lastCacheToken) {
+                    apiParams.set('cache_token', lastCacheToken);
+                }
+                const apiQueryString = apiParams.toString();
+                const apiUrl = '/api/leaderboard' + (apiQueryString ? '?' + apiQueryString : '');
                 const pageUrl = '/leaderboard' + (queryString ? '?' + queryString : '');
 
-                fetch(apiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                return fetch(apiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                     .then(function (response) {
                     return response.json().catch(function () {
                         return { ok: false, error: 'Could not parse leaderboard response.' };
                     });
                 })
                 .then(function (payload) {
+                    if (payload && payload.cache_token) {
+                        lastCacheToken = String(payload.cache_token);
+                    }
+                    if (payload && payload.unchanged) {
+                        refreshDelay = refreshBaseDelay;
+                        return;
+                    }
                     renderLeaderboard(payload);
+                    refreshDelay = payload && payload.ok
+                        ? refreshBaseDelay
+                        : Math.min(refreshMaxDelay, refreshDelay * 2);
                     if (pushHistory) {
                         window.history.replaceState({}, '', pageUrl);
                     }
                 })
                 .catch(function () {
-                    countNode.textContent = '0 players shown';
-                    renderState('Database connection error', 'Could not load the leaderboard.', true);
+                    refreshDelay = Math.min(refreshMaxDelay, refreshDelay * 2);
+                    if (!checkOnly) {
+                        countNode.textContent = '0 players shown';
+                        renderState('Database connection error', 'Could not load the leaderboard.', true);
+                    }
+                })
+                .finally(function () {
+                    requestInFlight = false;
                 });
+        }
+
+        function scheduleLeaderboardRefresh() {
+            window.setTimeout(function () {
+                if (document.visibilityState !== 'visible') {
+                    scheduleLeaderboardRefresh();
+                    return;
+                }
+                fetchLeaderboard(false, false, true).finally(scheduleLeaderboardRefresh);
+            }, refreshDelay);
         }
 
         if (!hasActiveRankedQuery && activeRankedInput) {
@@ -299,12 +343,7 @@ function fetchLeaderboard(pushHistory, showLoader) {
 
         syncStatusToggleClasses();
         syncActiveRankedButton();
-        fetchLeaderboard(false);
-        window.setInterval(function () {
-            if (document.visibilityState === 'visible') {
-                fetchLeaderboard(false, false);
-            }
-        }, 5000);
+        fetchLeaderboard(false).finally(scheduleLeaderboardRefresh);
     });
 })();
 </script>

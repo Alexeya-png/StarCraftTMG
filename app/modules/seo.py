@@ -58,6 +58,7 @@ def _build_pages_sitemap_entries() -> list[tuple[str, str | None]]:
         (build_absolute_url('/reports'), lastmod),
         (build_absolute_url('/submit'), lastmod),
         (build_absolute_url('/leagues'), lastmod),
+        (build_absolute_url('/support'), lastmod),
     ]
 
 def _build_player_sitemap_entries() -> list[tuple[str, str | None]]:
