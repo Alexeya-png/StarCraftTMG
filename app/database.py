@@ -1263,7 +1263,7 @@ def _calculate_draw_elo_result(
         'k_factor': base_result['k_factor'],
     }
 
-def _get_supabase_settings() -> dict[str, str]:
+def _get_supabase_settings(*, require_service_role: bool = False) -> dict[str, str]:
     explicit_url = _normalize_text(os.getenv('SUPABASE_URL'))
     project_ref = ''
 
@@ -1285,8 +1285,14 @@ def _get_supabase_settings() -> dict[str, str]:
             )
         url = f'https://{project_ref}.supabase.co'
 
+    service_role_key = _normalize_text(os.getenv('SUPABASE_SERVICE_ROLE_KEY'))
+    if require_service_role and not service_role_key:
+        raise DatabaseConfigError(
+            'SUPABASE_SERVICE_ROLE_KEY is required for supporter badge confirmation.'
+        )
+
     key = (
-        _normalize_text(os.getenv('SUPABASE_SERVICE_ROLE_KEY'))
+        service_role_key
         or _normalize_text(os.getenv('SUPABASE_KEY'))
         or _normalize_text(os.getenv('SUPABASE_ANON_KEY'))
     )
@@ -1318,8 +1324,9 @@ def _supabase_request(
     payload: Any | None = None,
     prefer: str | None = None,
     return_headers: bool = False,
+    require_service_role: bool = False,
 ):
-    settings = _get_supabase_settings()
+    settings = _get_supabase_settings(require_service_role=require_service_role)
     query = query or {}
 
     parts = []
@@ -4753,6 +4760,7 @@ def confirm_supporter_payment(
             'POST',
             '/rest/v1/rpc/confirm_supporter_payment',
             payload=payload,
+            require_service_role=True,
         )
     except Exception as exc:
         if _is_missing_supporter_schema_error(exc):
@@ -4765,13 +4773,58 @@ def confirm_supporter_payment(
     if not isinstance(row, dict):
         raise RuntimeError('Supporter badge confirmation returned no player.')
 
-    refresh_application_cache_after_write('supporter_badge_awarded')
+    try:
+        refresh_application_cache_after_write('supporter_badge_awarded')
+    except Exception:
+        logging.getLogger(__name__).exception(
+            'Supporter badge was awarded, but the application cache refresh failed'
+        )
     return {
         'player_id': int(row.get('awarded_player_id') or clean_player_id),
         'player_name': _normalize_player_name(row.get('awarded_player_name')),
         'supporter_since': _normalize_text(row.get('awarded_supporter_since')),
         'already_recorded': bool(row.get('already_recorded')),
     }
+
+
+def check_supporter_storage_access() -> tuple[bool, str | None]:
+    try:
+        _supabase_request(
+            'GET',
+            f'/rest/v1/{SUPPORTER_PAYMENTS_TABLE_NAME}',
+            query={'select': 'id', 'limit': 1},
+            require_service_role=True,
+        )
+        return True, None
+    except DatabaseConfigError:
+        return False, 'service_role_key_missing'
+    except Exception as exc:
+        message = str(exc).lower()
+        if 'supabase http 401' in message:
+            return False, 'service_role_key_invalid'
+        if 'supabase http 403' in message:
+            return False, 'service_role_forbidden'
+        if _is_missing_supporter_schema_error(exc):
+            return False, 'supporter_schema_missing'
+        return False, 'supporter_storage_unavailable'
+
+
+def classify_supporter_storage_error(exc: Exception) -> str:
+    if isinstance(exc, DatabaseConfigError):
+        return 'service_role_key_missing'
+
+    message = str(exc).lower()
+    if 'supabase http 401' in message:
+        return 'service_role_key_invalid'
+    if 'supabase http 403' in message:
+        return 'service_role_forbidden'
+    if 'supabase http 404' in message or _is_missing_supporter_schema_error(exc):
+        return 'supporter_schema_missing'
+    if 'supabase http 400' in message:
+        return 'supporter_rpc_rejected'
+    if 'timed out' in message or 'urlopen error' in message:
+        return 'supabase_connection_failed'
+    return 'supporter_award_failed'
 
 
 def _compute_player_rank_position(player_id: int) -> int | str:

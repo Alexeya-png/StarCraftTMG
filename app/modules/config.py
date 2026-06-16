@@ -41,6 +41,7 @@ FEEDBACK_MESSAGE_MAX_LENGTH = 300
 CACHE_WARMUP_ON_STARTUP = (os.getenv('APP_WARMUP_ON_STARTUP') or '0').strip().lower() not in {'0', 'false', 'no', 'off'}
 CACHE_REFRESH_BACKGROUND = (os.getenv('APP_CACHE_REFRESH_BACKGROUND') or '1').strip().lower() not in {'0', 'false', 'no', 'off'}
 APP_DISPLAY_VERSION = (os.getenv('APP_DISPLAY_VERSION') or 'v2').strip() or 'v2'
+SUPPORTER_WEBHOOK_BUILD = 'supporter-webhook-2026-06-10-6'
 LIVE_API_RATE_LIMIT_PER_MINUTE = max(0, int(os.getenv('APP_LIVE_API_RATE_LIMIT_PER_MINUTE', '600') or '600'))
 MATCH_SUBMIT_RATE_LIMIT_PER_HOUR = max(0, int(os.getenv('APP_MATCH_SUBMIT_RATE_LIMIT_PER_HOUR', '20') or '20'))
 TTS_SUBMIT_RATE_LIMIT_PER_HOUR = max(0, int(os.getenv('APP_TTS_SUBMIT_RATE_LIMIT_PER_HOUR', '120') or '120'))

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import os
+
 from flask import Blueprint, abort, jsonify, make_response, redirect, render_template, request
 
 from app.database import (
+    check_supporter_storage_access,
     fetch_current_league,
     fetch_league_results_overview,
     HEALTH_CHECK_DATABASE,
     fetch_player_profile,
     ping_database,
 )
+from app.modules.config import APP_DISPLAY_VERSION, SUPPORTER_WEBHOOK_BUILD
 from app.modules.context import base_context
 from app.modules.forms import _render_submit_page
 from app.modules.payloads import _parse_leaderboard_filters
@@ -29,6 +33,30 @@ def home():
 
 @bp.route('/health')
 def health():
+    if request.args.get('stripe') == '1':
+        stripe_key = str(os.getenv('STRIPE_SECRET_KEY') or '').strip()
+        webhook_secret = str(os.getenv('STRIPE_WEBHOOK_SECRET') or '').strip()
+        service_role_key = str(os.getenv('SUPABASE_SERVICE_ROLE_KEY') or '').strip()
+        storage_ok, storage_error = check_supporter_storage_access()
+        stripe_mode = 'test' if stripe_key.startswith('sk_test_') else 'live' if stripe_key.startswith('sk_live_') else 'unknown'
+        ready = bool(stripe_key and webhook_secret and service_role_key and storage_ok)
+        return jsonify(
+            {
+                'status': 'ok' if ready else 'error',
+                'app_version': APP_DISPLAY_VERSION,
+                'supporter_webhook_build': SUPPORTER_WEBHOOK_BUILD,
+                'stripe_support': {
+                    'ready': ready,
+                    'stripe_secret_configured': bool(stripe_key),
+                    'stripe_mode': stripe_mode,
+                    'webhook_secret_configured': bool(webhook_secret),
+                    'service_role_key_configured': bool(service_role_key),
+                    'supporter_storage_access': storage_ok,
+                    'supporter_storage_error': storage_error,
+                },
+            }
+        ), 200 if ready else 503
+
     if request.args.get('db') != '1' and not HEALTH_CHECK_DATABASE:
         return jsonify({'status': 'ok', 'database_error': None})
     ok, error = ping_database()
