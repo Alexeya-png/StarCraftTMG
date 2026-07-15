@@ -130,7 +130,10 @@
                         {% if race_slug in ['terran', 'protoss', 'zerg'] %}
                         <img class="profile-race-icon" src="/static/Race/{{ race_slug }}.svg" alt="{{ player.priority_race }} icon">
                         {% endif %}
-                        <h1 class="profile-player-name{% if player.name_color %} is-custom-name-color{% endif %}"{% if player.name_color %} style="--player-name-color: {{ player.name_color }}; color: {{ player.name_color }}"{% endif %}>{{ player.name }}</h1>
+                        {% set profile_name_color = player.name_color_fallback or player.name_color %}
+                        {% set profile_name_effect = player.name_color_effect or '' %}
+                        {% set profile_name_shadow = player.name_color_shadow or '' %}
+                        <h1 class="profile-player-name{% if profile_name_color %} is-custom-name-color{% endif %}{% if profile_name_effect %} is-effect-name-color{% endif %}"{% if profile_name_color %} style="--player-name-color: {{ profile_name_color }}; color: {{ profile_name_color }}{% if profile_name_effect %}; --player-name-effect: {{ profile_name_effect }}{% endif %}{% if profile_name_shadow %}; --player-name-shadow: {{ profile_name_shadow }}{% endif %}"{% endif %}>{{ player.name }}</h1>
                         {% if player.is_supporter %}
                         <img class="supporter-inline-badge profile-supporter-badge" src="/static/art/supporter-badges/supporter-planet.svg" alt="" title="TMG Stats Supporter">
                         {% endif %}

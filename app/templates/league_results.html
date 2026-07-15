@@ -434,9 +434,16 @@ document.addEventListener('DOMContentLoaded', function () {
             ? '<span class="league-player-race' + raceClassName(raceSlug) + '"><img class="race-inline-icon" src="/static/Race/' + escapeHtml(raceSlug) + '.svg" alt="' + escapeHtml(raceLabel) + ' icon"><span>' + escapeHtml(raceLabel) + '</span></span>'
             : '';
 
-        const cleanNameColor = /^#[0-9A-Fa-f]{6}$/.test(String(player.name_color || '')) ? String(player.name_color) : '';
-        const nameClass = cleanNameColor ? 'league-player-name is-custom-name-color' : 'league-player-name';
-        const nameStyle = cleanNameColor ? ' style="--player-name-color:' + escapeHtml(cleanNameColor) + '; color:' + escapeHtml(cleanNameColor) + '"' : '';
+        const fallbackColor = /^#[0-9A-Fa-f]{6}$/.test(String(player.name_color_fallback || '')) ? String(player.name_color_fallback) : '';
+        const effectValue = String(player.name_color_effect || '');
+        const shadowValue = String(player.name_color_shadow || '');
+        const canUseEffect = Boolean(effectValue && !String(extraClass || '').includes('table'));
+        const nameClass = fallbackColor
+            ? 'league-player-name is-custom-name-color' + (canUseEffect ? ' is-effect-name-color' : '')
+            : 'league-player-name';
+        const nameStyle = fallbackColor
+            ? ' style="--player-name-color:' + escapeHtml(fallbackColor) + '; color:' + escapeHtml(fallbackColor) + (canUseEffect ? '; --player-name-effect:' + escapeHtml(effectValue) + (shadowValue ? '; --player-name-shadow:' + escapeHtml(shadowValue) : '') : '') + '"'
+            : '';
         const supporterHtml = player.is_supporter
             ? '<img class="supporter-inline-badge" src="/static/art/supporter-badges/supporter-planet.svg" alt="" title="TMG Stats Supporter">'
             : '';

@@ -63,7 +63,10 @@
                     </div>
                     <div>
                         <div class="account-summary-label">Linked player</div>
-                        <strong class="account-summary-player"{% if player.name_color %} style="color: {{ player.name_color }}"{% endif %}>{{ player.name }}</strong>
+                        {% set account_name_color = player.name_color_fallback or player.name_color %}
+                        {% set account_name_effect = player.name_color_effect or '' %}
+                        {% set account_name_shadow = player.name_color_shadow or '' %}
+                        <strong class="account-summary-player{% if account_name_color %} is-custom-name-color{% endif %}{% if account_name_effect %} is-effect-name-color{% endif %}" data-color-preview-name{% if account_name_color %} style="--player-name-color: {{ account_name_color }}; color: {{ account_name_color }}{% if account_name_effect %}; --player-name-effect: {{ account_name_effect }}{% endif %}{% if account_name_shadow %}; --player-name-shadow: {{ account_name_shadow }}{% endif %}"{% endif %}>{{ player.name }}</strong>
                         <div class="account-muted-note">{{ account.email }}</div>
                     </div>
                 </div>
@@ -115,13 +118,13 @@
                         <label class="field-help-label" title="Changes the nickname color on the player profile and in leagues.">Nickname color</label>
                         {% set selected_color = namespace(option=profile_color_options[0]) %}
                         {% for color in profile_color_options %}
-                            {% if form_state.name_color|upper == color.value %}
+                            {% if form_state.name_color == color.value %}
                                 {% set selected_color.option = color %}
                             {% endif %}
                         {% endfor %}
                         <div class="account-color-picker" data-color-picker>
-                            <button class="account-color-trigger{% if selected_color.option.is_default %} is-default{% endif %}" type="button" data-color-trigger aria-expanded="false" style="--account-player-color: {{ selected_color.option.swatch or selected_color.option.value or '#18B1FF' }}">
-                                <span class="account-color-swatch account-color-trigger-swatch{% if selected_color.option.is_default %} is-default{% endif %}" data-color-trigger-swatch style="--account-player-color: {{ selected_color.option.swatch or selected_color.option.value or '#18B1FF' }}"></span>
+                            <button class="account-color-trigger{% if selected_color.option.is_default %} is-default{% endif %}" type="button" data-color-trigger aria-expanded="false" style="--account-player-color: {{ selected_color.option.swatch or selected_color.option.value or '#18B1FF' }}; --account-player-swatch: {{ selected_color.option.swatch_css or selected_color.option.effect or selected_color.option.swatch or selected_color.option.value or '#18B1FF' }}">
+                                <span class="account-color-swatch account-color-trigger-swatch{% if selected_color.option.is_default %} is-default{% endif %}" data-color-trigger-swatch style="--account-player-color: {{ selected_color.option.swatch or selected_color.option.value or '#18B1FF' }}; --account-player-swatch: {{ selected_color.option.swatch_css or selected_color.option.effect or selected_color.option.swatch or selected_color.option.value or '#18B1FF' }}"></span>
                                 <span class="account-color-trigger-text">
                                     <strong data-color-trigger-label>{{ selected_color.option.terran_label }}</strong>
                                     <small data-color-trigger-meta>{{ selected_color.option.meta_label or (selected_color.option.label ~ ' · ' ~ selected_color.option.value) }}</small>
@@ -130,19 +133,23 @@
                             </button>
                             <div class="account-color-menu" data-color-menu hidden>
                                 {% for color in profile_color_options %}
-                                <label class="account-color-option{% if form_state.name_color|upper == color.value %} is-selected{% endif %}{% if color.is_default %} is-default{% endif %}"
+                                <label class="account-color-option{% if form_state.name_color == color.value %} is-selected{% endif %}{% if color.is_default %} is-default{% endif %}"
                                        data-color-option
                                        data-color-value="{{ color.value }}"
                                        data-color-swatch="{{ color.swatch or color.value or '#18B1FF' }}"
+                                       data-color-swatch-css="{{ color.swatch_css or color.effect or color.swatch or color.value or '#18B1FF' }}"
+                                       data-color-fallback="{{ color.swatch or color.value or '#18B1FF' }}"
+                                       data-color-effect="{{ color.effect or '' }}"
+                                       data-color-shadow="{{ color.shadow or '' }}"
                                        data-color-label="{{ color.label }}"
                                        data-color-meta="{{ color.meta_label or '' }}"
                                        data-color-default="{% if color.is_default %}1{% else %}0{% endif %}"
                                        data-label-terran="{{ color.terran_label }}"
                                        data-label-zerg="{{ color.zerg_label }}"
                                        data-label-protoss="{{ color.protoss_label }}"
-                                       style="--account-player-color: {{ color.swatch or color.value or '#18B1FF' }}">
-                                    <input type="radio" name="name_color" value="{{ color.value }}" {% if form_state.name_color|upper == color.value %}checked{% endif %}>
-                                    <span class="account-color-swatch{% if color.is_default %} is-default{% endif %}" style="--account-player-color: {{ color.swatch or color.value or '#18B1FF' }}"></span>
+                                       style="--account-player-color: {{ color.swatch or color.value or '#18B1FF' }}; --account-player-swatch: {{ color.swatch_css or color.effect or color.swatch or color.value or '#18B1FF' }}">
+                                    <input type="radio" name="name_color" value="{{ color.value }}" {% if form_state.name_color == color.value %}checked{% endif %}>
+                                    <span class="account-color-swatch{% if color.is_default %} is-default{% endif %}" style="--account-player-color: {{ color.swatch or color.value or '#18B1FF' }}; --account-player-swatch: {{ color.swatch_css or color.effect or color.swatch or color.value or '#18B1FF' }}"></span>
                                     <span class="account-color-text">
                                         <strong data-color-faction-label>{{ color.terran_label }}</strong>
                                         <small data-color-base-label>{{ color.meta_label or (color.label ~ ' · ' ~ color.value) }}</small>
@@ -435,6 +442,7 @@
     const colorTriggerSwatch = colorPicker ? colorPicker.querySelector('[data-color-trigger-swatch]') : null;
     const colorTriggerLabel = colorPicker ? colorPicker.querySelector('[data-color-trigger-label]') : null;
     const colorTriggerMeta = colorPicker ? colorPicker.querySelector('[data-color-trigger-meta]') : null;
+    const colorPreviewName = document.querySelector('[data-color-preview-name]');
     const priorityRaceSelect = document.getElementById('account_priority_race');
 
     function colorRaceKey(value) {
@@ -501,13 +509,16 @@
         });
 
         const swatchColor = selectedOption ? selectedOption.dataset.colorSwatch || selectedOption.dataset.colorValue || '#18B1FF' : '#18B1FF';
+        const swatchCss = selectedOption ? selectedOption.dataset.colorSwatchCss || swatchColor : swatchColor;
         const isDefault = Boolean(selectedOption && selectedOption.dataset.colorDefault === '1');
         if (colorTrigger) {
             colorTrigger.style.setProperty('--account-player-color', swatchColor);
+            colorTrigger.style.setProperty('--account-player-swatch', swatchCss);
             colorTrigger.classList.toggle('is-default', isDefault);
         }
         if (colorTriggerSwatch) {
             colorTriggerSwatch.style.setProperty('--account-player-color', swatchColor);
+            colorTriggerSwatch.style.setProperty('--account-player-swatch', swatchCss);
             colorTriggerSwatch.classList.toggle('is-default', isDefault);
         }
         if (colorTriggerLabel) {
@@ -515,6 +526,34 @@
         }
         if (colorTriggerMeta) {
             colorTriggerMeta.textContent = display.meta || '';
+        }
+
+        if (colorPreviewName) {
+            const fallbackColor = selectedOption ? selectedOption.dataset.colorFallback || swatchColor : '';
+            const effectValue = selectedOption ? selectedOption.dataset.colorEffect || '' : '';
+            const shadowValue = selectedOption ? selectedOption.dataset.colorShadow || '' : '';
+            const hasCustomPreview = Boolean(!isDefault && fallbackColor);
+            const hasEffectPreview = Boolean(hasCustomPreview && effectValue);
+            colorPreviewName.classList.toggle('is-custom-name-color', hasCustomPreview);
+            colorPreviewName.classList.toggle('is-effect-name-color', hasEffectPreview);
+            if (hasCustomPreview) {
+                colorPreviewName.style.setProperty('--player-name-color', fallbackColor);
+                colorPreviewName.style.color = fallbackColor;
+            } else {
+                colorPreviewName.style.removeProperty('--player-name-color');
+                colorPreviewName.style.color = '';
+            }
+            if (hasEffectPreview) {
+                colorPreviewName.style.setProperty('--player-name-effect', effectValue);
+                if (shadowValue) {
+                    colorPreviewName.style.setProperty('--player-name-shadow', shadowValue);
+                } else {
+                    colorPreviewName.style.removeProperty('--player-name-shadow');
+                }
+            } else {
+                colorPreviewName.style.removeProperty('--player-name-effect');
+                colorPreviewName.style.removeProperty('--player-name-shadow');
+            }
         }
     }
 

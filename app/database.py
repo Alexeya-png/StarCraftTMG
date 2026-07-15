@@ -222,6 +222,7 @@ PROFILE_COLOR_OPTIONS = (
     {
         'value': '',
         'swatch': '#18B1FF',
+        'swatch_css': 'linear-gradient(135deg, #18B1FF, #5F84FF)',
         'label': 'Default',
         'meta_label': 'Default site color',
         'terran_label': 'Default',
@@ -293,9 +294,366 @@ PROFILE_COLOR_OPTIONS = (
         'zerg_label': 'Leviathan Brood',
         'protoss_label': 'Velari Tribe',
     },
+    {
+        'value': '#D8DEE8',
+        'swatch': '#D8DEE8',
+        'label': 'Light Gray',
+        'meta_label': 'Polished alloy',
+        'terran_label': 'Umojan Alloy',
+        'zerg_label': 'Ash Brood',
+        'protoss_label': 'Shelak Veil',
+    },
+    {
+        'value': '#1D222C',
+        'swatch': '#1D222C',
+        'label': 'Black',
+        'meta_label': 'Void armor',
+        'terran_label': 'Ghost Program',
+        'zerg_label': 'Nargil Brood',
+        'protoss_label': 'Nerazim Veil',
+    },
+    {
+        'value': '#B8A46D',
+        'swatch': '#B8A46D',
+        'label': 'Tan',
+        'meta_label': 'Dune plate',
+        'terran_label': 'Moria Dune Corps',
+        'zerg_label': 'Dustclaw Brood',
+        'protoss_label': 'Aiur Relic Guard',
+    },
+    {
+        'value': '#D8F36B',
+        'swatch': '#D8F36B',
+        'label': 'Spring',
+        'meta_label': 'Acid bloom',
+        'terran_label': 'Cerberus Bloom',
+        'zerg_label': 'Kukulza Spawn',
+        'protoss_label': 'Khalai Spring',
+    },
+    {
+        'value': '#99F06A',
+        'swatch': '#99F06A',
+        'label': 'Lime',
+        'meta_label': 'Irradiated green',
+        'terran_label': 'Irradiator Corps',
+        'zerg_label': 'Acid Spine Brood',
+        'protoss_label': 'Xel Naga Bloom',
+    },
+    {
+        'value': '#587761',
+        'swatch': '#587761',
+        'label': 'Forest',
+        'meta_label': 'Jungle carapace',
+        'terran_label': 'Jungle Patrol',
+        'zerg_label': 'Verdant Brood',
+        'protoss_label': 'Sargas Preserve',
+    },
+    {
+        'value': '#29C7CD',
+        'swatch': '#29C7CD',
+        'label': 'Petrol',
+        'meta_label': 'Deep refinery glow',
+        'terran_label': 'Goliath Foundry',
+        'zerg_label': 'Deepmire Brood',
+        'protoss_label': 'Furinax Tide',
+    },
+    {
+        'value': '#8D7CF0',
+        'swatch': '#8D7CF0',
+        'label': 'Lavender',
+        'meta_label': 'Psi haze',
+        'terran_label': 'Umojan Psi Wing',
+        'zerg_label': 'Jormungand Bloom',
+        'protoss_label': 'Velari Chorus',
+    },
+    {
+        'value': '#F09AD8',
+        'swatch': '#F09AD8',
+        'label': 'Rose',
+        'meta_label': 'Nebula rose',
+        'terran_label': 'Nova Squadron',
+        'zerg_label': 'Char Rose Brood',
+        'protoss_label': 'Ara Matriarch',
+    },
+    {
+        'value': '#B50D22',
+        'swatch': '#B50D22',
+        'label': 'Blood Red',
+        'meta_label': 'Crimson armor',
+        'terran_label': 'Blood Hawks',
+        'zerg_label': 'Tiamat Talon',
+        'protoss_label': 'Ara Crimson',
+    },
+    {
+        'value': '#13B84D',
+        'swatch': '#13B84D',
+        'label': 'Emerald',
+        'meta_label': 'Verdant crystal',
+        'terran_label': 'Korhal Emerald',
+        'zerg_label': 'Garm Venom Brood',
+        'protoss_label': 'Akilae Verdant',
+    },
+    {
+        'value': 'chrome',
+        'swatch': '#BEC8D8',
+        'swatch_css': 'linear-gradient(135deg, #F8FBFF 0%, #667180 28%, #FFFFFF 48%, #8E9BAB 66%, #E6EDF7 100%)',
+        'effect': 'linear-gradient(135deg, #F8FBFF 0%, #6A7380 22%, #FFFFFF 44%, #8A96A6 62%, #DCE6F3 100%)',
+        'label': 'Chrome',
+        'meta_label': 'Metallic effect',
+        'terran_label': 'Dominion Chrome',
+        'zerg_label': 'Carapace Prime',
+        'protoss_label': 'Purifier Chrome',
+    },
+    {
+        'value': 'sunset',
+        'swatch': '#EB5A8E',
+        'swatch_css': 'linear-gradient(135deg, #6435FF 0%, #FF2D95 45%, #FFB340 100%)',
+        'effect': 'linear-gradient(135deg, #6259FF 0%, #F02D9F 45%, #FFD05A 100%)',
+        'label': 'Sunset',
+        'meta_label': 'Dusk gradient',
+        'terran_label': 'Mar Sara Dusk',
+        'zerg_label': 'Char Sunset Brood',
+        'protoss_label': 'Sargas Sunset',
+    },
+    {
+        'value': 'gold',
+        'swatch': '#E9C347',
+        'swatch_css': 'linear-gradient(135deg, #7B4E00 0%, #FFF2A6 30%, #D99B16 55%, #FFF6B8 76%, #8A5A05 100%)',
+        'effect': 'linear-gradient(135deg, #B06C00 0%, #FFF0A8 28%, #D69512 54%, #FFF7BC 76%, #A36600 100%)',
+        'label': 'Gold',
+        'meta_label': 'Royal alloy',
+        'terran_label': 'Emperor Guard',
+        'zerg_label': 'Leviathan Gold',
+        'protoss_label': 'Auriga Conclave',
+    },
+    {
+        'value': 'rainbow',
+        'swatch': '#55D4FF',
+        'swatch_css': 'linear-gradient(135deg, #FF334E 0%, #FFB62E 18%, #E7FF44 35%, #31D86B 52%, #36D6FF 68%, #405DFF 84%, #B93CFF 100%)',
+        'effect': 'linear-gradient(135deg, #FF334E 0%, #FFB62E 18%, #E7FF44 35%, #31D86B 52%, #36D6FF 68%, #405DFF 84%, #B93CFF 100%)',
+        'label': 'Rainbow',
+        'meta_label': 'Prismatic effect',
+        'terran_label': 'Prism Corps',
+        'zerg_label': 'Prismatic Brood',
+        'protoss_label': 'Templar Prism',
+    },
+    {
+        'value': 'anaglyph-3d',
+        'swatch': '#F4F7FF',
+        'swatch_css': 'linear-gradient(135deg, #00E7FF 0%, #00E7FF 18%, #F8F13D 36%, #F8FBFF 48%, #FFFFFF 58%, #FF2BD6 78%, #FF2BD6 100%)',
+        'effect': 'linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 34%, #C9D2DE 58%, #FFFFFF 76%, #8E99A8 100%)',
+        'shadow': '-2px 0 0 #00E7FF, 2px 0 0 #FF2BD6, 0 2px 0 #F8F13D, -3px 1px 0 rgba(0, 231, 255, 0.72), 3px 1px 0 rgba(255, 43, 214, 0.72), 0 3px 0 rgba(0, 0, 0, 0.82)',
+        'label': '3D Anaglyph',
+        'meta_label': 'Chromatic 3D effect',
+        'terran_label': 'Spectral 3D Corps',
+        'zerg_label': 'Chromatic Brood',
+        'protoss_label': 'Khaydarin Anaglyph',
+    },
+    {
+        'value': 'aetheral',
+        'swatch': '#77C5FF',
+        'swatch_css': 'linear-gradient(135deg, rgba(112, 172, 255, 0.38) 0%, rgba(255, 255, 255, 0.9) 48%, rgba(116, 213, 255, 0.42) 100%)',
+        'effect': 'linear-gradient(135deg, rgba(128, 185, 255, 0.45) 0%, rgba(255, 255, 255, 0.96) 42%, rgba(100, 218, 255, 0.58) 100%)',
+        'label': 'Aetheral',
+        'meta_label': 'Transparent phase',
+        'terran_label': 'Ghost Phase Wing',
+        'zerg_label': 'Voidspore Brood',
+        'protoss_label': 'Nerazim Aether',
+    },
+    {
+        'value': 'split-red',
+        'swatch': '#C91624',
+        'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #C91624 51%, #FF3F4F 100%)',
+        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #B90F20 51%, #FF4356 100%)',
+        'label': 'Split Red',
+        'meta_label': 'Steel split',
+        'terran_label': 'Raider Redplate',
+        'zerg_label': 'Tiamat Splitclaw',
+        'protoss_label': 'Ara War Sigil',
+    },
+    {
+        'value': 'split-spring',
+        'swatch': '#BFEF58',
+        'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #BFEF58 51%, #F6FF89 100%)',
+        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #BDEB4B 51%, #FBFF9E 100%)',
+        'label': 'Split Spring',
+        'meta_label': 'Steel split',
+        'terran_label': 'Umojan Springline',
+        'zerg_label': 'Acid Bloom Split',
+        'protoss_label': 'Khalai Spring Guard',
+    },
+    {
+        'value': 'split-lime',
+        'swatch': '#91E857',
+        'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #91E857 51%, #C6FF88 100%)',
+        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #8DE351 51%, #CFFF94 100%)',
+        'label': 'Split Lime',
+        'meta_label': 'Steel split',
+        'terran_label': 'Irradiated Steel',
+        'zerg_label': 'Venom Plate Brood',
+        'protoss_label': 'Greensteel Prism',
+    },
+    {
+        'value': 'split-turquoise',
+        'swatch': '#36E0C8',
+        'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #36E0C8 51%, #74FFE5 100%)',
+        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #25D8C2 51%, #7CFFE9 100%)',
+        'label': 'Split Turquoise',
+        'meta_label': 'Steel split',
+        'terran_label': 'Kel-Morian Turbine',
+        'zerg_label': 'Fenris Splitfang',
+        'protoss_label': 'Akilae Tide Prism',
+    },
+    {
+        'value': 'split-teal',
+        'swatch': '#20B99F',
+        'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #20B99F 51%, #67F3D6 100%)',
+        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #19B199 51%, #75F8DB 100%)',
+        'label': 'Split Teal',
+        'meta_label': 'Steel split',
+        'terran_label': 'Moebius Teal Line',
+        'zerg_label': 'Leviathan Shoal',
+        'protoss_label': 'Furinax Sea Prism',
+    },
+    {
+        'value': 'split-navy',
+        'swatch': '#163FBC',
+        'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #163FBC 51%, #5678FF 100%)',
+        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #1236B0 51%, #5E80FF 100%)',
+        'label': 'Split Navy',
+        'meta_label': 'Steel split',
+        'terran_label': 'UED Night Fleet',
+        'zerg_label': 'Nargil Deep Brood',
+        'protoss_label': 'Sargas Nightblade',
+    },
+    {
+        'value': 'split-emerald',
+        'swatch': '#12B75B',
+        'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #12B75B 51%, #66FF9D 100%)',
+        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #0FAE55 51%, #70FFA6 100%)',
+        'label': 'Split Emerald',
+        'meta_label': 'Steel split',
+        'terran_label': 'Verdant Guard',
+        'zerg_label': 'Garm Split Venom',
+        'protoss_label': 'Akilae Emerald Blade',
+    },
+    {
+        'value': 'orca',
+        'swatch': '#D5DBE4',
+        'swatch_css': 'linear-gradient(135deg, #F6FAFF 0%, #F6FAFF 35%, #2D333C 36%, #11151D 64%, #DCE4EF 65%, #F7FBFF 100%)',
+        'effect': 'linear-gradient(135deg, #F8FBFF 0%, #F8FBFF 34%, #2A3039 35%, #0E1219 64%, #E2E9F3 65%, #FFFFFF 100%)',
+        'label': 'Orca',
+        'meta_label': 'Black-white split',
+        'terran_label': 'UED Orca Wing',
+        'zerg_label': 'Abyssal Orca Brood',
+        'protoss_label': 'Nerazim Orca Shard',
+    },
+    {
+        'value': 'split-purple',
+        'swatch': '#A032C6',
+        'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #A032C6 51%, #F05BFF 100%)',
+        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #9428BE 51%, #F366FF 100%)',
+        'label': 'Split Purple',
+        'meta_label': 'Steel split',
+        'terran_label': 'Antiga Psi Division',
+        'zerg_label': 'Jormungand Split',
+        'protoss_label': 'Furinax Void Sigil',
+    },
 )
-PROFILE_COLOR_VALUES = frozenset(option['value'] for option in PROFILE_COLOR_OPTIONS if option.get('value'))
+
+
+PROFILE_COLOR_DISPLAY_ORDER = {
+    '': 0,
+    '#D8DEE8': 10,
+    '#1D222C': 11,
+    '#B8A46D': 12,
+    '#D8F36B': 13,
+    '#99F06A': 14,
+    '#587761': 15,
+    '#2CB494': 16,
+    '#29C7CD': 17,
+    '#8D7CF0': 18,
+    '#F09AD8': 19,
+    '#B50D22': 20,
+    '#13B84D': 21,
+    'chrome': 22,
+    'sunset': 23,
+    'gold': 24,
+    'rainbow': 25,
+    'anaglyph-3d': 26,
+    'aetheral': 27,
+    'split-red': 28,
+    'split-spring': 29,
+    'split-lime': 30,
+    'split-turquoise': 31,
+    'split-teal': 32,
+    'split-navy': 33,
+    'split-emerald': 34,
+    'orca': 35,
+    'split-purple': 36,
+    '#F40404': 100,
+    '#0C48CC': 101,
+    '#88409C': 102,
+    '#F88C14': 103,
+    '#703014': 104,
+    '#CCE0D0': 105,
+    '#FCFC38': 106,
+}
+PROFILE_COLOR_OPTIONS = tuple(
+    sorted(
+        PROFILE_COLOR_OPTIONS,
+        key=lambda option: PROFILE_COLOR_DISPLAY_ORDER.get(str(option.get('value') or ''), 90),
+    )
+)
+
+
+def _profile_color_lookup_key(value: str | None) -> str:
+    return str(value or '').strip().upper()
+
+
+PROFILE_COLOR_BY_VALUE = {
+    _profile_color_lookup_key(option.get('value')): option
+    for option in PROFILE_COLOR_OPTIONS
+    if option.get('value')
+}
+PROFILE_COLOR_VALUES = frozenset(PROFILE_COLOR_BY_VALUE)
 PROFILE_COLOR_DEFAULT = ''
+
+
+def normalize_profile_color_value(value: str | None) -> str:
+    clean_key = _profile_color_lookup_key(value)
+    if not clean_key:
+        return PROFILE_COLOR_DEFAULT
+    option = PROFILE_COLOR_BY_VALUE.get(clean_key)
+    if option:
+        return str(option.get('value') or PROFILE_COLOR_DEFAULT)
+    raise ValueError('Choose one of the available nickname colors.')
+
+
+def profile_color_payload(value: str | None) -> dict:
+    clean_key = _profile_color_lookup_key(value)
+    option = PROFILE_COLOR_BY_VALUE.get(clean_key)
+    if not option:
+        return {
+            'name_color': PROFILE_COLOR_DEFAULT,
+            'name_color_fallback': '',
+            'name_color_effect': '',
+            'name_color_shadow': '',
+            'name_color_is_effect': False,
+        }
+
+    fallback = str(option.get('swatch') or option.get('value') or '').strip()
+    effect = str(option.get('effect') or '').strip()
+    shadow = str(option.get('shadow') or '').strip()
+    return {
+        'name_color': str(option.get('value') or PROFILE_COLOR_DEFAULT),
+        'name_color_fallback': fallback,
+        'name_color_effect': effect,
+        'name_color_shadow': shadow,
+        'name_color_is_effect': bool(effect),
+    }
+
+
 LEAGUE_TABLE_NAME = 'leagues'
 LEAGUE_BADGES_TABLE_NAME = 'player_league_badges'
 CURRENT_LEAGUE_SETTING_KEY = 'current_league_id'
@@ -957,13 +1315,7 @@ def _normalize_player_key(value: str | None) -> str:
 
 
 def _normalize_profile_color(value: str | None) -> str:
-    clean_value = _normalize_text(value)
-    if not clean_value:
-        return ''
-    clean_value = clean_value.upper()
-    if clean_value in PROFILE_COLOR_VALUES:
-        return clean_value
-    raise ValueError('Choose one of the available nickname colors.')
+    return normalize_profile_color_value(value)
 
 
 def _coerce_ladder_visibility(value, *, default: bool = True) -> bool:
@@ -1979,6 +2331,7 @@ def _prepare_league_player_card(row: dict | None) -> dict | None:
     prepared['win_rate_display'] = _format_percent(prepared.get('win_rate_numeric'))
     prepared['record_display'] = f"{int(prepared.get('wins') or 0)}-{int(prepared.get('losses') or 0)}"
     prepared['is_supporter'] = bool(_normalize_text(prepared.get('supporter_since')))
+    prepared.update(profile_color_payload(prepared.get('name_color')))
     if int(prepared.get('draws') or 0) > 0:
         prepared['record_display'] += f"-{int(prepared.get('draws') or 0)}"
     prepared['matches_label'] = f"{int(prepared.get('matches_count') or 0)} match"
@@ -2993,11 +3346,11 @@ def _prepare_player_row(row: dict) -> dict:
     player['last_played_label'] = _humanize_last_played(player.get('last_match_at'))
     player['current_elo_display'] = _normalize_elo_value(player.get('current_elo'))
     player['win_rate_display'] = _format_percent(player.get('win_rate'))
-    player['name_color'] = _normalize_text(player.get('name_color'))
-    if player['name_color'] and player['name_color'].upper() in PROFILE_COLOR_VALUES:
-        player['name_color'] = player['name_color'].upper()
-    elif player['name_color']:
-        player['name_color'] = ''
+    try:
+        player['name_color'] = _normalize_profile_color(player.get('name_color'))
+    except ValueError:
+        player['name_color'] = PROFILE_COLOR_DEFAULT
+    player.update(profile_color_payload(player.get('name_color')))
     player['ladder_show_flag'] = _coerce_ladder_visibility(player.get('ladder_show_flag'), default=True)
     player['ladder_show_aliases'] = _coerce_ladder_visibility(player.get('ladder_show_aliases'), default=False)
     player['ladder_show_badges'] = _coerce_ladder_visibility(player.get('ladder_show_badges'), default=True)

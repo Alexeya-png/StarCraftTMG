@@ -17,6 +17,7 @@ from app.database import (
     fetch_user_account,
     get_or_create_user_account_from_google,
     link_user_account_to_player,
+    normalize_profile_color_value,
     update_user_profile_settings,
 )
 from app.modules.auth import build_user_cookie, current_user_session
@@ -106,10 +107,10 @@ def _build_account_form_state(account: dict | None = None, source: dict | None =
     source = source or {}
     aliases = account.get('aliases') or []
     alias_text = '\n'.join(str(alias.get('alias_name') or '') for alias in aliases if alias.get('alias_name'))
-    allowed_colors = {str(option.get('value') or '').upper() for option in PROFILE_COLOR_OPTIONS}
     raw_name_color = source.get('name_color') if 'name_color' in source else player.get('name_color', PROFILE_COLOR_DEFAULT)
-    name_color = str(raw_name_color or '').strip().upper()
-    if name_color not in allowed_colors:
+    try:
+        name_color = normalize_profile_color_value(raw_name_color)
+    except ValueError:
         name_color = PROFILE_COLOR_DEFAULT
     return {
         'player_name': str(source.get('player_name', player.get('name', ''))).strip(),
