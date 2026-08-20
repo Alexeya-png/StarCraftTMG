@@ -33,6 +33,7 @@ DEFAULT_MISSION_OPTIONS = [
 ADMIN_COOKIE_NAME = 'starcraft_admin_session'
 USER_COOKIE_NAME = 'starcraft_user_session'
 GOOGLE_OAUTH_STATE_COOKIE_NAME = 'starcraft_google_oauth_state'
+DISCORD_OAUTH_STATE_COOKIE_NAME = 'starcraft_discord_oauth_state'
 ADMIN_SESSION_HOURS = 12
 USER_SESSION_DAYS = int(os.getenv('USER_SESSION_DAYS', '30') or '30')
 SUBMIT_NAME_SUGGESTION_LIMIT = int(os.getenv('SUBMIT_NAME_SUGGESTION_LIMIT', '200') or '200')

@@ -53,22 +53,11 @@
             <form class="admin-form-grid" method="post" action="/account">
                 <input type="hidden" name="action" value="save_profile">
 
-                <div class="account-summary">
-                    <div class="account-avatar-wrap">
-                        {% if account.avatar_url %}
-                        <img class="account-avatar" src="{{ account.avatar_url }}" alt="">
-                        {% else %}
-                        <div class="account-avatar account-avatar-empty">{{ account.display_name[:1] }}</div>
-                        {% endif %}
-                    </div>
-                    <div>
-                        <div class="account-summary-label">Linked player</div>
-                        {% set account_name_color = player.name_color_fallback or player.name_color %}
-                        {% set account_name_effect = player.name_color_effect or '' %}
-                        {% set account_name_shadow = player.name_color_shadow or '' %}
-                        <strong class="account-summary-player{% if account_name_color %} is-custom-name-color{% endif %}{% if account_name_effect %} is-effect-name-color{% endif %}" data-color-preview-name{% if account_name_color %} style="--player-name-color: {{ account_name_color }}; color: {{ account_name_color }}{% if account_name_effect %}; --player-name-effect: {{ account_name_effect }}{% endif %}{% if account_name_shadow %}; --player-name-shadow: {{ account_name_shadow }}{% endif %}"{% endif %}>{{ player.name }}</strong>
-                        <div class="account-muted-note">{{ account.email }}</div>
-                    </div>
+                <div class="account-summary account-summary-name-only">
+                    {% set account_name_color = player.name_color_fallback or player.name_color %}
+                    {% set account_name_effect = player.name_color_effect or '' %}
+                    {% set account_name_shadow = player.name_color_shadow or '' %}
+                    <strong class="account-summary-player{% if account_name_color %} is-custom-name-color{% endif %}{% if account_name_effect %} is-effect-name-color{% endif %}" data-color-preview-name{% if account_name_color %} style="--player-name-color: {{ account_name_color }}; color: {{ account_name_color }}{% if account_name_effect %}; --player-name-effect: {{ account_name_effect }}{% endif %}{% if account_name_shadow %}; --player-name-shadow: {{ account_name_shadow }}{% endif %}"{% endif %}>{{ player.name }}</strong>
                 </div>
 
                 <div class="admin-form-two-col">
@@ -127,7 +116,6 @@
                                 <span class="account-color-swatch account-color-trigger-swatch{% if selected_color.option.is_default %} is-default{% endif %}" data-color-trigger-swatch style="--account-player-color: {{ selected_color.option.swatch or selected_color.option.value or '#18B1FF' }}; --account-player-swatch: {{ selected_color.option.swatch_css or selected_color.option.effect or selected_color.option.swatch or selected_color.option.value or '#18B1FF' }}"></span>
                                 <span class="account-color-trigger-text">
                                     <strong data-color-trigger-label>{{ selected_color.option.terran_label }}</strong>
-                                    <small data-color-trigger-meta>{{ selected_color.option.meta_label or (selected_color.option.label ~ ' · ' ~ selected_color.option.value) }}</small>
                                 </span>
                                 <span class="account-color-trigger-arrow" aria-hidden="true">⌄</span>
                             </button>
@@ -152,7 +140,6 @@
                                     <span class="account-color-swatch{% if color.is_default %} is-default{% endif %}" style="--account-player-color: {{ color.swatch or color.value or '#18B1FF' }}; --account-player-swatch: {{ color.swatch_css or color.effect or color.swatch or color.value or '#18B1FF' }}"></span>
                                     <span class="account-color-text">
                                         <strong data-color-faction-label>{{ color.terran_label }}</strong>
-                                        <small data-color-base-label>{{ color.meta_label or (color.label ~ ' · ' ~ color.value) }}</small>
                                     </span>
                                     <span class="account-color-check" aria-hidden="true">✓</span>
                                 </label>
@@ -187,9 +174,20 @@
                             </div>
                         </div>
                     </div>
-                    <div class="toolbar-field">
-                        <label for="account_discord_url">Discord or link</label>
-                        <input id="account_discord_url" name="discord_url" type="text" value="{{ form_state.discord_url }}" placeholder="discord.gg/... or https://...">
+                    <div class="toolbar-field toolbar-field--discord">
+                        <label>Discord</label>
+                        <div class="account-discord-connect">
+                            {% if discord_oauth_enabled %}
+                            <a class="button button-secondary account-discord-button" href="/auth/discord/start">
+                                {{ 'Reconnect Discord' if form_state.discord_url else 'Connect Discord' }}
+                            </a>
+                            {% else %}
+                            <span class="button button-secondary account-discord-button is-disabled" aria-disabled="true">Connect Discord</span>
+                            {% endif %}
+                            {% if form_state.discord_url %}
+                            <a class="account-discord-profile" href="{{ form_state.discord_url }}" target="_blank" rel="noopener noreferrer">View profile</a>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
 
@@ -441,7 +439,6 @@
     const colorMenu = colorPicker ? colorPicker.querySelector('[data-color-menu]') : null;
     const colorTriggerSwatch = colorPicker ? colorPicker.querySelector('[data-color-trigger-swatch]') : null;
     const colorTriggerLabel = colorPicker ? colorPicker.querySelector('[data-color-trigger-label]') : null;
-    const colorTriggerMeta = colorPicker ? colorPicker.querySelector('[data-color-trigger-meta]') : null;
     const colorPreviewName = document.querySelector('[data-color-preview-name]');
     const priorityRaceSelect = document.getElementById('account_priority_race');
 
@@ -524,9 +521,6 @@
         if (colorTriggerLabel) {
             colorTriggerLabel.textContent = display.title || 'Choose color';
         }
-        if (colorTriggerMeta) {
-            colorTriggerMeta.textContent = display.meta || '';
-        }
 
         if (colorPreviewName) {
             const fallbackColor = selectedOption ? selectedOption.dataset.colorFallback || swatchColor : '';
@@ -561,13 +555,9 @@
         const key = colorRaceKey(priorityRaceSelect ? priorityRaceSelect.value : '');
         document.querySelectorAll('[data-color-option]').forEach(function (option) {
             const factionLabel = option.querySelector('[data-color-faction-label]');
-            const baseLabel = option.querySelector('[data-color-base-label]');
             const display = getColorDisplay(option, key);
             if (factionLabel) {
                 factionLabel.textContent = display.title;
-            }
-            if (baseLabel) {
-                baseLabel.textContent = display.meta;
             }
         });
         syncSelectedColor();

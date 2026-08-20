@@ -18,11 +18,13 @@ from app.database import (
     get_or_create_user_account_from_google,
     link_user_account_to_player,
     normalize_profile_color_value,
+    update_user_discord_profile,
     update_user_profile_settings,
 )
 from app.modules.auth import build_user_cookie, current_user_session
 from app.modules.config import (
     ADMIN_MATCH_RACE_OPTIONS,
+    DISCORD_OAUTH_STATE_COOKIE_NAME,
     GOOGLE_OAUTH_STATE_COOKIE_NAME,
     USER_COOKIE_NAME,
     USER_SESSION_DAYS,
@@ -30,6 +32,7 @@ from app.modules.config import (
 from app.modules.context import base_context
 
 bp = Blueprint('account', __name__)
+OUTBOUND_USER_AGENT = 'TMGStats/1.0 (+https://tmg-stats.org)'
 
 
 def _google_client_id() -> str:
@@ -49,6 +52,30 @@ def _google_redirect_uri() -> str:
 
 def _google_oauth_enabled() -> bool:
     return bool(_google_client_id() and _google_client_secret())
+
+
+def _discord_client_id() -> str:
+    return (os.getenv('DISCORD_CLIENT_ID') or '').strip()
+
+
+def _discord_client_secret() -> str:
+    return (os.getenv('DISCORD_CLIENT_SECRET') or '').strip()
+
+
+def _discord_redirect_uri() -> str:
+    configured = (os.getenv('DISCORD_REDIRECT_URI') or '').strip()
+    if configured:
+        return configured.rstrip('/')
+
+    site_url = (os.getenv('SITE_URL') or '').strip()
+    if site_url:
+        return site_url.rstrip('/') + '/auth/discord/callback'
+
+    return request.host_url.rstrip('/') + '/auth/discord/callback'
+
+
+def _discord_oauth_enabled() -> bool:
+    return bool(_discord_client_id() and _discord_client_secret())
 
 
 def _secure_cookie_enabled() -> bool:
@@ -76,7 +103,10 @@ def _exchange_google_code(code: str) -> dict:
     req = urllib_request.Request(
         'https://oauth2.googleapis.com/token',
         data=payload,
-        headers={'Content-Type': 'application/x-www-form-urlencoded'},
+        headers={
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': OUTBOUND_USER_AGENT,
+        },
         method='POST',
     )
     try:
@@ -90,7 +120,10 @@ def _exchange_google_code(code: str) -> dict:
 def _fetch_google_profile(access_token: str) -> dict:
     req = urllib_request.Request(
         'https://openidconnect.googleapis.com/v1/userinfo',
-        headers={'Authorization': f'Bearer {access_token}'},
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            'User-Agent': OUTBOUND_USER_AGENT,
+        },
         method='GET',
     )
     try:
@@ -99,6 +132,52 @@ def _fetch_google_profile(access_token: str) -> dict:
     except urllib_error.HTTPError as exc:
         detail = exc.read().decode('utf-8', errors='ignore')
         raise RuntimeError(detail or 'Could not fetch Google profile.') from None
+
+
+def _exchange_discord_code(code: str) -> dict:
+    payload = urllib_parse.urlencode(
+        {
+            'client_id': _discord_client_id(),
+            'client_secret': _discord_client_secret(),
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': _discord_redirect_uri(),
+        }
+    ).encode('utf-8')
+    req = urllib_request.Request(
+        'https://discord.com/api/v10/oauth2/token',
+        data=payload,
+        headers={
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'User-Agent': OUTBOUND_USER_AGENT,
+        },
+        method='POST',
+    )
+    try:
+        with urllib_request.urlopen(req, timeout=10) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except urllib_error.HTTPError as exc:
+        detail = exc.read().decode('utf-8', errors='ignore')
+        raise RuntimeError(detail or 'Discord token exchange failed.') from None
+
+
+def _fetch_discord_profile(access_token: str) -> dict:
+    req = urllib_request.Request(
+        'https://discord.com/api/v10/users/@me',
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/json',
+            'User-Agent': OUTBOUND_USER_AGENT,
+        },
+        method='GET',
+    )
+    try:
+        with urllib_request.urlopen(req, timeout=10) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except urllib_error.HTTPError as exc:
+        detail = exc.read().decode('utf-8', errors='ignore')
+        raise RuntimeError(detail or 'Could not fetch Discord profile.') from None
 
 
 def _build_account_form_state(account: dict | None = None, source: dict | None = None) -> dict:
@@ -169,6 +248,7 @@ def _render_account_page(
             'name_suggestions': name_suggestions,
             'google_oauth_enabled': _google_oauth_enabled(),
             'google_redirect_uri': _google_redirect_uri(),
+            'discord_oauth_enabled': _discord_oauth_enabled(),
         }
     )
     return make_response(render_template('account.html', **context), status_code)
@@ -263,6 +343,88 @@ def google_auth_callback():
     return response
 
 
+def _discord_oauth_error(message: str):
+    response = redirect('/account?error=' + urllib_parse.quote(message), code=303)
+    response.delete_cookie(DISCORD_OAUTH_STATE_COOKIE_NAME, path='/')
+    return response
+
+
+@bp.route('/auth/discord/start', methods=['GET'])
+def discord_auth_start():
+    session = current_user_session()
+    if not session:
+        return redirect('/login', code=303)
+    if not _discord_oauth_enabled():
+        return _discord_oauth_error('Discord connection is not configured yet.')
+
+    try:
+        account = fetch_user_account(int(session['account_id']), include_player_extras=False)
+    except Exception as exc:
+        return _discord_oauth_error(str(exc))
+    if not account or not account.get('player_id'):
+        return _discord_oauth_error('Link your account to a player first.')
+
+    state = secrets.token_urlsafe(32)
+    params = urllib_parse.urlencode(
+        {
+            'client_id': _discord_client_id(),
+            'redirect_uri': _discord_redirect_uri(),
+            'response_type': 'code',
+            'scope': 'identify',
+            'state': state,
+            'prompt': 'consent',
+        }
+    )
+    response = redirect(f'https://discord.com/oauth2/authorize?{params}', code=302)
+    response.set_cookie(
+        DISCORD_OAUTH_STATE_COOKIE_NAME,
+        state,
+        max_age=10 * 60,
+        httponly=True,
+        samesite='Lax',
+        secure=_secure_cookie_enabled(),
+        path='/',
+    )
+    return response
+
+
+@bp.route('/auth/discord/callback', methods=['GET'])
+def discord_auth_callback():
+    session = current_user_session()
+    if not session:
+        return redirect('/login', code=303)
+    if not _discord_oauth_enabled():
+        return _discord_oauth_error('Discord connection is not configured yet.')
+
+    expected_state = request.cookies.get(DISCORD_OAUTH_STATE_COOKIE_NAME)
+    provided_state = request.args.get('state', '')
+    if not expected_state or not provided_state or not secrets.compare_digest(expected_state, provided_state):
+        return _discord_oauth_error('Discord connection state expired. Try again.')
+
+    code = request.args.get('code', '')
+    if not code:
+        return _discord_oauth_error(
+            request.args.get('error_description') or request.args.get('error') or 'Discord did not return an auth code.'
+        )
+
+    try:
+        token_payload = _exchange_discord_code(code)
+        access_token = str(token_payload.get('access_token') or '')
+        if not access_token:
+            raise RuntimeError('Discord did not return an access token.')
+        discord_profile = _fetch_discord_profile(access_token)
+        update_user_discord_profile(
+            account_id=int(session['account_id']),
+            discord_user_id=str(discord_profile.get('id') or ''),
+        )
+    except Exception as exc:
+        return _discord_oauth_error(str(exc))
+
+    response = redirect('/account?discord=connected', code=303)
+    response.delete_cookie(DISCORD_OAUTH_STATE_COOKIE_NAME, path='/')
+    return response
+
+
 @bp.route('/logout', methods=['POST'])
 def user_logout():
     response = redirect('/', code=303)
@@ -287,8 +449,16 @@ def account_page():
         response.delete_cookie(USER_COOKIE_NAME, path='/')
         return response
 
-    success_message = 'Profile saved.' if request.args.get('saved') == '1' else None
-    return _render_account_page(account=account, success_message=success_message)
+    success_message = None
+    if request.args.get('saved') == '1':
+        success_message = 'Profile saved.'
+    elif request.args.get('discord') == 'connected':
+        success_message = 'Discord connected.'
+    return _render_account_page(
+        account=account,
+        error_message=request.args.get('error') or None,
+        success_message=success_message,
+    )
 
 
 @bp.route('/account', methods=['POST'])
@@ -321,7 +491,10 @@ def account_page_post():
             account = update_user_profile_settings(
                 account_id=int(session['account_id']),
                 country_code=form_state.get('country_code', ''),
-                discord_url=form_state.get('discord_url', ''),
+                discord_url=form_state.get(
+                    'discord_url',
+                    str((account.get('player') or {}).get('discord_url') or ''),
+                ),
                 priority_race=form_state.get('priority_race', ''),
                 name_color=form_state.get('name_color', ''),
                 ladder_show_flag=form_state.get('ladder_show_flag'),

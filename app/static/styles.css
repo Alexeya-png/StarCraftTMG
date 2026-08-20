@@ -2414,6 +2414,11 @@ select option:checked {
     background: rgba(255, 255, 255, 0.04);
 }
 
+.account-summary-name-only {
+    justify-content: center;
+    min-height: 72px;
+}
+
 .account-avatar-wrap {
     flex: 0 0 auto;
 }
@@ -2438,8 +2443,8 @@ select option:checked {
 }
 
 .account-summary-player {
-    display: block;
-    margin: 4px 0;
+    display: inline-block;
+    margin: 0;
     color: #18b1ff;
     font-size: 24px;
     line-height: 1.1;
@@ -2598,11 +2603,12 @@ select option:checked {
     position: absolute;
     z-index: 60;
     top: calc(100% + 8px);
-    left: 0;
+    left: auto;
     right: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    width: min(840px, calc(100vw - 40px));
     max-height: 336px;
     overflow: auto;
     padding: 8px;
@@ -2646,8 +2652,8 @@ select option:checked {
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 48px;
-    padding: 9px 36px 9px 11px;
+    min-height: 54px;
+    padding: 9px 32px 9px 10px;
     border: 1px solid color-mix(in srgb, var(--account-player-color) 34%, rgba(255, 255, 255, 0.08));
     border-radius: 6px;
     background:
@@ -2737,6 +2743,43 @@ select option:checked {
     text-shadow: 0 0 12px color-mix(in srgb, var(--account-player-color) 62%, transparent);
     transform: scale(0.72);
     transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.account-color-option .account-color-text strong {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.account-discord-connect {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 58px;
+}
+
+.account-discord-button {
+    min-width: 170px;
+    justify-content: center;
+}
+
+.account-discord-button.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+}
+
+.account-discord-profile {
+    color: #8edcff;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.account-discord-profile:hover {
+    color: #ffffff;
+    text-decoration: underline;
 }
 
 .account-color-option.is-selected .account-color-check,
@@ -3201,7 +3244,8 @@ select option:checked {
     }
 
     .account-color-menu {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: min(620px, calc(100vw - 32px));
     }
 
     .profile-section-head-with-control {
@@ -6470,6 +6514,18 @@ select option:checked {
 
 .account-color-check {
     text-shadow: none;
+}
+
+@media (max-width: 640px) {
+    .account-color-menu {
+        grid-template-columns: 1fr;
+        width: min(360px, calc(100vw - 24px));
+    }
+
+    .account-discord-connect {
+        align-items: stretch;
+        flex-direction: column;
+    }
 }
 
 .profile-elo-card,

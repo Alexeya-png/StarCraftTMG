@@ -435,9 +435,11 @@ document.addEventListener('DOMContentLoaded', function () {
             : '';
 
         const fallbackColor = /^#[0-9A-Fa-f]{6}$/.test(String(player.name_color_fallback || '')) ? String(player.name_color_fallback) : '';
+        const isTableSurface = String(extraClass || '').includes('table');
         const effectValue = String(player.name_color_effect || '');
         const shadowValue = String(player.name_color_shadow || '');
-        const canUseEffect = Boolean(effectValue && !String(extraClass || '').includes('table'));
+        const is3dEffect = ['anaglyph-3d', 'light-3d'].includes(String(player.name_color || '').toLowerCase());
+        const canUseEffect = Boolean(effectValue && (!isTableSurface || is3dEffect));
         const nameClass = fallbackColor
             ? 'league-player-name is-custom-name-color' + (canUseEffect ? ' is-effect-name-color' : '')
             : 'league-player-name';

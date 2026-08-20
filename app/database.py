@@ -439,15 +439,27 @@ PROFILE_COLOR_OPTIONS = (
     },
     {
         'value': 'anaglyph-3d',
-        'swatch': '#F4F7FF',
-        'swatch_css': 'linear-gradient(135deg, #00E7FF 0%, #00E7FF 18%, #F8F13D 36%, #F8FBFF 48%, #FFFFFF 58%, #FF2BD6 78%, #FF2BD6 100%)',
-        'effect': 'linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 34%, #C9D2DE 58%, #FFFFFF 76%, #8E99A8 100%)',
-        'shadow': '-2px 0 0 #00E7FF, 2px 0 0 #FF2BD6, 0 2px 0 #F8F13D, -3px 1px 0 rgba(0, 231, 255, 0.72), 3px 1px 0 rgba(255, 43, 214, 0.72), 0 3px 0 rgba(0, 0, 0, 0.82)',
-        'label': '3D Anaglyph',
-        'meta_label': 'Chromatic 3D effect',
-        'terran_label': 'Spectral 3D Corps',
-        'zerg_label': 'Chromatic Brood',
-        'protoss_label': 'Khaydarin Anaglyph',
+        'swatch': '#202631',
+        'swatch_css': 'linear-gradient(135deg, #00AFC8 0%, #151A22 24%, #3B4452 48%, #090B10 70%, #C21B9F 100%)',
+        'effect': 'linear-gradient(180deg, #3C4654 0%, #171C24 38%, #05070A 62%, #252C37 82%, #090B0F 100%)',
+        'shadow': '-1px 0 0 #00C7E6, 1px 0 0 #E524BA, 0 1px 0 #B7A91B, -2px 1px 0 rgba(0, 154, 184, 0.52), 2px 1px 0 rgba(184, 20, 145, 0.52), 0 2px 1px rgba(0, 0, 0, 0.92)',
+        'label': 'Dark 3D',
+        'meta_label': 'Dark chromatic 3D effect',
+        'terran_label': 'Dark 3D Corps',
+        'zerg_label': 'Dark 3D Brood',
+        'protoss_label': 'Dark 3D Conclave',
+    },
+    {
+        'value': 'light-3d',
+        'swatch': '#F5F8FF',
+        'swatch_css': 'linear-gradient(135deg, #00DDF5 0%, #F7FAFF 26%, #FFFFFF 52%, #E4EAF3 72%, #FF2AC4 100%)',
+        'effect': 'linear-gradient(180deg, #FFFFFF 0%, #F7FAFF 46%, #C8D0DC 72%, #FFFFFF 100%)',
+        'shadow': '-1px 0 0 #00DDF5, 1px 0 0 #FF2AC4, 0 1px 0 #E0D52C, -2px 0 0 rgba(0, 179, 211, 0.58), 2px 0 0 rgba(218, 27, 166, 0.58), 0 2px 1px rgba(0, 0, 0, 0.88)',
+        'label': 'Light 3D',
+        'meta_label': 'Light chromatic 3D effect',
+        'terran_label': 'Light 3D Corps',
+        'zerg_label': 'Light 3D Brood',
+        'protoss_label': 'Light 3D Conclave',
     },
     {
         'value': 'aetheral',
@@ -464,7 +476,7 @@ PROFILE_COLOR_OPTIONS = (
         'value': 'split-red',
         'swatch': '#C91624',
         'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #C91624 51%, #FF3F4F 100%)',
-        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #B90F20 51%, #FF4356 100%)',
+        'effect': 'linear-gradient(90deg, #E6EDF5 0%, #E6EDF5 50%, #B90F20 50%, #FF4356 100%)',
         'label': 'Split Red',
         'meta_label': 'Steel split',
         'terran_label': 'Raider Redplate',
@@ -475,7 +487,7 @@ PROFILE_COLOR_OPTIONS = (
         'value': 'split-spring',
         'swatch': '#BFEF58',
         'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #BFEF58 51%, #F6FF89 100%)',
-        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #BDEB4B 51%, #FBFF9E 100%)',
+        'effect': 'linear-gradient(90deg, #E6EDF5 0%, #E6EDF5 50%, #BDEB4B 50%, #FBFF9E 100%)',
         'label': 'Split Spring',
         'meta_label': 'Steel split',
         'terran_label': 'Umojan Springline',
@@ -486,7 +498,7 @@ PROFILE_COLOR_OPTIONS = (
         'value': 'split-lime',
         'swatch': '#91E857',
         'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #91E857 51%, #C6FF88 100%)',
-        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #8DE351 51%, #CFFF94 100%)',
+        'effect': 'linear-gradient(90deg, #E6EDF5 0%, #E6EDF5 50%, #8DE351 50%, #CFFF94 100%)',
         'label': 'Split Lime',
         'meta_label': 'Steel split',
         'terran_label': 'Irradiated Steel',
@@ -497,7 +509,7 @@ PROFILE_COLOR_OPTIONS = (
         'value': 'split-turquoise',
         'swatch': '#36E0C8',
         'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #36E0C8 51%, #74FFE5 100%)',
-        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #25D8C2 51%, #7CFFE9 100%)',
+        'effect': 'linear-gradient(90deg, #E6EDF5 0%, #E6EDF5 50%, #25D8C2 50%, #7CFFE9 100%)',
         'label': 'Split Turquoise',
         'meta_label': 'Steel split',
         'terran_label': 'Kel-Morian Turbine',
@@ -508,7 +520,7 @@ PROFILE_COLOR_OPTIONS = (
         'value': 'split-teal',
         'swatch': '#20B99F',
         'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #20B99F 51%, #67F3D6 100%)',
-        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #19B199 51%, #75F8DB 100%)',
+        'effect': 'linear-gradient(90deg, #E6EDF5 0%, #E6EDF5 50%, #19B199 50%, #75F8DB 100%)',
         'label': 'Split Teal',
         'meta_label': 'Steel split',
         'terran_label': 'Moebius Teal Line',
@@ -519,7 +531,7 @@ PROFILE_COLOR_OPTIONS = (
         'value': 'split-navy',
         'swatch': '#163FBC',
         'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #163FBC 51%, #5678FF 100%)',
-        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #1236B0 51%, #5E80FF 100%)',
+        'effect': 'linear-gradient(90deg, #E6EDF5 0%, #E6EDF5 50%, #1236B0 50%, #5E80FF 100%)',
         'label': 'Split Navy',
         'meta_label': 'Steel split',
         'terran_label': 'UED Night Fleet',
@@ -530,7 +542,7 @@ PROFILE_COLOR_OPTIONS = (
         'value': 'split-emerald',
         'swatch': '#12B75B',
         'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #12B75B 51%, #66FF9D 100%)',
-        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #0FAE55 51%, #70FFA6 100%)',
+        'effect': 'linear-gradient(90deg, #E6EDF5 0%, #E6EDF5 50%, #0FAE55 50%, #70FFA6 100%)',
         'label': 'Split Emerald',
         'meta_label': 'Steel split',
         'terran_label': 'Verdant Guard',
@@ -541,7 +553,7 @@ PROFILE_COLOR_OPTIONS = (
         'value': 'orca',
         'swatch': '#D5DBE4',
         'swatch_css': 'linear-gradient(135deg, #F6FAFF 0%, #F6FAFF 35%, #2D333C 36%, #11151D 64%, #DCE4EF 65%, #F7FBFF 100%)',
-        'effect': 'linear-gradient(135deg, #F8FBFF 0%, #F8FBFF 34%, #2A3039 35%, #0E1219 64%, #E2E9F3 65%, #FFFFFF 100%)',
+        'effect': 'linear-gradient(90deg, #F8FBFF 0%, #F8FBFF 34%, #2A3039 35%, #0E1219 64%, #E2E9F3 65%, #FFFFFF 100%)',
         'label': 'Orca',
         'meta_label': 'Black-white split',
         'terran_label': 'UED Orca Wing',
@@ -552,7 +564,7 @@ PROFILE_COLOR_OPTIONS = (
         'value': 'split-purple',
         'swatch': '#A032C6',
         'swatch_css': 'linear-gradient(135deg, #D7DEE8 0%, #D7DEE8 50%, #A032C6 51%, #F05BFF 100%)',
-        'effect': 'linear-gradient(135deg, #E6EDF5 0%, #E6EDF5 50%, #9428BE 51%, #F366FF 100%)',
+        'effect': 'linear-gradient(90deg, #E6EDF5 0%, #E6EDF5 50%, #9428BE 50%, #F366FF 100%)',
         'label': 'Split Purple',
         'meta_label': 'Steel split',
         'terran_label': 'Antiga Psi Division',
@@ -581,16 +593,17 @@ PROFILE_COLOR_DISPLAY_ORDER = {
     'gold': 24,
     'rainbow': 25,
     'anaglyph-3d': 26,
-    'aetheral': 27,
-    'split-red': 28,
-    'split-spring': 29,
-    'split-lime': 30,
-    'split-turquoise': 31,
-    'split-teal': 32,
-    'split-navy': 33,
-    'split-emerald': 34,
-    'orca': 35,
-    'split-purple': 36,
+    'light-3d': 27,
+    'aetheral': 28,
+    'split-red': 29,
+    'split-spring': 30,
+    'split-lime': 31,
+    'split-turquoise': 32,
+    'split-teal': 33,
+    'split-navy': 34,
+    'split-emerald': 35,
+    'orca': 36,
+    'split-purple': 37,
     '#F40404': 100,
     '#0C48CC': 101,
     '#88409C': 102,
@@ -1699,6 +1712,7 @@ def _supabase_request(
     headers = {
         'apikey': settings['key'],
         'Authorization': f"Bearer {settings['key']}",
+        'User-Agent': 'TMGStats/1.0 (+https://tmg-stats.org)',
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Accept-Profile': settings['schema'],
@@ -6229,6 +6243,40 @@ def update_user_profile_settings(
         raise _user_profile_storage_error(exc) from None
 
     refresh_application_cache_after_write('update_user_profile')
+    return fetch_user_account(clean_account_id, include_player_extras=False) or {}
+
+
+def update_user_discord_profile(*, account_id: int, discord_user_id: str) -> dict:
+    clean_account_id = _coerce_positive_int(account_id)
+    clean_discord_user_id = _normalize_text(discord_user_id)
+    if not clean_account_id:
+        raise ValueError('Sign in again.')
+    if not re.fullmatch(r'\d{2,32}', clean_discord_user_id):
+        raise ValueError('Discord did not return a valid profile.')
+
+    account = fetch_user_account(clean_account_id, include_player_extras=False)
+    if not account or not account.get('player_id'):
+        raise ValueError('Link your account to a player first.')
+
+    player_id = int(account['player_id'])
+    discord_url = f'https://discord.com/users/{clean_discord_user_id}'
+    try:
+        rows = _rest_update(
+            'players',
+            {
+                'discord_url': discord_url,
+                'updated_at': datetime.utcnow().isoformat(),
+            },
+            filters=[('id', 'eq', player_id)],
+        )
+        if not rows:
+            raise ValueError('Player not found.')
+    except Exception as exc:
+        if isinstance(exc, ValueError):
+            raise
+        raise _user_profile_storage_error(exc) from None
+
+    refresh_application_cache_after_write('update_user_discord_profile')
     return fetch_user_account(clean_account_id, include_player_extras=False) or {}
 
 def fetch_player_admin(player_id: int) -> dict | None:

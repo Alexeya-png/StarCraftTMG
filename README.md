@@ -105,9 +105,12 @@ Required env:
 GOOGLE_CLIENT_ID=your_google_oauth_client_id
 GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
 GOOGLE_REDIRECT_URI=https://tmg-stats.org/auth/google/callback
+DISCORD_CLIENT_ID=your_discord_application_client_id
+DISCORD_CLIENT_SECRET=your_discord_application_client_secret
+DISCORD_REDIRECT_URI=https://tmg-stats.org/auth/discord/callback
 ```
 
-Add the same redirect URI in Google Cloud Console. After login, users open `/account`, link their Google account to a player, then manage flag, nickname color, public aliases, offrace ELO, and ladder visibility.
+Add the Google redirect URI in Google Cloud Console and the Discord redirect URI in the Discord Developer Portal. After login, users open `/account`, link their Google account to a player, then manage flag, nickname color, Discord profile, public aliases, offrace ELO, and ladder visibility.
 
 ## Firebase app auth
 
