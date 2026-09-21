@@ -139,13 +139,16 @@ def _reports_payload(
         current_page: int,
         per_page: int,
         show_ranked_only: bool,
+        season: str = 'all',
 ) -> tuple[dict, str | None]:
+    season = season if season in {'all', 'current', 'past'} else 'all'
     try:
         page_data = fetch_game_reports_page(
             search=search,
             page=current_page,
             per_page=per_page,
             ranked_only=show_ranked_only,
+            season=season,
         )
         matches = _serialize_game_reports(page_data['items'])
         total_matches = int(page_data['total_count'])
@@ -161,6 +164,7 @@ def _reports_payload(
             'total_pages': total_pages,
             'pagination_numbers': _pagination_numbers(resolved_page, total_pages),
             'show_ranked_only': show_ranked_only,
+            'season': season,
             'current_league': page_data.get('current_league'),
         }, None
     except Exception as exc:

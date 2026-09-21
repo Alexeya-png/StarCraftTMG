@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from app.database import MatchSubmissionRateLimitError, fetch_league_results_overview, get_application_cache_token, rebuild_ratings_admin, submit_tts_match_result
+from app.database import MatchSubmissionRateLimitError, fetch_league_results_overview, fetch_league_season_state, get_application_cache_token, rebuild_ratings_admin, submit_tts_match_result
 from app.modules.auth import is_admin
 from app.modules.cache import is_valid_supabase_webhook_request, run_cache_refresh, run_cache_refresh_background
 from app.modules.config import CACHE_REFRESH_BACKGROUND
@@ -109,6 +109,7 @@ def reports_api():
         current_page=current_page,
         per_page=per_page,
         show_ranked_only=show_ranked_only,
+        season=request.args.get('season', 'all'),
     )
     status_code = 200 if payload.get('ok') else 500
     if db_error:
@@ -128,6 +129,7 @@ def league_results_api():
             {
                 'ok': True,
                 'league_sections': league_sections,
+                **fetch_league_season_state(),
                 'cache_token': get_application_cache_token(),
             }
         )

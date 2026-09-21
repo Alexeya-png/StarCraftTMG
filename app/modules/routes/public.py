@@ -108,8 +108,11 @@ def game_reports():
     search = request.args.get('search', '')
     show_ranked_only = request.args.get('ranked_only') == '1'
     ranked_only_query_present = 'ranked_only' in request.args
+    season = request.args.get('season', 'all')
+    if season not in {'all', 'current', 'past'}:
+        season = 'all'
 
-    is_filtered_page = bool(str(search).strip()) or current_page > 1 or per_page != 25 or show_ranked_only
+    is_filtered_page = bool(str(search).strip()) or current_page > 1 or per_page != 25 or show_ranked_only or season != 'all'
     context = base_context(
         'Game Reports – TMG Stats',
         'reports',
@@ -129,6 +132,7 @@ def game_reports():
             'current_page': current_page,
             'show_ranked_only': show_ranked_only,
             'ranked_only_query_present': ranked_only_query_present,
+            'season': season,
             'current_league': current_league,
         }
     )

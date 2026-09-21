@@ -1980,6 +1980,9 @@ def _fetch_current_league_uncached(*, required: bool = False) -> dict | None:
     }
 
     for key in CURRENT_LEAGUE_SETTING_FALLBACK_KEYS:
+        # An explicit pause also overrides the legacy current_league setting.
+        if settings_by_key.get(key, '').lower() == 'offseason':
+            return None
         league = _fetch_league_by_setting_value(settings_by_key.get(key))
         if league:
             return league
@@ -2122,21 +2125,19 @@ def _select_featured_leagues() -> list[dict]:
         return []
 
     current_league = fetch_current_league(required=False)
-    if not current_league:
-        return leagues[:2]
-
-    ordered: list[dict] = []
-    current_id = int(current_league['id'])
-    for league in leagues:
-        if int(league['id']) == current_id:
-            ordered.append(league)
-            break
-    for league in leagues:
-        if int(league['id']) != current_id:
-            ordered.append(league)
-        if len(ordered) >= 2:
-            break
+    current_id = int(current_league['id']) if current_league else None
+    ordered = [current_league] if current_league else []
+    # Prepared seasons have no end date and are not current yet.
+    ordered.extend(league for league in leagues if league.get('ends_at') and int(league['id']) != current_id)
     return ordered[:2]
+
+
+def fetch_league_season_state() -> dict:
+    current = fetch_current_league(required=False)
+    upcoming = [league for league in fetch_all_leagues()
+                if not league.get('ends_at') and int(league['id']) != int((current or {}).get('id') or 0)]
+    return {'is_offseason': current is None, 'current_league': current,
+            'upcoming_league': upcoming[-1] if upcoming else None}
 
 
 def _player_league_sort_key(row: dict) -> tuple:
@@ -2715,21 +2716,6 @@ def _ensure_player_league_badge(
     if rows_to_delete:
         _delete_league_badge_rows(rows_to_delete)
 
-    existing_for_player = _rest_select(
-        LEAGUE_BADGES_TABLE_NAME,
-        select='id,player_id,league_id,badge_code,awarded_at,awarded_match_id',
-        filters=[('player_id', 'eq', clean_player_id)],
-    )
-    player_rows_to_delete = [
-        row for row in existing_for_player or []
-        if not (
-            _coerce_positive_int(row.get('league_id')) == league_id
-            and _normalize_league_badge_code(row.get('badge_code')) == clean_badge_code
-        )
-    ]
-    if player_rows_to_delete:
-        _delete_league_badge_rows(player_rows_to_delete)
-
     if matching_existing:
         badge = _build_league_badge_display(badge_code=clean_badge_code, league=prepared_league, row=matching_existing)
         if badge:
@@ -2837,6 +2823,9 @@ def _sync_league_badges_for_league(league: dict | int, *, awarded_match_id: int 
     if not prepared_league:
         return []
 
+    # Completed awards are issued once by the closing SQL and stay permanent.
+    if prepared_league.get('ends_at'):
+        return []
     summary = _get_league_results_summary_cached(prepared_league, force_refresh=True)
     badge_kind = _normalize_league_badge_kind(summary.get('badge_kind')) or _resolve_league_badge_kind_for_league(prepared_league.get('id'))
     targets_by_badge_code: dict[str, int] = {}
@@ -2870,13 +2859,9 @@ def _sync_league_badges_after_ranked_match(*, league_id: int | None, match_id: i
 def _sync_all_current_league_badges() -> list[dict]:
     awarded_badges: list[dict] = []
     try:
-        leagues = fetch_all_leagues(force_refresh=True)
         current_league = fetch_current_league(required=False, force_refresh=True)
-        current_league_id = _coerce_positive_int((current_league or {}).get('id'))
-        ordered_leagues = [league for league in leagues if _coerce_positive_int(league.get('id')) != current_league_id]
-        ordered_leagues.extend([league for league in leagues if _coerce_positive_int(league.get('id')) == current_league_id])
-        for league in ordered_leagues:
-            awarded_badges.extend(_sync_league_badges_for_league(league))
+        if current_league:
+            awarded_badges.extend(_sync_league_badges_for_league(current_league))
     except Exception as exc:
         if _is_missing_league_badges_table_error(exc):
             return awarded_badges
@@ -2999,17 +2984,17 @@ def fetch_player_badges(player_id: int) -> list[dict]:
             str(badge.get('awarded_at') or ''),
         )
     )
-    return badges[:1]
+    return badges
 
-def _resolve_match_league_id(*, ranked_match: bool, existing_league_id=None) -> int | None:
+def _resolve_match_league_id(*, ranked_match: bool, existing_league_id=None, existing_ranked_match: bool = False) -> int | None:
     if not ranked_match:
         return None
 
     existing_id = _coerce_positive_int(existing_league_id)
-    if existing_id:
+    if existing_id or existing_ranked_match:
         return existing_id
 
-    current_league = fetch_current_league(required=True)
+    current_league = fetch_current_league(required=False)
     return int(current_league['id']) if current_league else None
 
 
@@ -4089,12 +4074,17 @@ def _build_match_search_or_clause(search: str) -> str:
     return '(' + ','.join(or_parts) + ')'
 
 
-def _fetch_game_reports_page_uncached(search: str = '', page: int = 1, per_page: int = 25, *, ranked_only: bool = False) -> dict:
+def _fetch_game_reports_page_uncached(search: str = '', page: int = 1, per_page: int = 25, *, ranked_only: bool = False, season: str = 'all') -> dict:
     safe_per_page = max(1, min(int(per_page or 25), 100))
     requested_page = max(1, int(page or 1))
 
     current_league = fetch_current_league(required=False)
     current_league_id = _coerce_positive_int((current_league or {}).get('id'))
+
+    season = season if season in {'all', 'current', 'past'} else 'all'
+    leagues_by_id = {int(league['id']): league for league in fetch_all_leagues()}
+    past_ids = {league_id for league_id, league in leagues_by_id.items()
+                if league.get('ends_at') and league_id != current_league_id}
 
     all_matches = _fetch_all_matches_raw()
     all_player_ids: set[int] = set()
@@ -4114,24 +4104,13 @@ def _fetch_game_reports_page_uncached(search: str = '', page: int = 1, per_page:
         match_league_id = _coerce_positive_int(match.get('league_id'))
         match_is_ranked = bool(match.get('is_ranked'))
 
-        if ranked_only:
-            return bool(
-                current_league_id
-                and match_is_ranked
-                and match_league_id == current_league_id
-            )
-
-        is_current_league_match = bool(
-            current_league_id
-            and match_league_id == current_league_id
-        )
-
-        is_friendly_null_match = bool(
-            match_league_id is None
-            and match_is_ranked is False
-        )
-
-        return is_current_league_match or is_friendly_null_match
+        if ranked_only and not match_is_ranked:
+            return False
+        if season == 'current':
+            return bool(current_league_id and match_league_id == current_league_id)
+        if season == 'past':
+            return match_league_id in past_ids
+        return True
 
     def match_passes_search(match: dict) -> bool:
         if not normalized_search:
@@ -4275,7 +4254,7 @@ def _fetch_game_reports_page_uncached(search: str = '', page: int = 1, per_page:
             'result_type': result_type,
             'is_tie': is_tie,
             'league_id': match_league_id,
-            'league_name': 'Friendly' if is_friendly_null_match else ((current_league or {}).get('name') or ''),
+            'league_name': 'Friendly' if is_friendly_null_match else (leagues_by_id.get(match_league_id, {}).get('name') or 'Off-season'),
         }
 
         items.append(_prepare_game_report_row(item))
@@ -4289,13 +4268,15 @@ def _fetch_game_reports_page_uncached(search: str = '', page: int = 1, per_page:
         'current_league': current_league,
     }
 
-def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25, *, ranked_only: bool = False) -> dict:
+def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25, *, ranked_only: bool = False, season: str = 'all') -> dict:
+    season = season if season in {'all', 'current', 'past'} else 'all'
     key = _make_page_cache_key(
         'game_reports_page',
         search,
         page=int(page or 1),
         per_page=int(per_page or 25),
         ranked_only=bool(ranked_only),
+        season=season,
     )
     cached = _get_page_cache(key)
     if cached is not None:
@@ -4305,6 +4286,7 @@ def fetch_game_reports_page(search: str = '', page: int = 1, per_page: int = 25,
         page=page,
         per_page=per_page,
         ranked_only=ranked_only,
+        season=season,
     )
     return _set_page_cache(key, result)
 
@@ -5716,6 +5698,9 @@ def submit_match_result(
 
         match_rows = _rest_insert('matches', match_payload)
         match_row = match_rows[0] if isinstance(match_rows, list) else match_rows
+        # The database may have crossed a season boundary since this worker's
+        # cache was loaded. Use the assignment returned by the insert trigger.
+        match_league_id = _coerce_positive_int(match_row.get('league_id'))
 
         player1_matches_after_match = player1_matches_before_match + 1
         player2_matches_after_match = player2_matches_before_match + 1
@@ -6762,6 +6747,7 @@ def update_match_admin(
     match_league_id = _resolve_match_league_id(
         ranked_match=ranked_match,
         existing_league_id=existing.get('league_id'),
+        existing_ranked_match=bool(existing.get('is_ranked')),
     )
 
     player1 = _get_or_create_player(clean_player1_name)

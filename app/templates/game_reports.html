@@ -14,20 +14,29 @@
             .game-reports-summary-separator {
                 opacity: 0.7;
             }
+            .reports-season-select {
+                width: auto;
+                padding: 5px 28px 5px 10px;
+                border: 1px solid #405585;
+                border-radius: 8px;
+                background: #141d35;
+                color: #b8d6ff;
+                font: inherit;
+                cursor: pointer;
+            }
+            .reports-season-select:focus-visible { outline: 2px solid #7da9ff; }
         </style>
 
         <div class="page-head leaderboard-page-head game-reports-page-head">
             <div>
                 <p class="page-text leaderboard-page-subtitle game-reports-summary-line">
                     <span data-reports-count>Loading data...</span>
-                    <span class="game-reports-summary-separator" data-reports-separator hidden>·</span>
-                    <span data-reports-league>
-                        {% if current_league %}
-                            {{ current_league.name }}
-                        {% else %}
-                            Current league is not configured
-                        {% endif %}
-                    </span>
+                    <span class="game-reports-summary-separator">·</span>
+                    <select class="reports-season-select" data-reports-season aria-label="Filter by season">
+                        <option value="all" {% if season == 'all' %}selected{% endif %}>All seasons</option>
+                        <option value="current" {% if season == 'current' %}selected{% endif %}>Current season{% if current_league %} — {{ current_league.name }}{% endif %}</option>
+                        <option value="past" {% if season == 'past' %}selected{% endif %}>Past seasons</option>
+                    </select>
                 </p>
             </div>
         </div>
@@ -73,20 +82,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const reportsShell = document.querySelector('[data-reports-shell]');
     const paginationNode = document.querySelector('[data-reports-pagination]');
     const countNode = document.querySelector('[data-reports-count]');
-    const leagueNode = document.querySelector('[data-reports-league]');
-    const leagueSeparatorNode = document.querySelector('[data-reports-separator]');
+    const seasonSelect = document.querySelector('[data-reports-season]');
     const isAdmin = {{ 'true' if is_admin else 'false' }};
     const state = {
         page: {{ current_page|int }},
         perPage: {{ per_page|int }},
         search: {{ search|tojson }},
-        rankedOnly: {{ 'true' if show_ranked_only else 'false' }}
+        rankedOnly: {{ 'true' if show_ranked_only else 'false' }},
+        season: {{ season|tojson }}
     };
     const refreshBaseDelay = 5000;
     const refreshMaxDelay = 60000;
     let refreshDelay = refreshBaseDelay;
     let lastCacheToken = '';
     let requestInFlight = false;
+    let pendingRequest = null;
 
     function escapeHtml(value) {
         return String(value || '')
@@ -101,6 +111,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const params = new URLSearchParams();
         params.set('page', String(state.page || 1));
         params.set('per_page', String(state.perPage || 25));
+        params.set('season', state.season);
         if (state.search) {
             params.set('search', state.search);
         }
@@ -293,19 +304,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const currentLeague = payload.current_league || null;
         countNode.textContent = String(payload.total_matches || 0) + ' matches shown';
 
-        if (leagueNode) {
-            if (currentLeague && currentLeague.name) {
-                leagueNode.textContent = currentLeague.name;
-                if (leagueSeparatorNode) {
-                    leagueSeparatorNode.hidden = false;
-                }
-            } else {
-                leagueNode.textContent = 'Current league is not configured';
-                if (leagueSeparatorNode) {
-                    leagueSeparatorNode.hidden = true;
-                }
-            }
-        }
+        seasonSelect.value = state.season;
+        seasonSelect.querySelector('[value="current"]').textContent = currentLeague
+            ? 'Current season — ' + currentLeague.name : 'Current season — Off-season';
 
         if (!payload.ok) {
             renderState('Database connection error', payload.error || 'Could not load match reports.', true);
@@ -314,11 +315,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const matches = Array.isArray(payload.matches) ? payload.matches : [];
         if (!matches.length) {
-            if (!currentLeague) {
-                renderState('Current league is not configured', 'Add a league in Supabase and set system_settings.current_league_id.', false);
-            } else {
-                renderState('No matches found', 'There are no saved matches in the current league yet.', false);
-            }
+            renderState('No matches found', state.season === 'current' && !currentLeague
+                ? 'Off-season. The next season has not started yet.'
+                : 'There are no matches for the selected filters.', false);
             return;
         }
 
@@ -727,6 +726,8 @@ document.addEventListener('DOMContentLoaded', function () {
         state.perPage = Math.max(1, Math.min(Number(params.get('per_page') || 25), 100));
         state.search = params.get('search') || '';
         state.rankedOnly = params.get('ranked_only') === '1';
+        state.season = ['all', 'current', 'past'].includes(params.get('season')) ? params.get('season') : 'all';
+        seasonSelect.value = state.season;
     }
 
     function resetReportScroll() {
@@ -736,6 +737,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function fetchReports(pushHistory, showLoader, checkOnly) {
         if (requestInFlight) {
+            if (!checkOnly) pendingRequest = { pushHistory, showLoader };
             return Promise.resolve();
         }
         requestInFlight = true;
@@ -744,6 +746,7 @@ document.addEventListener('DOMContentLoaded', function () {
             renderLoading();
         }
         const apiParams = new URLSearchParams(buildQueryString());
+        const requestedQuery = buildQueryString();
         if (checkOnly && lastCacheToken) {
             apiParams.set('cache_token', lastCacheToken);
         }
@@ -756,6 +759,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             })
             .then(function (payload) {
+                if (requestedQuery !== buildQueryString()) return;
                 if (payload && payload.cache_token) {
                     lastCacheToken = String(payload.cache_token);
                 }
@@ -785,8 +789,21 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .finally(function () {
                 requestInFlight = false;
+                if (pendingRequest) {
+                    const pending = pendingRequest;
+                    pendingRequest = null;
+                    lastCacheToken = '';
+                    fetchReports(pending.pushHistory, pending.showLoader, false);
+                }
             });
     }
+
+    seasonSelect.addEventListener('change', function () {
+        state.season = seasonSelect.value;
+        state.page = 1;
+        lastCacheToken = '';
+        fetchReports(true);
+    });
 
     function scheduleReportsRefresh() {
         window.setTimeout(function () {

@@ -116,6 +116,9 @@
 </section>
 
 <style>
+.league-offseason { margin-bottom: 24px; }
+.league-offseason p { margin: 0; }
+
 .league-rules-card {
     margin-top: 28px;
     padding: 24px;
@@ -530,7 +533,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const player = entry.player || null;
             const badge = entry.badge || null;
             const raceSlug = String(entry.race || '').trim().toLowerCase();
-            const badgeKind = 'contender';
+            const badgeKind = section.badge_kind || (section.is_current_league ? 'contender' : 'champion');
             const badgeHtml = player ? renderLeagueBadge(badge, raceSlug, badgeKind) : '';
             const playerHtml = player
                 ? renderPlayerLink(player) + '<div class="league-race-meta">' + renderPointsValue(player, pointsRules) + ' pts · ' + escapeHtml(player.record_display || '') + ' · ' + escapeHtml(player.win_rate_display || '') + '</div>'
@@ -558,7 +561,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<article class="league-section-card">'
             + '<div class="league-section-head">'
             + '<div>'
-            + '<div class="league-kicker">' + (index === 0 ? 'Current league' : 'Previous league') + '</div>'
+            + '<div class="league-kicker">' + (section.is_current_league ? 'Current league' : 'Completed season') + '</div>'
             + '<h2>' + escapeHtml(league.name || '') + '</h2>'
             + (league.date_range_label ? '<p class="league-date-range">' + escapeHtml(league.date_range_label) + '</p>' : '')
             + '</div>'
@@ -586,12 +589,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const sections = Array.isArray(payload.league_sections) ? payload.league_sections : [];
-        if (!sections.length) {
+        const offseasonHtml = payload.is_offseason
+            ? '<article class="league-section-card league-offseason"><div class="league-kicker">Off-season</div>'
+                + '<h2>Межсезонье</h2><p>'
+                + escapeHtml(payload.upcoming_league ? payload.upcoming_league.name + ' is coming soon.' : 'The next season has not started yet.')
+                + '</p><p>Completed season results and Champion awards are shown below.</p></article>'
+            : '';
+        if (!sections.length && !payload.is_offseason) {
             renderState('No leagues found', 'Add leagues in Supabase and set the current league in system_settings to show results here.', false);
             return;
         }
 
-        content.innerHTML = sections.map(renderLeagueSection).join('');
+        content.innerHTML = offseasonHtml + sections.map(renderLeagueSection).join('');
     }
 
     content.addEventListener('click', function (event) {
