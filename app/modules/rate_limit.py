@@ -12,6 +12,17 @@ _buckets: dict[tuple[str, str], deque[float]] = {}
 _MAX_BUCKETS = 10000
 
 
+def client_ip_address() -> str:
+    """Return the client's IP address, honoring X-Forwarded-For for proxied requests."""
+    forwarded_for = request.headers.get('X-Forwarded-For', '')
+    if forwarded_for:
+        # The left-most entry is the originating client; later entries are proxies.
+        first_hop = forwarded_for.split(',')[0].strip()
+        if first_hop:
+            return first_hop
+    return request.remote_addr or 'unknown'
+
+
 def _client_key() -> str:
     return request.remote_addr or 'unknown'
 
