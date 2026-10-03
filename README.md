@@ -1,10 +1,10 @@
-## TMG ELO
+## TMG Stats
 
 A web application for tracking matches and displaying an ELO rating system for StarCraft TMG.
 
 About the Project
 
-TMG ELO is a website for:
+TMG Stats is a website for:
 
 - submitting match results
 - viewing the global player leaderboard
